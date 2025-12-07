@@ -1,6 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import {signPayload} from '../utils/jwt.js'
 import User from "../schemas/UserSchema.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 import Job from "../schemas/JobSchema.js"
@@ -27,11 +28,7 @@ UserRouter.post("/login", async (req, res) => {
     if (!isMatch)
       return res.status(401).json({ message: "Invalid credentials." });
 
-    const token = jwt.sign(
-      { userId: user._id, role: user.role },
-      process.env.JWT_SECRET,
-      { expiresIn: "7d" }
-    );
+    const token = signPayload({ userId: user._id, role: user.role });
 
     res.json({ message: "Login successful.", token });
   } catch (err) {
