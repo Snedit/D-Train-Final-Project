@@ -3,32 +3,93 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
 
+import multer from "multer";
+import AdmZip from "adm-zip";
+import { supabase } from "../utils/supabaseClient.js";
+import redisPublisher from "../utils/redis.js";
+
 const JobRouter = Router();
+const upload = multer({ storage: multer.memoryStorage() }); // handle zip upload
 
+JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res) => {
+    try {
+      const { mainFileName } = req.body;
+      console.log(  req. user);
+      if (!req.file)
+        return res.status(400).json({ message: "ZIP file is required." });
+      if (!mainFileName)
+        return res.status(400).json({ message: "mainFileName is required." });
 
-JobRouter.post("/create", authMiddleware, async (req, res) => {
-  try {
-    const { zipUrl, requirements, metadata } = req.body;
+      // validate zip
 
-    if (!zipUrl) return res.status(400).json({ message: "zipUrl required" });
+      const zip = new AdmZip(req.file.buffer);
+      const entries = zip.getEntries().map((e) => e.entryName);
 
-    const job = await Job.create({
-      userId: req.user.userId,
-      zipUrl,
-      requirements,
-      metadata,
-      status: "pending",
-    });
+      if (!entries.includes("requirements.txt"))
+        return res
+          .status(400)
+          .json({ message: "requirements.txt missing in ZIP." });
 
-    // You will also publish to Redis here: "new_job" → job._id
+      if (!entries.includes(mainFileName))
+        return res
+          .status(400)
+          .json({ message: `Main file '${mainFileName}' not found.` });
 
-    res.status(201).json({ message: "Job created", job });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+      // -----------------------------
+      // 2. Upload ZIP to Supabase
+      // -----------------------------
+      const filePath = `jobs/${Date.now()}-${req.file.originalname}`;
+
+      const { data, error } = await supabase.storage
+        .from("jobs")
+        .upload(filePath, req.file.buffer, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) {
+        console.error(error);
+        return res.status(500).json({ message: "Supabase upload failed." });
+      }
+
+      // Public link
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("jobs").getPublicUrl(filePath);
+
+      // -----------------------------
+      // 3. Create Job in MongoDB
+      // -----------------------------
+      const job = await Job.create({
+        userId: req.user.userId,
+        mainFile: mainFileName,
+        zipFileUrl: publicUrl,
+        status: "pending",
+        logs: [],
+        createdAt: new Date(),
+      });
+
+      // -----------------------------
+      // 4. Publish Redis Event
+      // -----------------------------
+      await redisPublisher.publish(
+        "new_job",
+        JSON.stringify({ jobId: job._id, zipUrl: publicUrl, mainFileName })
+      );
+
+      // -----------------------------
+      // 5. Response
+      // -----------------------------
+      res.status(201).json({
+        message: "Request submitted",
+        jobId: job._id,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: "Server error" });
+    }
   }
-});
-
+);
 
 JobRouter.get("/:jobId/status", authMiddleware, async (req, res) => {
   try {

@@ -21,8 +21,8 @@ const jobSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["queued", "assigned", "processing", "completed", "failed", "cancelled"],
-      default: "queued",
+      enum: ["pending", "assigned", "processing", "completed", "failed", "cancelled"],
+      default: "pending",
     },
 
     logs: [String],

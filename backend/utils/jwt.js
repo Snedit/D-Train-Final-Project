@@ -1,4 +1,6 @@
 import jwt from "jsonwebtoken";
+// import dotenv from "dotenv";
+// dotenv.config()
 function signPayload(payload, expiresIn='7d')
 {
 

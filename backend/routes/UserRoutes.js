@@ -5,7 +5,7 @@ import {signPayload} from '../utils/jwt.js'
 import User from "../schemas/UserSchema.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 import Job from "../schemas/JobSchema.js"
-import Billing from "../schemas/BillingSchema.js"
+import Billing from "../schemas/BillingSchema.js" 
 
 const UserRouter = Router();
 
@@ -13,6 +13,9 @@ const UserRouter = Router();
  * POST /login
  * Logs the user in and returns JWT
  */
+UserRouter.get('/', (req, res)=>{
+  res.json({"message" : "this api is running"})
+});
 UserRouter.post("/login", async (req, res) => {
   try {
     const { email, password } = req.body;
