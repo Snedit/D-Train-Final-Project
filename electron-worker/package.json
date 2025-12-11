@@ -1,0 +1,20 @@
+{
+  "name": "electron-worker",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.13.2",
+    "electron": "^39.2.6",
+    "node-machine-id": "^1.1.12",
+    "redis": "^5.10.0",
+    "socket.io-client": "^4.8.1"
+  }
+}

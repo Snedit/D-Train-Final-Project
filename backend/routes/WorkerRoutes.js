@@ -36,10 +36,33 @@ WorkerRouter.post("/register", async (req, res) => {
   }
 });
 
-/**
- * POST /heartbeat
- * Worker periodically pings to stay active
- */
+
+WorkerRouter.post("/push-log", async (req, res) => {
+  try {
+    const { jobId, deviceId, line } = req.body;
+
+    if (!jobId || !deviceId || !line)
+      return res.status(400).json({ message: "jobId, deviceId and line required" });
+
+    // Save log in DB
+    await Job.findByIdAndUpdate(jobId, {
+      $push: { logs: { ts: Date.now(), message: line } }
+    });
+
+    // Emit to socket clients
+    req.app.get("io").to(`job_${jobId}`).emit("job_log", {
+      job_id: jobId,
+      line,
+    });
+
+    res.json({ message: "Log streamed" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+
 WorkerRouter.post("/heartbeat", async (req, res) => {
   try {
     const { deviceId } = req.body;
