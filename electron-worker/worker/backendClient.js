@@ -17,7 +17,7 @@ class BackendClient {
       existingWorkerId: config.auth.workerId
     };
 
-    const { data } = await axios.post(`${this.baseUrl}/api/workers/register`, payload);
+    const { data } = await axios.post(`${this.baseUrl}/api/worker/register`, payload);
     config.updateAuth(data.workerId, data.token);
     logger.info('Registered worker %s', data.workerId);
     this.bus.emit('status', { state: 'idle', workerId: data.workerId });
@@ -29,7 +29,7 @@ class BackendClient {
 
   async heartbeat(status) {
     await axios.post(
-      `${this.baseUrl}/api/workers/heartbeat`,
+      `${this.baseUrl}/api/worker/heartbeat`,
       status,
       { headers: this.headers }
     );

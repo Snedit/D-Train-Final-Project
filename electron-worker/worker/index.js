@@ -38,6 +38,7 @@ async function init() {
     );
   } catch (err) {
     logger.error('Worker init failed: %s', err.stack || err.message);
+    console.log(err)
   }
 }
 

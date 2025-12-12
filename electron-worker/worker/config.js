@@ -3,7 +3,7 @@ const Store = require('electron-store');
 const store = new Store({ name: 'worker-config' });
 
 const config = {
-  backendBaseUrl: store.get('backendBaseUrl', 'https://your-backend.example.com'),
+  backendBaseUrl: store.get('backendBaseUrl', 'http://localhost:3000'),
   redisUrl: store.get('redisUrl', 'redis://127.0.0.1:6379'),
   docker: {
     defaultImage: store.get('dockerDefaultImage', 'your-ml-image:latest'),
