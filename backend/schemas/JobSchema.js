@@ -4,8 +4,8 @@ const jobSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
 
-    title: String,
-    description: String,
+    title: {type: String, required: true},
+    description: {type: String, required: true},
 
     zipFileUrl: { type: String, required: true },
 

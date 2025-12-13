@@ -13,7 +13,7 @@ const upload = multer({ storage: multer.memoryStorage() }); // handle zip upload
 
 JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res) => {
     try {
-      const { mainFileName } = req.body;
+      const { mainFileName, title, description } = req.body;
       console.log(  req. user);
       if (!req.file)
         return res.status(400).json({ message: "ZIP file is required." });
@@ -65,6 +65,8 @@ JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res
         mainFile: mainFileName,
         zipFileUrl: publicUrl,
         status: "pending",
+        title: title,
+        description: description,
         logs: [],
         createdAt: new Date(),
       });
@@ -74,7 +76,7 @@ JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res
       // -----------------------------
       await redisPublisher.publish(
         "new_job",
-        JSON.stringify({ jobId: job._id, zipUrl: publicUrl, mainFileName })
+        JSON.stringify({ jobId: job._id, title: title, description: description })
       );
 
       // -----------------------------
