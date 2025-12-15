@@ -109,8 +109,9 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
               Back to Dashboard
             </button>
             <div>
-              <h1 className="text-3xl font-bold text-white">{job.name}</h1>
-              <p className="text-slate-400">Job ID: {job.id}</p>
+              <h1 className="text-3xl font-bold text-white">{job.title}</h1>
+              <h1 className="text-xl text-slate-100">{job.description}</h1>
+              <p className="text-slate-400">Job ID: {job._id}</p>
             </div>
           </div>
           
@@ -182,15 +183,15 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Main Entry:</span>
-                  <span className="text-white font-mono">{job.main_entry}</span>
+                  <span className="text-white font-mono">{job.config?.entryFile}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Requirements:</span>
-                  <span className="text-white font-mono">{job.requirements_file}</span>
+                  <span className="text-white font-mono">requirements.txt</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Created:</span>
-                  <span className="text-white">{new Date(job.created_at).toLocaleDateString()}</span>
+                  <span className="text-white">{new Date(job.createdAt).toLocaleDateString()}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-slate-400">Docker Image:</span>

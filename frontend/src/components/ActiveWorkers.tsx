@@ -13,7 +13,8 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
   const getWorkerStatus = (worker: Worker) => {
     const runningJob = jobs.find(job => job.accepted_by === worker.id && job.status === 'running');
     if (runningJob) return { status: 'busy', job: runningJob };
-    return { status: 'idle', job: null };
+    return { status: worker.currentStatus, job: null };
+
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -206,7 +207,7 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                           <h3 className="text-base font-extrabold text-slate-900 mb-2">
                             {worker.name}
                           </h3>
-                          <p className="text-xs text-slate-600 font-medium mb-2">ID: {worker.id}</p>
+                          <p className="text-xs text-slate-600 font-medium mb-2">ID: {worker._id}</p>
                           {workerStatus.job && (
                             <p className="text-xs text-slate-900 font-semibold">
                               Running: <span className="font-mono">{workerStatus.job.name}</span>
@@ -265,7 +266,7 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                                 transition={{ duration: 1.5, repeat: Infinity }}
                                 className="w-2 h-2 bg-[#22C55E] rounded-full border border-slate-900"
                               />
-                              <span className="text-xs font-bold text-slate-900">Online</span>
+                              <span className="text-xs font-bold text-slate-900">{worker.currentStatus}</span>
                             </div>
                           </div>
                         </div>

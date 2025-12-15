@@ -295,7 +295,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                         return (
                           <motion.tr
-                            key={job.id}
+                            key={job._id}
                             initial={{ opacity: 0, x: -20 }}
                             animate={{ opacity: 1, x: 0 }}
                             transition={{ duration: 0.3, delay: index * 0.05 }}
@@ -303,7 +303,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <td className="px-5 py-4">
                               <p className="text-sm font-extrabold text-slate-900">{job.name}</p>
-                              <p className="text-xs text-slate-600 font-medium">ID: {job.id}</p>
+                              <p className="text-xs text-slate-600 font-medium">{index+1}</p>
                             </td>
                             <td className="px-5 py-4">
                               <div className={`inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${statusStyle}`}>
@@ -312,10 +312,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                               </div>
                             </td>
                             <td className="px-5 py-4 text-xs text-slate-700 font-medium">
-                              {new Date(job.created_at).toLocaleString()}
+                              {new Date(job.createdAt).toLocaleString()}
                             </td>
                             <td className="px-5 py-4 text-xs text-slate-900 font-mono font-semibold">
-                              {job.main_entry}
+                              {job.config?.entryFile}
                             </td>
                             <td className="px-5 py-4">
                               <motion.button

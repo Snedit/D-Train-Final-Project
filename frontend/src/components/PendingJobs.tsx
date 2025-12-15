@@ -169,15 +169,15 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-700">
                               <div className="flex items-center gap-1">
                                 <FileText className="w-3 h-3" />
-                                <span className="font-mono font-semibold">{job.main_entry}</span>
+                                <span className="font-mono font-semibold">{job.config?.entryFile}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                <span className="font-medium">{getTimeAgo(job.created_at)}</span>
+                                <span className="font-medium">{getTimeAgo(job.createdAt)}</span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Settings className="w-3 h-3" />
-                                <span className="font-medium">ID: {job.id}</span>
+                                <span className="font-medium">ID: {job._id}</span>
                               </div>
                             </div>
                           </div>

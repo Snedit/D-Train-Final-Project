@@ -12,7 +12,8 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
   onJobSubmitted,
   onBackToDashboard,
 }) => {
-  const [jobName, setJobName] = useState('');
+  const [jobTitle, setjobTitle] = useState('');
+  const [jobDescription, setJobDescription] = useState('');
   const [mainEntry, setMainEntry] = useState('main.py');
   const [requirementsFile, setRequirementsFile] = useState('requirements.txt');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -39,8 +40,8 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedFile || !jobName.trim()) {
-      setError('Please provide a job name and upload a zip file');
+    if (!selectedFile || !jobTitle.trim() || !jobDescription.trim()) {
+      setError('Please provide a job title, description & upload a zip file');
       return;
     }
 
@@ -49,14 +50,19 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
 
     try {
       const formData = new FormData();
-      formData.append('name', jobName.trim());
-      formData.append('main_entry', mainEntry);
-      formData.append('requirements_file', requirementsFile);
+      formData.append('title', jobTitle.trim());
+      formData.append('description', jobDescription.trim());
+      formData.append('mainFileName', mainEntry);
+      // formData.append('requirements_file', requirementsFile);
       formData.append('file', selectedFile);
+      const token = localStorage.getItem('dtrain_token');
 
-      const response = await fetch('http://localhost:5000/api/jobs', {
+      const response = await fetch('http://localhost:5000/api/jobs/create', {
         method: 'POST',
         body: formData,
+        headers: {
+          "Authorization" : `Bearer ${token}`
+        }
       });
 
       if (!response.ok) {
@@ -172,18 +178,33 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
             {/* Left: form */}
             <div className="rounded-[22px] border-[3px] border-slate-900 bg-white p-5 md:p-6 shadow-[8px_8px_0_0_rgba(15,23,42,1)]">
               <form onSubmit={handleSubmit} className="space-y-5">
-                {/* Job name */}
+                {/* Job title */}
                 <div>
                   <label className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#FFE66D] text-[11px] font-semibold text-slate-900 mb-2">
-                    Job name
+                    Job Title
                     <span className="ml-1 text-red-600">*</span>
                   </label>
                   <input
                     type="text"
-                    value={jobName}
-                    onChange={(e) => setJobName(e.target.value)}
+                    value={jobTitle}
+                    onChange={(e) => setjobTitle(e.target.value)}
                     className="mt-2 w-full px-4 py-3 rounded-[14px] border-[3px] border-slate-900 bg-[#FFFDF8] text-sm font-medium text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-0 focus:border-slate-900 focus:-translate-y-0.5 focus:shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all"
                     placeholder="e.g., CNN Training on CIFAR-10"
+                    required
+                  />
+                </div>
+                {/* Job description */}
+                <div>
+                  <label className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#91ff6d] text-[11px] font-semibold text-slate-900 mb-2">
+                    Job Description
+                    <span className="ml-1 text-red-600">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    className="mt-2 w-full px-4 py-3 rounded-[14px] border-[3px] border-slate-900 bg-[#f8fffc] text-sm font-medium text-slate-900 placeholder-slate-500 focus:outline-none focus:ring-0 focus:border-slate-900 focus:-translate-y-0.5 focus:shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all"
+                    placeholder="Fine tuning the dataset."
                     required
                   />
                 </div>
@@ -259,6 +280,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                     <input
                       type="text"
                       value={requirementsFile}
+                      disabled
                       onChange={(e) => setRequirementsFile(e.target.value)}
                       className="mt-2 w-full px-4 py-3 rounded-[14px] border-[3px] border-slate-900 bg-[#FFFDF8] text-sm font-medium text-slate-900 placeholder-slate-500 focus:outline-none focus:border-slate-900 focus:-translate-y-0.5 focus:shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all"
                       placeholder="requirements.txt"
@@ -283,19 +305,19 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                 {/* Submit */}
                 <motion.button
                   type="submit"
-                  disabled={!selectedFile || !jobName.trim() || isSubmitting}
+                  disabled={!selectedFile || !jobTitle.trim() || isSubmitting}
                   whileHover={
-                    !isSubmitting && selectedFile && jobName.trim()
+                    !isSubmitting && selectedFile && jobTitle.trim()
                       ? { y: -2 }
                       : {}
                   }
                   whileTap={
-                    !isSubmitting && selectedFile && jobName.trim()
+                    !isSubmitting && selectedFile && jobTitle.trim()
                       ? { y: 0 }
                       : {}
                   }
                   className={`w-full inline-flex items-center justify-center px-6 py-4 rounded-[18px] border-[3px] border-slate-900 text-sm md:text-base font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all ${
-                    !selectedFile || !jobName.trim() || isSubmitting
+                    !selectedFile || !jobTitle.trim() || isSubmitting
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
                       : 'bg-[#4ADE80] text-slate-900 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-[#22C55E] active:shadow-[4px_4px_0_0_rgba(15,23,42,1)]'
                   }`}

@@ -11,9 +11,28 @@ import redisPublisher from "../utils/redis.js";
 const JobRouter = Router();
 const upload = multer({ storage: multer.memoryStorage() }); // handle zip upload
 
+JobRouter.get('/', authMiddleware, async (req, res)=>{
+
+  try{
+
+    const jobs  = await Job.find({
+    userId : req.user.userId
+  });
+  return res.status(200).json({message: "jobs fetched", jobs})
+}
+catch (err)
+{
+  console.log(err);
+  return res.status(500).json({messae: " error fetching the jobs"})
+}
+
+});
+
+
 JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res) => {
     try {
       const { mainFileName, title, description } = req.body;
+      console.table(req.body);
       console.log(  req. user);
       if (!req.file)
         return res.status(400).json({ message: "ZIP file is required." });
@@ -62,7 +81,7 @@ JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res
       // -----------------------------
       const job = await Job.create({
         userId: req.user.userId,
-        mainFile: mainFileName,
+        config: {entryFile: mainFileName},
         zipFileUrl: publicUrl,
         status: "pending",
         title: title,

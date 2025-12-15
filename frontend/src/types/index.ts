@@ -1,9 +1,12 @@
 export interface Job {
-  id: number;
+  _id: string;
+  title: string;
+  description: string;
+  config: {entryFile:string};
   name: string;
   status: 'pending' | 'accepted' | 'running' | 'completed' | 'failed';
-  created_at: string;
-  updated_at: string | null;
+  createdAt: string;
+  updatedAt: string | null;
   bundle_filename: string;
   main_entry: string;
   requirements_file: string;

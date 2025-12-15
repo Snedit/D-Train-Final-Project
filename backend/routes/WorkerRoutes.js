@@ -10,6 +10,17 @@ const WorkerRouter = Router();
  * POST /register
  * Worker installs the desktop app → registers this machine as a worker node
  */
+WorkerRouter.get('/', async (req, res)=>{
+  try {
+    const workers = await Worker.find();
+    return res.status(200).json({message: "workers available", workers});
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({message: "error fetching workers"});
+    
+  }
+})
+
 WorkerRouter.post("/register", async (req, res) => {
   try {
     const { deviceId, os, cpu, ram, gpu } = req.body;

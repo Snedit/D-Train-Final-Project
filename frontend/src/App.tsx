@@ -21,11 +21,13 @@ function App() {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-
+  
   useEffect(() => {
     // Check if user is already logged in (from localStorage)
     const savedUser = localStorage.getItem('dtrain_user');
-    if (savedUser) {
+ 
+    if (savedUser ) {
+      
       setIsAuthenticated(true);
     }
 
@@ -43,7 +45,7 @@ function App() {
     const interval = setInterval(() => {
       fetchJobs();
       fetchWorkers();
-    }, 5000);
+    }, 15000);
 
     return () => {
       newSocket.close();
@@ -53,10 +55,16 @@ function App() {
 
   const fetchJobs = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/jobs');
+      const token = localStorage.getItem('dtrain_token')
+      const response = await fetch('http://localhost:5000/api/jobs', {
+        headers: {
+          'Authorization' :  `Bearer ${token}`
+        }
+      });
       if (response.ok) {
         const data = await response.json();
-        setJobs(data);
+        console.log(data);
+        setJobs(data.jobs);
       }
     } catch (error) {
       console.error('Failed to fetch jobs:', error);
@@ -65,10 +73,11 @@ function App() {
 
   const fetchWorkers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/workers');
+      const response = await fetch('http://localhost:5000/api/worker');
       if (response.ok) {
         const data = await response.json();
-        setWorkers(data);
+        console.log(data);
+        setWorkers(data.workers);
       }
     } catch (error) {
       console.error('Failed to fetch workers:', error);
@@ -104,29 +113,47 @@ function App() {
     }, 800);
   };
 
-  const handleSignIn = async (email: string, _password: string) => {
-    // Mock authentication - replace with actual API call
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        // Simulate successful login
-        const mockUser = {
-          name: email.split('@')[0],
-          email: email
-        };
-        
-        setIsAuthenticated(true);
-        localStorage.setItem('dtrain_user', JSON.stringify(mockUser));
-        
-        setIsLoading(true);
-        setTimeout(() => {
-          setCurrentView('dashboard');
-          setIsLoading(false);
-        }, 800);
-        
-        resolve();
-      }, 1000);
+ const handleSignIn = async (email: string, password: string) => {
+  try {
+    setIsLoading(true);
+
+    const res = await fetch("http://localhost:5000/api/user/login", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ email, password }),
     });
-  };
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Login failed");
+    }
+
+    // Save JWT
+    localStorage.setItem("dtrain_token", data.token);
+
+    // Optional: store minimal user info
+    const user = {
+      email,
+    };
+    localStorage.setItem("dtrain_user", JSON.stringify(user));
+
+    setIsAuthenticated(true);
+
+    // Transition to dashboard
+    setTimeout(() => {
+      setCurrentView("dashboard");
+      setIsLoading(false);
+    }, 500);
+
+  } catch (err: any) {
+    setIsLoading(false);
+    alert(err.message || "Something went wrong");
+  }
+};
+
 
   const handleSignUp = async (name: string, email: string, _password: string) => {
     // Mock registration - replace with actual API call
