@@ -1,7 +1,7 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer } = require("electron");
 
-contextBridge.exposeInMainWorld('electronAPI', {
-  onWorkerEvent: callback => ipcRenderer.on('worker-event', (_e, data) => callback(data)),
-  onUiControl: callback => ipcRenderer.on('ui-control', (_e, data) => callback(data)),
-  sendUiCommand: data => ipcRenderer.send('ui-command', data)
+contextBridge.exposeInMainWorld("worker", {
+  runTestJob: () => ipcRenderer.invoke("run-test-job"),
+  onLog: (callback) =>
+    ipcRenderer.on("job-log", (_, data) => callback(data))
 });
