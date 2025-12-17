@@ -1,46 +1,58 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Lock, User, ArrowRight, UserPlus } from 'lucide-react';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  UserPlus,
+  ArrowLeft,
+} from "lucide-react";
 
 interface SignUpProps {
-  onSignUp: (name: string, email: string, password: string) => void;
+  onSignUp: (name: string, email: string, password: string) => Promise<void>;
   onSwitchToSignIn: () => void;
+  onBack?: () => void; // Optional back handler
 }
 
-const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToSignIn }) => {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [error, setError] = useState('');
+const SignUp: React.FC<SignUpProps> = ({
+  onSignUp,
+  onSwitchToSignIn,
+  onBack,
+}) => {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!name || !email || !password || !confirmPassword) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
     if (password !== confirmPassword) {
-      setError('Passwords do not match');
+      setError("Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+      setError("Password must be at least 6 characters");
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       await onSignUp(name, email, password);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign up failed');
-    } finally {
+      // Success - App.tsx will handle navigation
+    } catch (err: any) {
+      setError(err.message || "Registration failed. Please try again.");
       setIsLoading(false);
     }
   };
@@ -53,8 +65,8 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToSignIn }) => {
           className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-            backgroundSize: '26px 26px',
+              "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
           }}
         />
 
@@ -72,19 +84,51 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToSignIn }) => {
 
         {/* Main content */}
         <div className="relative z-10 px-8 py-8">
-          {/* Logo/Branding */}
-          <div className="flex justify-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img 
-                  src="/logo.png" 
-                  alt="DTrain Logo" 
-                  className="w-8 h-8 object-contain"
-                />
+          {/* Top Nav - Logo and Back Button */}
+          {onBack && (
+            <nav className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+                <span className="text-2xl font-extrabold text-slate-900">
+                  DTrain
+                </span>
               </div>
-              <span className="text-3xl font-extrabold text-slate-900">DTrain</span>
+
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onBack}
+                className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </motion.button>
+            </nav>
+          )}
+
+          {/* Logo/Branding - Only show if no back button */}
+          {!onBack && (
+            <div className="flex justify-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+                <span className="text-3xl font-extrabold text-slate-900">
+                  DTrain
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Header */}
           <div className="text-center mb-8">
@@ -196,15 +240,19 @@ const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToSignIn }) => {
               whileTap={!isLoading ? { y: 0 } : {}}
               className={`w-full flex items-center justify-center px-6 py-4 rounded-[16px] border-[3px] border-slate-900 text-sm font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all ${
                 isLoading
-                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  : 'bg-blue-400 text-white hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-blue-500'
+                  ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                  : "bg-blue-400 text-white hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-blue-500"
               }`}
             >
               {isLoading ? (
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="w-5 h-5 border-[3px] border-slate-900 border-t-transparent rounded-full mr-2"
                   />
                   Creating Account...

@@ -1,39 +1,49 @@
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence, Variants } from 'framer-motion';
-import HeroSection from './components/HeroSection';
-import Dashboard from './components/Dashboard';
-import JobSubmission from './components/JobSubmission';
-import JobDetail from './components/JobDetail';
-import RunningJobs from './components/RunningJobs';
-import PendingJobs from './components/PendingJobs';
-import ActiveWorkers from './components/ActiveWorkers';
-import SignIn from './components/SignIn';
-import SignUp from './components/SignUp';
-import Documentation from './components/Documentation';
-import { Job, Worker } from './types';
-import { io, Socket } from 'socket.io-client';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence, Variants } from "framer-motion";
+import HeroSection from "./components/HeroSection";
+import Dashboard from "./components/Dashboard";
+import JobSubmission from "./components/JobSubmission";
+import JobDetail from "./components/JobDetail";
+import RunningJobs from "./components/RunningJobs";
+import PendingJobs from "./components/PendingJobs";
+import ActiveWorkers from "./components/ActiveWorkers";
+import SignIn from "./components/SignIn";
+import SignUp from "./components/SignUp";
+import Documentation from "./components/Documentation";
+import { Job, Worker } from "./types";
+import { io, Socket } from "socket.io-client";
 
 function App() {
-  const [currentView, setCurrentView] = useState<'hero' | 'signin' | 'signup' | 'dashboard' | 'submit' | 'detail' | 'running' | 'pending' | 'workers' | 'documentation'>('hero');
+  const [currentView, setCurrentView] = useState<
+    | "hero"
+    | "signin"
+    | "signup"
+    | "dashboard"
+    | "submit"
+    | "detail"
+    | "running"
+    | "pending"
+    | "workers"
+    | "documentation"
+  >("hero");
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [workers, setWorkers] = useState<Worker[]>([]);
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  
+
   useEffect(() => {
     // Check if user is already logged in (from localStorage)
-    const savedUser = localStorage.getItem('dtrain_user');
- 
-    if (savedUser ) {
-      
+    const savedUser = localStorage.getItem("dtrain_user");
+
+    if (savedUser) {
       setIsAuthenticated(true);
     }
 
     // Initialize Socket.IO connection
-    const newSocket = io('http://localhost:5000', {
-      transports: ['websocket', 'polling']
+    const newSocket = io("http://localhost:5000", {
+      transports: ["websocket", "polling"],
     });
     setSocket(newSocket);
 
@@ -55,11 +65,11 @@ function App() {
 
   const fetchJobs = async () => {
     try {
-      const token = localStorage.getItem('dtrain_token')
-      const response = await fetch('http://localhost:5000/api/jobs', {
+      const token = localStorage.getItem("dtrain_token");
+      const response = await fetch("http://localhost:5000/api/jobs", {
         headers: {
-          'Authorization' :  `Bearer ${token}`
-        }
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (response.ok) {
         const data = await response.json();
@@ -67,20 +77,20 @@ function App() {
         setJobs(data.jobs);
       }
     } catch (error) {
-      console.error('Failed to fetch jobs:', error);
+      console.error("Failed to fetch jobs:", error);
     }
   };
 
   const fetchWorkers = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/worker');
+      const response = await fetch("http://localhost:5000/api/worker");
       if (response.ok) {
         const data = await response.json();
         console.log(data);
         setWorkers(data.workers);
       }
     } catch (error) {
-      console.error('Failed to fetch workers:', error);
+      console.error("Failed to fetch workers:", error);
     }
   };
 
@@ -89,9 +99,9 @@ function App() {
     setTimeout(() => {
       // Check if user is authenticated
       if (isAuthenticated) {
-        setCurrentView('dashboard');
+        setCurrentView("dashboard");
       } else {
-        setCurrentView('signin');
+        setCurrentView("signin");
       }
       setIsLoading(false);
     }, 1000);
@@ -100,7 +110,7 @@ function App() {
   const handleDocumentation = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('documentation');
+      setCurrentView("documentation");
       setIsLoading(false);
     }, 800);
   };
@@ -108,87 +118,138 @@ function App() {
   const handleBackToHero = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('hero');
+      setCurrentView("hero");
       setIsLoading(false);
     }, 800);
   };
 
- const handleSignIn = async (email: string, password: string) => {
-  try {
-    setIsLoading(true);
+  const handleSignIn = async (email: string, password: string) => {
+    // Don't set loading here - SignIn component handles it
+    try {
+      const res = await fetch("http://localhost:5000/api/user/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email, password }),
+      });
 
-    const res = await fetch("http://localhost:5000/api/user/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ email, password }),
-    });
+      const data = await res.json();
 
-    const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.message || "Login failed");
+      }
 
-    if (!res.ok) {
-      throw new Error(data.message || "Login failed");
-    }
+      // Save JWT token
+      localStorage.setItem("dtrain_token", data.token);
 
-    // Save JWT
-    localStorage.setItem("dtrain_token", data.token);
+      // Save user info
+      const user = {
+        email,
+        name: data.user?.name || email.split("@")[0],
+      };
+      localStorage.setItem("dtrain_user", JSON.stringify(user));
 
-    // Optional: store minimal user info
-    const user = {
-      email,
-    };
-    localStorage.setItem("dtrain_user", JSON.stringify(user));
+      setIsAuthenticated(true);
 
-    setIsAuthenticated(true);
-
-    // Transition to dashboard
-    setTimeout(() => {
-      setCurrentView("dashboard");
-      setIsLoading(false);
-    }, 500);
-
-  } catch (err: any) {
-    setIsLoading(false);
-    alert(err.message || "Something went wrong");
-  }
-};
-
-
-  const handleSignUp = async (name: string, email: string, _password: string) => {
-    // Mock registration - replace with actual API call
-    return new Promise<void>((resolve) => {
+      // Transition to dashboard
+      setIsLoading(true);
       setTimeout(() => {
-        // Simulate successful registration
-        const newUser = {
-          name: name,
-          email: email
-        };
-        
+        setCurrentView("dashboard");
+        setIsLoading(false);
+      }, 500);
+    } catch (err: any) {
+      // Re-throw error so SignIn component can catch and display it
+      throw new Error(err.message || "Something went wrong");
+    }
+  };
+
+  const handleSignUp = async (
+    name: string,
+    email: string,
+    password: string
+  ) => {
+    try {
+      setIsLoading(true);
+
+      // Step 1: Register the user
+      const registerRes = await fetch(
+        "http://localhost:5000/api/user/register",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ name, email, password }),
+        }
+      );
+
+      const registerData = await registerRes.json();
+
+      if (!registerRes.ok) {
+        throw new Error(registerData.message || "Registration failed");
+      }
+
+      // Step 2: If token is returned, save it directly
+      if (registerData.token) {
+        localStorage.setItem("dtrain_token", registerData.token);
+
+        const user = { name, email };
+        localStorage.setItem("dtrain_user", JSON.stringify(user));
+
         setIsAuthenticated(true);
-        localStorage.setItem('dtrain_user', JSON.stringify(newUser));
-        
-        setIsLoading(true);
+
         setTimeout(() => {
-          setCurrentView('dashboard');
+          setCurrentView("dashboard");
           setIsLoading(false);
         }, 800);
-        
-        resolve();
-      }, 1000);
-    });
+      } else {
+        // Step 3: If no token, perform auto-login
+        const loginRes = await fetch("http://localhost:5000/api/user/login", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const loginData = await loginRes.json();
+
+        if (!loginRes.ok) {
+          throw new Error(loginData.message || "Auto-login failed");
+        }
+
+        localStorage.setItem("dtrain_token", loginData.token);
+
+        const user = { name, email };
+        localStorage.setItem("dtrain_user", JSON.stringify(user));
+
+        setIsAuthenticated(true);
+
+        setTimeout(() => {
+          setCurrentView("dashboard");
+          setIsLoading(false);
+        }, 800);
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      throw err; // Re-throw to let SignUp component handle the error
+    }
   };
 
   const handleSignOut = () => {
     // Clear authentication state
     setIsAuthenticated(false);
-    // Remove user data from localStorage
-    localStorage.removeItem('dtrain_user');
+
+    // Remove ALL auth data from localStorage
+    localStorage.removeItem("dtrain_user");
+    localStorage.removeItem("dtrain_token");
+
     // Show loading animation
     setIsLoading(true);
     setTimeout(() => {
       // Redirect to hero page
-      setCurrentView('hero');
+      setCurrentView("hero");
       setIsLoading(false);
     }, 800);
   };
@@ -196,7 +257,7 @@ function App() {
   const handleSwitchToSignUp = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('signup');
+      setCurrentView("signup");
       setIsLoading(false);
     }, 800);
   };
@@ -204,7 +265,7 @@ function App() {
   const handleSwitchToSignIn = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('signin');
+      setCurrentView("signin");
       setIsLoading(false);
     }, 800);
   };
@@ -213,7 +274,7 @@ function App() {
     setIsLoading(true);
     fetchJobs();
     setTimeout(() => {
-      setCurrentView('dashboard');
+      setCurrentView("dashboard");
       setIsLoading(false);
     }, 800);
   };
@@ -222,7 +283,7 @@ function App() {
     setIsLoading(true);
     setSelectedJob(job);
     setTimeout(() => {
-      setCurrentView('detail');
+      setCurrentView("detail");
       setIsLoading(false);
     }, 800);
   };
@@ -231,7 +292,7 @@ function App() {
     setIsLoading(true);
     setSelectedJob(null);
     setTimeout(() => {
-      setCurrentView('dashboard');
+      setCurrentView("dashboard");
       setIsLoading(false);
     }, 800);
   };
@@ -239,7 +300,7 @@ function App() {
   const handleBackToSubmit = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('submit');
+      setCurrentView("submit");
       setIsLoading(false);
     }, 800);
   };
@@ -247,7 +308,7 @@ function App() {
   const handleViewRunning = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('running');
+      setCurrentView("running");
       setIsLoading(false);
     }, 800);
   };
@@ -255,7 +316,7 @@ function App() {
   const handleViewPending = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('pending');
+      setCurrentView("pending");
       setIsLoading(false);
     }, 800);
   };
@@ -263,34 +324,34 @@ function App() {
   const handleViewWorkers = () => {
     setIsLoading(true);
     setTimeout(() => {
-      setCurrentView('workers');
+      setCurrentView("workers");
       setIsLoading(false);
     }, 800);
   };
 
   // Consistent page transition variants
   const pageVariants: Variants = {
-    initial: { 
-      opacity: 0, 
+    initial: {
+      opacity: 0,
       scale: 0.95,
-      y: 20
+      y: 20,
     },
-    animate: { 
-      opacity: 1, 
+    animate: {
+      opacity: 1,
       scale: 1,
-      y: 0
+      y: 0,
     },
-    exit: { 
-      opacity: 0, 
+    exit: {
+      opacity: 0,
       scale: 1.05,
-      y: -20
-    }
+      y: -20,
+    },
   };
 
   // Transition configuration
   const pageTransition = {
     duration: 0.4,
-    ease: "easeOut" as const
+    ease: "easeOut" as const,
   };
 
   return (
@@ -313,21 +374,29 @@ function App() {
                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   className="absolute inset-0 rounded-[16px] border-[4px] border-slate-900 bg-blue-400 shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
                 />
-                
+
                 {/* Inner pulsing circle */}
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
                   className="absolute inset-4 rounded-full border-[4px] border-slate-900 bg-[#FFD447]"
                 />
-                
+
                 {/* Center dot */}
                 <motion.div
-                  animate={{ 
+                  animate={{
                     scale: [1, 0.8, 1],
-                    backgroundColor: ['#FF76B8', '#7CF2D0', '#FF76B8']
+                    backgroundColor: ["#FF76B8", "#7CF2D0", "#FF76B8"],
                   }}
-                  transition={{ duration: 1, repeat: Infinity, ease: "easeInOut" }}
+                  transition={{
+                    duration: 1,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                  }}
                   className="absolute inset-8 rounded-full border-[3px] border-slate-900"
                 />
               </div>
@@ -338,24 +407,40 @@ function App() {
                 animate={{ opacity: 1, y: 0 }}
                 className="inline-flex items-center px-6 py-3 rounded-[16px] border-[3px] border-slate-900 bg-white shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
               >
-                <span className="text-lg font-extrabold text-slate-900 mr-2">Loading DTrain</span>
+                <span className="text-lg font-extrabold text-slate-900 mr-2">
+                  Loading DTrain
+                </span>
                 <motion.span
                   animate={{ scale: [1, 1.3, 1] }}
-                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2 }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                  }}
                   className="text-xl"
                 >
                   .
                 </motion.span>
                 <motion.span
                   animate={{ scale: [1, 1.3, 1] }}
-                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2, delay: 0.2 }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                    delay: 0.2,
+                  }}
                   className="text-xl"
                 >
                   .
                 </motion.span>
                 <motion.span
                   animate={{ scale: [1, 1.3, 1] }}
-                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2, delay: 0.4 }}
+                  transition={{
+                    duration: 0.6,
+                    repeat: Infinity,
+                    repeatDelay: 0.2,
+                    delay: 0.4,
+                  }}
                   className="text-xl"
                 >
                   .
@@ -365,7 +450,7 @@ function App() {
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'hero' && (
+        {!isLoading && currentView === "hero" && (
           <motion.div
             key="hero"
             variants={pageVariants}
@@ -374,14 +459,14 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <HeroSection 
-              onGetStarted={handleGetStarted} 
+            <HeroSection
+              onGetStarted={handleGetStarted}
               onDocumentation={handleDocumentation}
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'documentation' && (
+        {!isLoading && currentView === "documentation" && (
           <motion.div
             key="documentation"
             variants={pageVariants}
@@ -394,7 +479,7 @@ function App() {
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'signin' && (
+        {!isLoading && currentView === "signin" && (
           <motion.div
             key="signin"
             variants={pageVariants}
@@ -403,14 +488,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <SignIn 
+            <SignIn
               onSignIn={handleSignIn}
               onSwitchToSignUp={handleSwitchToSignUp}
+              onBack={handleBackToHero} // ✅ Add this line
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'signup' && (
+        {!isLoading && currentView === "signup" && (
           <motion.div
             key="signup"
             variants={pageVariants}
@@ -419,14 +505,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <SignUp 
+            <SignUp
               onSignUp={handleSignUp}
               onSwitchToSignIn={handleSwitchToSignIn}
+              onBack={handleBackToHero} // ✅ Add this line
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'submit' && (
+        {!isLoading && currentView === "submit" && (
           <motion.div
             key="submit"
             variants={pageVariants}
@@ -435,14 +522,14 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <JobSubmission 
-              onJobSubmitted={handleJobSubmitted} 
+            <JobSubmission
+              onJobSubmitted={handleJobSubmitted}
               onBackToDashboard={handleBackToDashboard}
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'dashboard' && (
+        {!isLoading && currentView === "dashboard" && (
           <motion.div
             key="dashboard"
             variants={pageVariants}
@@ -451,8 +538,8 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <Dashboard 
-              onJobSelect={handleJobSelect} 
+            <Dashboard
+              onJobSelect={handleJobSelect}
               onNewJob={handleBackToSubmit}
               onViewRunning={handleViewRunning}
               onViewPending={handleViewPending}
@@ -465,7 +552,7 @@ function App() {
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'detail' && selectedJob && (
+        {!isLoading && currentView === "detail" && selectedJob && (
           <motion.div
             key="detail"
             variants={pageVariants}
@@ -474,15 +561,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <JobDetail 
-              job={selectedJob} 
+            <JobDetail
+              job={selectedJob}
               onBack={handleBackToDashboard}
               socket={socket}
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'running' && (
+        {!isLoading && currentView === "running" && (
           <motion.div
             key="running"
             variants={pageVariants}
@@ -491,15 +578,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <RunningJobs 
-              jobs={jobs.filter(job => job.status === 'running')}
+            <RunningJobs
+              jobs={jobs.filter((job) => job.status === "running")}
               onJobSelect={handleJobSelect}
               onBack={handleBackToDashboard}
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'pending' && (
+        {!isLoading && currentView === "pending" && (
           <motion.div
             key="pending"
             variants={pageVariants}
@@ -508,15 +595,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <PendingJobs 
-              jobs={jobs.filter(job => job.status === 'pending')}
+            <PendingJobs
+              jobs={jobs.filter((job) => job.status === "pending")}
               onJobSelect={handleJobSelect}
               onBack={handleBackToDashboard}
             />
           </motion.div>
         )}
 
-        {!isLoading && currentView === 'workers' && (
+        {!isLoading && currentView === "workers" && (
           <motion.div
             key="workers"
             variants={pageVariants}
@@ -525,7 +612,7 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <ActiveWorkers 
+            <ActiveWorkers
               workers={workers}
               jobs={jobs}
               onBack={handleBackToDashboard}

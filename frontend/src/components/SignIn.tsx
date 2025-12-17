@@ -1,34 +1,39 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, LogIn } from 'lucide-react';
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Mail, Lock, ArrowRight, LogIn, ArrowLeft } from "lucide-react";
 
 interface SignInProps {
-  onSignIn: (email: string, password: string) => void;
+  onSignIn: (email: string, password: string) => Promise<void>;
   onSwitchToSignUp: () => void;
+  onBack?: () => void; // Optional back handler
 }
 
-const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp }) => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
+const SignIn: React.FC<SignInProps> = ({
+  onSignIn,
+  onSwitchToSignUp,
+  onBack,
+}) => {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError("");
 
     if (!email || !password) {
-      setError('Please fill in all fields');
+      setError("Please fill in all fields");
       return;
     }
 
     setIsLoading(true);
-    
+
     try {
       await onSignIn(email, password);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Sign in failed');
-    } finally {
+      // Success - App.tsx will handle navigation
+    } catch (err: any) {
+      setError(err.message || "Sign in failed. Please try again.");
       setIsLoading(false);
     }
   };
@@ -41,8 +46,8 @@ const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp }) => {
           className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-            backgroundSize: '26px 26px',
+              "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
           }}
         />
 
@@ -60,19 +65,51 @@ const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp }) => {
 
         {/* Main content */}
         <div className="relative z-10 px-8 py-8">
-          {/* Logo/Branding */}
-          <div className="flex justify-center mb-6">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img 
-                  src="/logo.png" 
-                  alt="DTrain Logo" 
-                  className="w-8 h-8 object-contain"
-                />
+          {/* Top Nav - Logo and Back Button */}
+          {onBack && (
+            <nav className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+                <span className="text-2xl font-extrabold text-slate-900">
+                  DTrain
+                </span>
               </div>
-              <span className="text-3xl font-extrabold text-slate-900">DTrain</span>
+
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onBack}
+                className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                Back
+              </motion.button>
+            </nav>
+          )}
+
+          {/* Logo/Branding - Only show if no back button */}
+          {!onBack && (
+            <div className="flex justify-center mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
+                    className="w-8 h-8 object-contain"
+                  />
+                </div>
+                <span className="text-3xl font-extrabold text-slate-900">
+                  DTrain
+                </span>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Header */}
           <div className="text-center mb-8">
@@ -146,15 +183,19 @@ const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp }) => {
               whileTap={!isLoading ? { y: 0 } : {}}
               className={`w-full flex items-center justify-center px-6 py-4 rounded-[16px] border-[3px] border-slate-900 text-sm font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all ${
                 isLoading
-                  ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
-                  : 'bg-blue-400 text-white hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-blue-500'
+                  ? "bg-slate-300 text-slate-500 cursor-not-allowed"
+                  : "bg-blue-400 text-white hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-blue-500"
               }`}
             >
               {isLoading ? (
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                    transition={{
+                      duration: 1,
+                      repeat: Infinity,
+                      ease: "linear",
+                    }}
                     className="w-5 h-5 border-[3px] border-slate-900 border-t-transparent rounded-full mr-2"
                   />
                   Signing In...
@@ -192,13 +233,6 @@ const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp }) => {
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0); }
-          50% { transform: translateY(-6px); }
-        }
-      `}</style>
     </div>
   );
 };
