@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, LogOut} from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus } from 'lucide-react';
 import { Job, Worker } from '../types';
 import { Socket } from 'socket.io-client';
+import ProfileDropdown from './ProfileDropdown';
 
 interface DashboardProps {
   onJobSelect: (job: Job) => void;
@@ -28,6 +29,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   workers 
 }) => {
   const [loading, setLoading] = useState(true);
+  const [userInfo, setUserInfo] = useState({ name: '', email: '' });
 
   const statusIcons = {
     pending: Clock,
@@ -47,6 +49,20 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   useEffect(() => {
     setLoading(false);
+
+    // Load user info from localStorage
+    const savedUser = localStorage.getItem('dtrain_user');
+    if (savedUser) {
+      try {
+        const user = JSON.parse(savedUser);
+        setUserInfo({
+          name: user.name || 'User',
+          email: user.email || 'user@example.com'
+        });
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+      }
+    }
 
     // Set up socket listeners
     if (socket) {
@@ -141,20 +157,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
                   onClick={onNewJob}
-                  className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
+                  className="flex items-center justify-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
                 >
-                  New Job
+                  <Plus className="w-5 h-5 sm:hidden" />
+                  <span className="hidden sm:inline">New Job</span>
                 </motion.button>
 
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: 0 }}
-                  onClick={onSignOut}
-                  className="flex items-center justify-center w-10 h-10 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] active:translate-y-0"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-5 h-5" />
-                </motion.button>
+                {/* Replace LogOut button with ProfileDropdown */}
+                <ProfileDropdown 
+                  onSignOut={onSignOut}
+                  userName={userInfo.name}
+                  userEmail={userInfo.email}
+                />
               </div>
             </nav>
 
@@ -303,7 +317,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <td className="px-5 py-4">
                               <p className="text-sm font-extrabold text-slate-900">{job.name}</p>
-                              <p className="text-xs text-slate-600 font-medium">{index+1}</p>
+                              <p className="text-xs text-slate-600 font-medium">#{index+1}</p>
                             </td>
                             <td className="px-5 py-4">
                               <div className={`inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${statusStyle}`}>

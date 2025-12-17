@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { ArrowLeft, Terminal, Activity, Cpu, HardDrive, Zap } from 'lucide-react';
+import { Terminal, Activity, Cpu, HardDrive, Zap, Clock, FileCode, CheckCircle } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { Job, JobLog, MetricData } from '../types';
 import { Socket } from 'socket.io-client';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { XAxis, YAxis, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
 interface JobDetailProps {
   job: Job;
@@ -18,15 +19,12 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
   // Socket connection and log fetching
   useEffect(() => {
-    // Fetch past logs from API
     fetch(`http://localhost:5000/api/jobs/${job.id}/logs`)
       .then(res => res.json())
       .then(data => {
         console.log(data);
-        
-        // Type the data properly
-        console.table(data)
-        setLogs(data)
+        console.table(data);
+        setLogs(data);
         setTerminalOutput(data.map((l: JobLog) => `[${l.level}] ${l.message}`));
       })
       .catch(error => {
@@ -95,238 +93,317 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     return new Date(timestamp).toLocaleTimeString();
   };
 
+  const statusColors = {
+    pending: 'bg-FFE66D text-slate-900',
+    accepted: 'bg-7BC8FF text-slate-900',
+    running: 'bg-7CF2D0 text-slate-900',
+    completed: 'bg-4ADE80 text-slate-900',
+    failed: 'bg-FEE2E2 text-slate-900',
+  };
+
   return (
-    <div className="min-h-screen bg-slate-900 p-6">
+    <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8 opacity-0 animate-fade-in">
-          <div className="flex items-center">
-            <button
-              onClick={onBack}
-              className="flex items-center px-4 py-2 text-slate-400 hover:text-white transition-colors mr-6 hover:scale-105 transform"
-            >
-              <ArrowLeft className="w-5 h-5 mr-2" />
-              Back to Dashboard
-            </button>
-            <div>
-              <h1 className="text-3xl font-bold text-white">{job.title}</h1>
-              <h1 className="text-xl text-slate-100">{job.description}</h1>
-              <p className="text-slate-400">Job ID: {job._id}</p>
-            </div>
-          </div>
-          
-          <div className={`px-4 py-2 rounded-lg font-semibold ${
-            job.status === 'running' 
-              ? 'bg-green-500/20 text-green-400' 
-              : job.status === 'pending'
-              ? 'bg-yellow-500/20 text-yellow-400'
-              : job.status === 'completed'
-              ? 'bg-emerald-500/20 text-emerald-400'
-              : 'bg-red-500/20 text-red-400'
-          }`}>
-            {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
-          </div>
-        </div>
+        <div className="relative">
+          {/* Grid background card */}
+          <div 
+            className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)
+              `,
+              backgroundSize: '26px 26px',
+            }}
+          />
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Terminal Section */}
-          <div className="lg:col-span-2 opacity-0 animate-fade-in-delay-1">
-            <div className="bg-slate-800 rounded-xl border border-slate-700 overflow-hidden">
-              <div className="flex items-center px-6 py-4 bg-slate-900/50 border-b border-slate-700">
-                <Terminal className="w-5 h-5 text-slate-400 mr-3" />
-                <span className="text-white font-semibold">Live Output</span>
-                <div className="ml-auto flex space-x-2">
-                  <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                  <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                  <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+          {/* Memphis shapes */}
+          <motion.div 
+            className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
+            animate={{ 
+              rotate: [0, 15, -15, 0],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 4, 
+              ease: "easeInOut" 
+            }}
+          >
+            <Activity className="w-8 h-8 text-slate-900" />
+          </motion.div>
+
+          <motion.div 
+            className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#FFD447]"
+            animate={{ y: [0, -6, 0] }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 5, 
+              ease: "easeInOut" 
+            }}
+          />
+
+          <motion.div 
+            className="absolute top-1/3 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
+            animate={{ rotate: [6, -6, 6] }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 6, 
+              ease: "easeInOut" 
+            }}
+          >
+            <Terminal className="w-8 h-8 text-slate-900" />
+          </motion.div>
+
+          {/* Main content */}
+          <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
+            {/* Top nav */}
+            <nav className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
+                <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
+                  DTrain
+                </span>
               </div>
-              
-              <div 
-                ref={terminalRef}
-                className="h-80 p-4 bg-black font-mono text-sm overflow-y-auto scrollbar-thin scrollbar-thumb-slate-600 scrollbar-track-slate-800"
+
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onBack}
+                className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
               >
-                {terminalOutput.map((line, index) => (
-                  <div
-                    key={index}
-                    className={`mb-1 opacity-0 animate-slide-in ${
-                      line.includes('[ERROR]') 
-                        ? 'text-red-400' 
-                        : line.includes('[WARNING]')
-                        ? 'text-yellow-400'
-                        : line.includes('[INFO]')
-                        ? 'text-blue-400'
-                        : 'text-green-400'
-                    }`}
-                    style={{ animationDelay: `${index * 0.05}s` }}
+                Back to Dashboard
+              </motion.button>
+            </nav>
+
+            {/* Header */}
+            <div className="mb-8">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div>
+                  <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
+                    {job.title}
+                  </h1>
+                  <p className="text-sm text-slate-700 font-medium mb-2">{job.description}</p>
+                  <p className="text-xs text-slate-600 font-mono">Job ID: {job._id}</p>
+                </div>
+                
+                <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${
+                  statusColors[job.status as keyof typeof statusColors] || 'bg-slate-300 text-slate-900'
+                }`}>
+                  {job.status === 'running' && <Activity className="w-3 h-3 mr-1.5" />}
+                  {job.status === 'pending' && <Clock className="w-3 h-3 mr-1.5" />}
+                  {job.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1.5" />}
+                  {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+              {/* Terminal Section */}
+              <div className="lg:col-span-2">
+                <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
+                  <div className="flex items-center px-6 py-4 bg-[#F5F3FF] border-b-[3px] border-slate-900">
+                    <div className="w-10 h-10 bg-slate-900 rounded-[12px] flex items-center justify-center mr-3">
+                      <Terminal className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-slate-900">Live Output</h3>
+                      <p className="text-xs text-slate-700">Real-time execution logs</p>
+                    </div>
+                    <div className="ml-auto flex space-x-2">
+                      <div className="w-3 h-3 bg-[#fb7185] rounded-full border border-slate-900"></div>
+                      <div className="w-3 h-3 bg-[#facc15] rounded-full border border-slate-900"></div>
+                      <div className="w-3 h-3 bg-[#22c55e] rounded-full border border-slate-900"></div>
+                    </div>
+                  </div>
+                  
+                  <div 
+                    ref={terminalRef}
+                    className="h-96 p-4 bg-slate-900 font-mono text-xs overflow-y-auto"
                   >
-                    <span className="text-slate-500">[{formatTime(new Date().toISOString())}]</span> {line}
+                    {terminalOutput.map((line, index) => (
+                      <div
+                        key={index}
+                        className={`mb-1 ${
+                          line.includes('[ERROR]') 
+                            ? 'text-red-400' 
+                            : line.includes('[WARNING]')
+                            ? 'text-yellow-400'
+                            : line.includes('[INFO]')
+                            ? 'text-blue-400'
+                            : 'text-[#E0E7FF]'
+                        }`}
+                      >
+                        <span className="text-slate-500">[{formatTime(new Date().toISOString())}]</span> {line}
+                      </div>
+                    ))}
+                    {job.status === 'running' && (
+                      <div className="text-[#7CF2D0] animate-pulse inline-block">
+                        ▋
+                      </div>
+                    )}
                   </div>
-                ))}
-                {job.status === 'running' && (
-                  <div className="text-green-400 animate-pulse">
-                    ▋
+                </div>
+              </div>
+
+              {/* Job Info */}
+              <div className="space-y-6">
+                <div className="rounded-[20px] border-[3px] border-slate-900 bg-white p-5 shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-[12px] bg-[#7BC8FF] border-[2px] border-slate-900 flex items-center justify-center">
+                      <FileCode className="w-5 h-5 text-slate-900" />
+                    </div>
+                    <h3 className="text-base font-extrabold text-slate-900">Job Information</h3>
                   </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Job Info */}
-          <div className="space-y-6 opacity-0 animate-fade-in-delay-2">
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-              <h3 className="text-lg font-semibold text-white mb-4">Job Information</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Status:</span>
-                  <span className="text-white font-mono">{job.status}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Main Entry:</span>
-                  <span className="text-white font-mono">{job.config?.entryFile}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Requirements:</span>
-                  <span className="text-white font-mono">requirements.txt</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Created:</span>
-                  <span className="text-white">{new Date(job.createdAt).toLocaleDateString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-400">Docker Image:</span>
-                  <span className="text-white font-mono text-xs">{job.docker_image_tag}</span>
+                  <div className="space-y-3 text-xs">
+                    <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                      <span className="text-slate-700 font-semibold">Status:</span>
+                      <span className="font-mono font-bold text-slate-900">{job.status}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                      <span className="text-slate-700 font-semibold">Main Entry:</span>
+                      <span className="font-mono font-bold text-slate-900">{job.config?.entryFile}</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                      <span className="text-slate-700 font-semibold">Requirements:</span>
+                      <span className="font-mono font-bold text-slate-900">requirements.txt</span>
+                    </div>
+                    <div className="flex justify-between items-center py-2 border-b border-slate-200">
+                      <span className="text-slate-700 font-semibold">Created:</span>
+                      <span className="font-medium text-slate-900">{new Date(job.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div className="flex flex-col py-2">
+                      <span className="text-slate-700 font-semibold mb-1">Docker Image:</span>
+                      <span className="font-mono text-[10px] text-slate-900 break-all bg-[#FFFDF8] p-2 rounded-lg border border-slate-200">
+                        {job.docker_image_tag}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        {/* Metrics Section */}
-        <div className="mt-8 opacity-0 animate-fade-in-delay-3">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* CPU Usage */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center mr-3">
-                  <Cpu className="w-5 h-5 text-blue-400" />
+            {/* Metrics Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* CPU Usage */}
+              <motion.div 
+                whileHover={{ y: -2 }}
+                className="rounded-[18px] border-[3px] border-slate-900 bg-[#7BC8FF] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
+                    <Cpu className="w-5 h-5 text-slate-900" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">CPU Usage</h3>
+                    <p className="text-2xl font-extrabold text-slate-900">
+                      {metrics.length > 0 ? `${Math.round(metrics[metrics.length - 1].cpu)}%` : '0%'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-white font-semibold">CPU Usage</h3>
-                  <p className="text-slate-400 text-sm">
-                    {metrics.length > 0 ? `${Math.round(metrics[metrics.length - 1].cpu)}%` : '0%'}
-                  </p>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={metrics.slice(-10)}>
-                  <Area 
-                    type="monotone" 
-                    dataKey="cpu" 
-                    stroke="#3B82F6" 
-                    fill="#3B82F6" 
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                  <XAxis dataKey="timestamp" hide />
-                  <YAxis hide />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                <ResponsiveContainer width="100%" height={100}>
+                  <AreaChart data={metrics.slice(-10)}>
+                    <Area 
+                      type="monotone" 
+                      dataKey="cpu" 
+                      stroke="#0f172a" 
+                      fill="#3B82F6" 
+                      fillOpacity={0.3}
+                      strokeWidth={3}
+                    />
+                    <XAxis dataKey="timestamp" hide />
+                    <YAxis hide />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </motion.div>
 
-            {/* Memory Usage */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-green-500/20 rounded-lg flex items-center justify-center mr-3">
-                  <HardDrive className="w-5 h-5 text-green-400" />
+              {/* Memory Usage */}
+              <motion.div 
+                whileHover={{ y: -2 }}
+                className="rounded-[18px] border-[3px] border-slate-900 bg-[#7CF2D0] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
+                    <HardDrive className="w-5 h-5 text-slate-900" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">Memory Usage</h3>
+                    <p className="text-2xl font-extrabold text-slate-900">
+                      {metrics.length > 0 ? `${Math.round(metrics[metrics.length - 1].memory)}%` : '0%'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-white font-semibold">Memory Usage</h3>
-                  <p className="text-slate-400 text-sm">
-                    {metrics.length > 0 ? `${Math.round(metrics[metrics.length - 1].memory)}%` : '0%'}
-                  </p>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={metrics.slice(-10)}>
-                  <Area 
-                    type="monotone" 
-                    dataKey="memory" 
-                    stroke="#10B981" 
-                    fill="#10B981" 
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                  <XAxis dataKey="timestamp" hide />
-                  <YAxis hide />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
+                <ResponsiveContainer width="100%" height={100}>
+                  <AreaChart data={metrics.slice(-10)}>
+                    <Area 
+                      type="monotone" 
+                      dataKey="memory" 
+                      stroke="#0f172a" 
+                      fill="#10B981" 
+                      fillOpacity={0.3}
+                      strokeWidth={3}
+                    />
+                    <XAxis dataKey="timestamp" hide />
+                    <YAxis hide />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </motion.div>
 
-            {/* GPU Usage */}
-            <div className="bg-slate-800 rounded-xl border border-slate-700 p-6">
-              <div className="flex items-center mb-4">
-                <div className="w-10 h-10 bg-purple-500/20 rounded-lg flex items-center justify-center mr-3">
-                  <Zap className="w-5 h-5 text-purple-400" />
+              {/* GPU Usage */}
+              <motion.div 
+                whileHover={{ y: -2 }}
+                className="rounded-[18px] border-[3px] border-slate-900 bg-[#FFB4D3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
+              >
+                <div className="flex items-start gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
+                    <Zap className="w-5 h-5 text-slate-900" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-extrabold text-slate-900">GPU Usage</h3>
+                    <p className="text-2xl font-extrabold text-slate-900">
+                      {metrics.length > 0 && metrics[metrics.length - 1].gpu 
+                        ? `${Math.round(metrics[metrics.length - 1].gpu!)}%` 
+                        : 'N/A'
+                      }
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-white font-semibold">GPU Usage</h3>
-                  <p className="text-slate-400 text-sm">
-                    {metrics.length > 0 && metrics[metrics.length - 1].gpu 
-                      ? `${Math.round(metrics[metrics.length - 1].gpu!)}%` 
-                      : 'N/A'
-                    }
-                  </p>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={120}>
-                <AreaChart data={metrics.slice(-10)}>
-                  <Area 
-                    type="monotone" 
-                    dataKey="gpu" 
-                    stroke="#A855F7" 
-                    fill="#A855F7" 
-                    fillOpacity={0.2}
-                    strokeWidth={2}
-                  />
-                  <XAxis dataKey="timestamp" hide />
-                  <YAxis hide />
-                </AreaChart>
-              </ResponsiveContainer>
+                <ResponsiveContainer width="100%" height={100}>
+                  <AreaChart data={metrics.slice(-10)}>
+                    <Area 
+                      type="monotone" 
+                      dataKey="gpu" 
+                      stroke="#0f172a" 
+                      fill="#A855F7" 
+                      fillOpacity={0.3}
+                      strokeWidth={3}
+                    />
+                    <XAxis dataKey="timestamp" hide />
+                    <YAxis hide />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </motion.div>
             </div>
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes fade-in {
-          from { opacity: 0; transform: translateY(20px); }
-          to { opacity: 1; transform: translateY(0); }
+        @keyframes float {
+          0%, 100% { transform: translateY(0) rotate(-8deg); }
+          50% { transform: translateY(-6px) rotate(-8deg); }
         }
         
-        @keyframes slide-in {
-          from { opacity: 0; transform: translateX(-10px); }
-          to { opacity: 1; transform: translateX(0); }
+        @keyframes wiggle {
+          0%, 100% { transform: rotate(6deg); }
+          50% { transform: rotate(2deg); }
         }
-
-        .animate-fade-in {
-          animation: fade-in 0.5s ease-out forwards;
-        }
-
-        .animate-fade-in-delay-1 {
-          animation: fade-in 0.6s ease-out 0.1s forwards;
-        }
-
-        .animate-fade-in-delay-2 {
-          animation: fade-in 0.6s ease-out 0.2s forwards;
-        }
-
-        .animate-fade-in-delay-3 {
-          animation: fade-in 0.6s ease-out 0.3s forwards;
-        }
-
-        .animate-slide-in {
-          animation: slide-in 0.3s ease-out forwards;
+        
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.1); }
         }
       `}</style>
     </div>
