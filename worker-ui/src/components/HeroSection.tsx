@@ -84,7 +84,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                 <img 
-                  src="/logo.png" 
+                  src="logo.png" 
                   alt="DTrain Logo" 
                   className="w-8 h-8 object-contain"
                 />
