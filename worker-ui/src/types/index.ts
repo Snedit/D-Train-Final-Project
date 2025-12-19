@@ -1,5 +1,6 @@
 // types.ts
 
+
 // ============================================
 // USER TYPES
 // ============================================
@@ -11,10 +12,12 @@ export interface User {
   createdAt: string;
 }
 
+
 export interface UserProfile extends User {
   totalJobs: number;
   totalSpent: number;
 }
+
 
 // ============================================
 // JOB TYPES
@@ -37,15 +40,18 @@ export interface Job {
   completedAt?: string;
 }
 
+
 export interface JobLog {
   ts: number; // timestamp
   message: string;
 }
 
+
 export interface JobDetail extends Job {
   worker?: Worker;
   billing?: BillingSummary;
 }
+
 
 // ============================================
 // WORKER TYPES
@@ -63,11 +69,13 @@ export interface Worker {
   createdAt: string;
 }
 
+
 export interface WorkerStats extends Worker {
   totalJobsCompleted: number;
   totalEarnings: number;
   uptime: number; // in milliseconds
 }
+
 
 // ============================================
 // BILLING TYPES
@@ -85,10 +93,12 @@ export interface Billing {
   createdAt: string;
 }
 
+
 export interface BillingSummary {
   total: number;
   breakdown: Billing[];
 }
+
 
 // ============================================
 // METRIC TYPES (for live monitoring)
@@ -99,6 +109,7 @@ export interface MetricData {
   memory: number; // percentage (RAM)
   gpu?: number; // percentage
 }
+
 
 export interface SystemMetrics {
   jobId: string;
@@ -112,6 +123,7 @@ export interface SystemMetrics {
   peakGpu?: number;
 }
 
+
 // ============================================
 // SOCKET.IO EVENT TYPES
 // ============================================
@@ -122,10 +134,12 @@ export interface SocketEvents {
   new_job_available: (data: { jobId: string; title: string; description: string }) => void;
   worker_status: (data: { workerId: string; status: Worker['status'] }) => void;
 
+
   // Client → Server
   subscribe_job: (jobId: string) => void;
   unsubscribe_job: (jobId: string) => void;
 }
+
 
 // ============================================
 // API RESPONSE TYPES
@@ -135,6 +149,7 @@ export interface ApiResponse<T = any> {
   data?: T;
   error?: string;
 }
+
 
 export interface LoginResponse {
   message: string;
@@ -147,22 +162,27 @@ export interface LoginResponse {
   };
 }
 
+
 export interface RegisterResponse extends LoginResponse {}
+
 
 export interface JobCreateResponse {
   message: string;
   jobId: string;
 }
 
+
 export interface WorkerRegisterResponse {
   message: string;
   worker: Worker;
 }
 
+
 export interface JobAcceptResponse {
   message: string;
   job: Job;
 }
+
 
 // ============================================
 // ELECTRON IPC TYPES
@@ -174,10 +194,12 @@ export interface DeviceInfo {
   gpu?: string;
 }
 
+
 export interface ElectronAPI {
   // Device Info
   getDeviceId: () => Promise<string>;
   getDeviceInfo: () => Promise<DeviceInfo>;
+
 
   // Docker Operations
   runJob: (jobConfig: {
@@ -188,24 +210,29 @@ export interface ElectronAPI {
   
   stopJob: (jobId: string) => Promise<void>;
 
+
   // File Operations
   downloadFile: (url: string, destination: string) => Promise<string>;
   uploadFile: (filePath: string) => Promise<string>;
 
+
   // System Metrics
   getSystemMetrics: () => Promise<MetricData>;
+
 
   // Logs
   onJobLog: (callback: (log: string) => void) => void;
   onJobComplete: (callback: (data: { success: boolean; modelPath?: string; error?: string }) => void) => void;
 }
 
+
 // Extend Window interface for Electron
 declare global {
   interface Window {
-    electron: ElectronAPI;
+    electron?: ElectronAPI;  // CHANGED: Added ? here
   }
 }
+
 
 // ============================================
 // REDIS/QUEUE TYPES
@@ -220,6 +247,7 @@ export interface JobQueueMessage {
   };
 }
 
+
 // ============================================
 // COMPONENT PROP TYPES
 // ============================================
@@ -227,11 +255,13 @@ export interface HeroSectionProps {
   onGetStarted: () => void;
 }
 
+
 export interface SignInProps {
   onSignIn: (email: string, password: string) => Promise<void>;
   onSwitchToSignUp?: () => void;
   onBack: () => void;
 }
+
 
 export interface SignUpProps {
   onSignUp: (name: string, email: string, password: string) => Promise<void>;
@@ -239,11 +269,13 @@ export interface SignUpProps {
   onBack: () => void;
 }
 
+
 export interface WorkerDashboardProps {
   worker: Worker;
   onJobStart: (jobId: string) => void;
   onSignOut: () => void;
 }
+
 
 export interface RunningJobsProps {
   jobId: string;
@@ -252,10 +284,12 @@ export interface RunningJobsProps {
   onBack: () => void;
 }
 
+
 export interface JobDetailProps {
   job: Job;
   onBack: () => void;
 }
+
 
 // ============================================
 // UTILITY TYPES
@@ -263,6 +297,7 @@ export interface JobDetailProps {
 export type JobStatus = Job['status'];
 export type WorkerStatus = Worker['status'];
 export type UserRole = User['role'];
+
 
 export interface PaginatedResponse<T> {
   data: T[];
@@ -272,12 +307,14 @@ export interface PaginatedResponse<T> {
   hasMore: boolean;
 }
 
+
 export interface FilterOptions {
   status?: JobStatus[];
   dateFrom?: string;
   dateTo?: string;
   workerId?: string;
 }
+
 
 // ============================================
 // LOCAL STORAGE TYPES
@@ -287,6 +324,7 @@ export interface StoredWorkerData {
   worker: Worker;
   lastSync: number;
 }
+
 
 export interface StoredAuthData {
   token: string;

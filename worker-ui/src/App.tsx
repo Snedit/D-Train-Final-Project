@@ -10,6 +10,7 @@ import JobDetail from "./components/JobDetail";
 import Documentation from "./components/Documentation";
 import type { Worker as WorkerType, Job } from "./types";
 
+
 function App() {
   const [currentView, setCurrentView] = useState<
     | "hero"
@@ -207,16 +208,36 @@ function App() {
         throw new Error("Please sign in first");
       }
 
-      // Get device info from browser APIs
+      // Get device info from Electron API (not browser fallback)
+      let deviceInfo: {
+        os: string;
+        cpu: string;
+        ram: string;
+        gpu: string;
+      };
+
+      if (window.electron) {
+        // Use Electron device info
+        const electronInfo = await window.electron.getDeviceInfo();
+        deviceInfo = {
+          os: electronInfo.os,
+          cpu: electronInfo.cpu,
+          ram: electronInfo.ram,
+          gpu: electronInfo.gpu || "Not detected", // Handle undefined case
+        };
+      } else {
+        // Browser fallback (only if not in Electron)
+        deviceInfo = {
+          os: navigator.platform || "Unknown OS",
+          cpu: `${navigator.hardwareConcurrency || 4} cores`,
+          ram: `${(navigator as any).deviceMemory || 8}GB`,
+          gpu: "WebGL GPU",
+        };
+      }
+
       const deviceId = `device-${Date.now()}-${Math.random()
         .toString(36)
         .substr(2, 9)}`;
-      const deviceInfo = {
-        os: navigator.platform || "Unknown OS",
-        cpu: `${navigator.hardwareConcurrency || 4} cores`,
-        ram: `${(navigator as any).deviceMemory || 8}GB`,
-        gpu: "WebGL GPU",
-      };
 
       console.log("Registering worker with device info:", {
         deviceId,
@@ -502,7 +523,7 @@ function App() {
           </motion.div>
         )}
 
-        {/* Worker Registration - ADDED BACK */}
+        {/* Worker Registration */}
         {!isLoading && currentView === "workerRegister" && (
           <motion.div
             key="workerRegister"

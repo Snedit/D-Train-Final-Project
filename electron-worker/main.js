@@ -3,11 +3,14 @@ const path = require("path");
 const fs = require("fs");
 const AdmZip = require("adm-zip");
 const { spawn, exec } = require("child_process");
+const os = require("os");
+
 
 function createWindow() {
   const win = new BrowserWindow({
     width: 1000,
     height: 700,
+    icon: path.join(__dirname, "assets", "icon.png"),
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -15,11 +18,43 @@ function createWindow() {
     }
   });
 
+  win.setMenu(null);
+  win.maximize(); // ADD THIS LINE - Opens window maximized
   win.loadFile(path.join(__dirname, "dist", "index.html"));
-  
-  // Open DevTools for debugging
-  // win.webContents.openDevTools();
 }
+
+
+// Device Info Handler
+ipcMain.handle("get-device-info", async () => {
+  const cpus = os.cpus();
+  const totalRAM = (os.totalmem() / (1024 ** 3)).toFixed(1);
+  
+  // Try to get GPU info
+  let gpuInfo = "Not detected";
+  try {
+    const gpuOutput = await new Promise((resolve) => {
+      exec("wmic path win32_VideoController get name", (error, stdout) => {
+        if (error) {
+          resolve("Not detected");
+        } else {
+          const lines = stdout.split('\n').filter(line => line.trim() && !line.includes('Name'));
+          resolve(lines[0]?.trim() || "Not detected");
+        }
+      });
+    });
+    gpuInfo = gpuOutput;
+  } catch (err) {
+    console.error("GPU detection failed:", err);
+  }
+
+  return {
+    os: `${os.type()} ${os.release()}`,
+    cpu: `${cpus[0]?.model || 'Unknown CPU'} (${cpus.length} cores)`,
+    ram: `${totalRAM}GB`,
+    gpu: gpuInfo
+  };
+});
+
 
 ipcMain.handle("run-test-job", async (event) => {
   const jobDir = path.join(__dirname, "jobs", "job-test");
@@ -27,20 +62,17 @@ ipcMain.handle("run-test-job", async (event) => {
   const outputDir = path.join(__dirname, "jobs", "job-test", "output");
 
   try {
-    // Clean job directory
     if (fs.existsSync(jobDir)) {
       fs.rmSync(jobDir, { recursive: true, force: true });
     }
     fs.mkdirSync(jobDir, { recursive: true });
     fs.mkdirSync(outputDir, { recursive: true });
 
-    // Unzip
     event.sender.send("job-log", "📦 Extracting job files...\n");
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(jobDir, true);
     event.sender.send("job-log", "✅ Files extracted successfully\n\n");
 
-    // Create Dockerfile
     const dockerfile = `
 FROM python:3.11-slim
 WORKDIR /app
@@ -51,10 +83,8 @@ CMD ["python", "main.py"]
     `.trim();
 
     fs.writeFileSync(path.join(jobDir, "Dockerfile"), dockerfile);
-
     event.sender.send("job-log", "🐳 Building Docker image...\n");
 
-    // Build image
     await new Promise((resolve, reject) => {
       const build = spawn("docker", ["build", "-t", "dtrain-test", "."], {
         cwd: jobDir,
@@ -80,7 +110,6 @@ CMD ["python", "main.py"]
 
     event.sender.send("job-log", "\n🚀 Running training...\n");
 
-    // Run container (without --rm so we can copy files)
     const containerName = "dtrain-test-container";
     
     await new Promise((resolve, reject) => {
@@ -107,7 +136,6 @@ CMD ["python", "main.py"]
 
     event.sender.send("job-log", "\n📥 Extracting output files...\n");
 
-    // Copy files from container
     await new Promise((resolve, reject) => {
       exec(
         `docker cp ${containerName}:/app/. "${outputDir}"`,
@@ -120,12 +148,10 @@ CMD ["python", "main.py"]
       );
     });
 
-    // Clean up container
     await new Promise((resolve) => {
       exec(`docker rm ${containerName}`, () => resolve());
     });
 
-    // Check what files were created
     const files = fs.readdirSync(outputDir);
     const outputFiles = files.filter(f => 
       !['main.py', 'requirements.txt', 'Dockerfile', '__pycache__'].includes(f) &&
@@ -150,13 +176,11 @@ CMD ["python", "main.py"]
 
   } catch (err) {
     event.sender.send("job-log", `\n❌ Error: ${err.message}\n`);
-    
-    // Try to clean up container if it exists
     exec("docker rm -f dtrain-test-container", () => {});
-    
     return { success: false };
   }
 });
+
 
 app.whenReady().then(createWindow);
 
