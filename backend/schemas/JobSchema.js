@@ -17,7 +17,7 @@ const jobSchema = new mongoose.Schema(
       other: Object,
     },
 
-    assignedWorkerId: { type: mongoose.Schema.Types.ObjectId, ref: "Worker" },
+    assignedWorkerId: { type: String, ref: "Worker" },
 
     status: {
       type: String,
