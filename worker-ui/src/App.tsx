@@ -64,9 +64,9 @@ function App() {
         if (data.worker) {
           // Map backend worker to frontend WorkerType
           const workerObj: WorkerType = {
-            id: data.worker._id,
+            _id: data.worker._id,
             deviceId: data.worker.deviceId,
-            os: data.worker.systemInfo?.cpu || "Unknown",
+            os: data.worker.systemInfo?.os || "Unknown",
             cpu: data.worker.systemInfo?.cpu || "Unknown",
             ram: data.worker.systemInfo?.ram || "Unknown",
             gpu: data.worker.systemInfo?.gpu || "N/A",
@@ -251,8 +251,8 @@ function App() {
       console.log("Worker registered successfully:", workerData);
 
       // Save worker data
-      const workerObj = {
-        id: workerData.worker._id || workerData.worker.id,
+      const workerObj: WorkerType = {
+        _id: workerData.worker._id,
         deviceId: workerData.worker.deviceId,
         os: deviceInfo.os,
         cpu: deviceInfo.cpu,
@@ -276,14 +276,6 @@ function App() {
       console.error("Worker registration failed:", err);
       throw err;
     }
-  };
-
-  const handleSkipRegistration = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setCurrentView("dashboard");
-      setIsLoading(false);
-    }, 500);
   };
 
   const handleSignOut = () => {
@@ -510,7 +502,7 @@ function App() {
           </motion.div>
         )}
 
-        {/* Worker Registration */}
+        {/* Worker Registration - ADDED BACK */}
         {!isLoading && currentView === "workerRegister" && (
           <motion.div
             key="workerRegister"
@@ -522,8 +514,7 @@ function App() {
           >
             <WorkerRegistration
               onRegister={handleWorkerRegister}
-              onSkip={handleSkipRegistration}
-              onSignOut={handleSignOut} // Add this line
+              onSignOut={handleSignOut}
             />
           </motion.div>
         )}

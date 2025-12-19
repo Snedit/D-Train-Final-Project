@@ -2,13 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Server, Cpu, HardDrive, Zap, AlertCircle, LogOut } from 'lucide-react';
 
-
 interface WorkerRegistrationProps {
   onRegister: () => Promise<void>;
-  onSkip: () => void;
   onSignOut?: () => void;
 }
-
 
 interface DeviceInfo {
   os: string;
@@ -16,7 +13,6 @@ interface DeviceInfo {
   ram: string;
   gpu?: string;
 }
-
 
 const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({ 
   onRegister,
@@ -26,11 +22,9 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
   const [error, setError] = useState<string>('');
 
-
   useEffect(() => {
     fetchDeviceInfo();
   }, []);
-
 
   const fetchDeviceInfo = async () => {
     try {
@@ -41,9 +35,9 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
         // Browser fallback
         setDeviceInfo({
           os: navigator.platform || 'Web Browser',
-          cpu: 'Browser CPU',
-          ram: '8GB',
-          gpu: 'Integrated',
+          cpu: `${navigator.hardwareConcurrency || 4} cores`,
+          ram: `${(navigator as any).deviceMemory || 8}GB`,
+          gpu: 'WebGL GPU',
         });
       }
     } catch (err) {
@@ -51,7 +45,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
       setError('Failed to get device information');
     }
   };
-
 
   const handleRegister = async () => {
     setLoading(true);
@@ -63,7 +56,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
       setLoading(false);
     }
   };
-
 
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] flex items-center justify-center px-4 py-10">
@@ -78,7 +70,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
           }}
         />
 
-
         {/* Memphis shapes */}
         <motion.div
           className="absolute -top-6 -left-6 w-20 h-20 rounded-[20px] border-[3px] border-slate-900 bg-[#7CF2D0]"
@@ -90,7 +81,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
           animate={{ scale: [1, 1.1, 1] }}
           transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
         />
-
 
         {/* Main content */}
         <div className="relative z-10 px-8 py-8">
@@ -115,14 +105,13 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
                 onClick={onSignOut}
-                className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
+                className="flex items-center gap-2 px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
               >
                 <LogOut className="w-4 h-4" />
-                Sign Out
+                <span className="hidden sm:inline">Sign Out</span>
               </motion.button>
             )}
           </nav>
-
 
           {/* Header */}
           <div className="text-center mb-8">
@@ -133,7 +122,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
               Register your device to start earning by processing training jobs
             </p>
           </div>
-
 
           {/* Error Message */}
           {error && (
@@ -148,7 +136,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
               </p>
             </motion.div>
           )}
-
 
           {/* Device Info Preview */}
           {deviceInfo ? (
@@ -203,7 +190,6 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
             </div>
           )}
 
-
           {/* Register Button */}
           <motion.button
             whileHover={!loading && deviceInfo ? { y: -2 } : {}}
@@ -241,6 +227,5 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
     </div>
   );
 };
-
 
 export default WorkerRegistration;

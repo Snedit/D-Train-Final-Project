@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, CheckCircle, XCircle, Activity, ArrowLeft } from 'lucide-react';
+import { CheckCircle, Activity, ArrowLeft } from 'lucide-react';
 import type { Job } from '../types';
 
 interface RunningJobsProps {
@@ -12,7 +12,6 @@ interface RunningJobsProps {
 
 const RunningJobs: React.FC<RunningJobsProps> = ({ 
   jobId, 
-  workerId, 
   onJobComplete, 
   onBack 
 }) => {
@@ -20,68 +19,76 @@ const RunningJobs: React.FC<RunningJobsProps> = ({
   const [logs, setLogs] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
+  const completionHandledRef = useRef(false);
 
   useEffect(() => {
+    const fetchJobDetails = async () => {
+      try {
+        const token = localStorage.getItem('dtrain_worker_token');
+        const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/status`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setJob(data);
+        }
+      } catch (error) {
+        console.error('Failed to fetch job details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
     fetchJobDetails();
-    
+  }, [jobId]);
+
+  useEffect(() => {
+    const handleJobCompletion = async () => {
+      if (completionHandledRef.current) return;
+      completionHandledRef.current = true;
+
+      try {
+        await fetch('http://localhost:5000/api/worker/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            modelUrl: 'https://example.com/model.pkl',
+            logsUrl: 'https://example.com/logs.txt',
+          }),
+        });
+
+        if (job && onJobComplete) {
+          onJobComplete({ ...job, status: 'completed' });
+        }
+      } catch (error) {
+        console.error('Failed to complete job:', error);
+      }
+    };
+
     // Simulate job execution
     const interval = setInterval(() => {
       setProgress(prev => {
-        if (prev >= 100) {
+        const newProgress = prev + 5;
+        
+        if (newProgress >= 100) {
           clearInterval(interval);
           handleJobCompletion();
           return 100;
         }
-        return prev + 5;
+        
+        // Add log with current progress
+        setLogs(prevLogs => [...prevLogs, `[${new Date().toLocaleTimeString()}] Processing... ${newProgress}%`]);
+        
+        return newProgress;
       });
-      
-      // Simulate logs
-      setLogs(prev => [...prev, `[${new Date().toLocaleTimeString()}] Processing... ${progress}%`]);
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [jobId]);
-
-  const fetchJobDetails = async () => {
-    try {
-      const token = localStorage.getItem('dtrain_worker_token');
-      const response = await fetch(`http://localhost:5000/api/jobs/${jobId}/status`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setJob(data);
-      }
-    } catch (error) {
-      console.error('Failed to fetch job details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleJobCompletion = async () => {
-    try {
-      // Mark job as completed
-      await fetch('http://localhost:5000/api/worker/complete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jobId,
-          modelUrl: 'https://example.com/model.pkl',
-          logsUrl: 'https://example.com/logs.txt',
-        }),
-      });
-
-      if (job && onJobComplete) {
-        onJobComplete({ ...job, status: 'completed' });
-      }
-    } catch (error) {
-      console.error('Failed to complete job:', error);
-    }
-  };
+  }, [jobId, job, onJobComplete]);
 
   if (loading) {
     return (
