@@ -111,36 +111,35 @@ const JobDetail: React.FC<JobDetailProps> = ({
   };
 
   const handleAccept = async () => {
-    if (!jobDetails || !workerId || !onAcceptJob) return;
-
-    setAccepting(true);
-    try {
-      const response = await fetch(
-        "http://localhost:5000/api/worker/accept-job",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            jobId: jobDetails.job._id,
-            deviceId: workerId,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to accept job");
-      }
-
-      onAcceptJob(jobDetails.job._id);
-    } catch (err: any) {
-      alert(err.message || "Failed to accept job");
-    } finally {
-      setAccepting(false);
+  if (!jobDetails || !workerId || !onAcceptJob) return;
+  
+  setAccepting(true);
+  try {
+    // Call accept API
+    const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        jobId: jobDetails.job._id, 
+        deviceId: workerId 
+      }),
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || "Failed to accept job");
     }
-  };
+    
+    // ✅ CRITICAL: Navigate to RunningJobs IMMEDIATELY
+    onAcceptJob(jobDetails.job._id); // This calls handleJobStart in App.tsx
+    
+  } catch (err: any) {
+    alert(err.message || "Failed to accept job");
+  } finally {
+    setAccepting(false);
+  }
+};
+
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";

@@ -1,3 +1,0 @@
-Trained Model Data
-Final accuracy: 1.000
-Final loss: 0.200

@@ -548,13 +548,15 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-            <WorkerDashboard
-              worker={worker}
-              onJobStart={handleJobStart}
-              onViewJobDetails={handleViewJobDetails}
-              onSignOut={handleSignOut}
-              onRegisterWorker={() => setCurrentView("workerRegister")}
-            />
+<WorkerDashboard
+  worker={worker}
+  onJobStart={handleJobStart}
+  onViewJobDetails={handleViewJobDetails}
+  onAcceptJob={handleJobStart}  // ✅ ADD THIS LINE
+  onSignOut={handleSignOut}
+  onRegisterWorker={() => setCurrentView("workerRegister")}
+/>
+
           </motion.div>
         )}
 
@@ -603,6 +605,7 @@ function App() {
                   jobId={currentJobId!}
                   workerId={worker?.deviceId || ""}
                   onBack={handleBackToDashboard}
+                  onAcceptJob={handleJobStart} 
                 />
               )}
             </motion.div>

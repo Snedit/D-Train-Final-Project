@@ -19,9 +19,11 @@ interface WorkerDashboardProps {
   worker: Worker | null;
   onJobStart: (jobId: string) => void;
   onViewJobDetails: (jobId: string) => void;
+  onAcceptJob: (jobId: string) => void;  // ✅ ADD THIS LINE
   onSignOut: () => void;
   onRegisterWorker: () => void;
 }
+
 
 interface PendingJob {
   _id: string;
