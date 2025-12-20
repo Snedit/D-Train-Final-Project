@@ -10,7 +10,6 @@ import JobDetail from "./components/JobDetail";
 import Documentation from "./components/Documentation";
 import type { Worker as WorkerType, Job } from "./types";
 
-
 function App() {
   const [currentView, setCurrentView] = useState<
     | "hero"
@@ -63,7 +62,6 @@ function App() {
       if (response.ok) {
         const data = await response.json();
         if (data.worker) {
-          // Map backend worker to frontend WorkerType
           const workerObj: WorkerType = {
             _id: data.worker._id,
             deviceId: data.worker.deviceId,
@@ -129,20 +127,16 @@ function App() {
 
       localStorage.setItem(TOKEN_KEY, loginData.token);
       setIsAuthenticated(true);
-
       setIsLoading(true);
 
-      // Check if user already has a registered worker
       const existingWorker = await checkExistingWorker(loginData.token);
 
       setTimeout(() => {
         if (existingWorker) {
-          // User already has a worker registered
           setWorker(existingWorker);
           localStorage.setItem(WORKER_KEY, JSON.stringify(existingWorker));
           setCurrentView("dashboard");
         } else {
-          // No worker found, show registration
           setCurrentView("workerRegister");
         }
         setIsLoading(false);
@@ -179,7 +173,6 @@ function App() {
         localStorage.setItem(TOKEN_KEY, registerData.token);
         setIsAuthenticated(true);
 
-        // Check if user already has a worker (unlikely for new user, but safe)
         const existingWorker = await checkExistingWorker(registerData.token);
 
         setTimeout(() => {
@@ -208,7 +201,6 @@ function App() {
         throw new Error("Please sign in first");
       }
 
-      // Get device info from Electron API (not browser fallback)
       let deviceInfo: {
         os: string;
         cpu: string;
@@ -216,17 +208,15 @@ function App() {
         gpu: string;
       };
 
-      if (window.electron) {
-        // Use Electron device info
-        const electronInfo = await window.electron.getDeviceInfo();
+      if ((window as any).electron) {
+        const electronInfo = await (window as any).electron.getDeviceInfo();
         deviceInfo = {
           os: electronInfo.os,
           cpu: electronInfo.cpu,
           ram: electronInfo.ram,
-          gpu: electronInfo.gpu || "Not detected", // Handle undefined case
+          gpu: electronInfo.gpu || "Not detected",
         };
       } else {
-        // Browser fallback (only if not in Electron)
         deviceInfo = {
           os: navigator.platform || "Unknown OS",
           cpu: `${navigator.hardwareConcurrency || 4} cores`,
@@ -244,7 +234,6 @@ function App() {
         ...deviceInfo,
       });
 
-      // Call backend API to register worker
       const registerRes = await fetch(
         "http://localhost:5000/api/worker/register",
         {
@@ -271,7 +260,6 @@ function App() {
 
       console.log("Worker registered successfully:", workerData);
 
-      // Save worker data
       const workerObj: WorkerType = {
         _id: workerData.worker._id,
         deviceId: workerData.worker.deviceId,
@@ -287,7 +275,6 @@ function App() {
       setWorker(workerObj);
       localStorage.setItem(WORKER_KEY, JSON.stringify(workerObj));
 
-      // Navigate to dashboard
       setIsLoading(true);
       setTimeout(() => {
         setCurrentView("dashboard");
@@ -354,6 +341,17 @@ function App() {
       setCurrentView("dashboard");
       setIsLoading(false);
     }, 800);
+  };
+
+  // NEW: open job detail from pending/available jobs list by jobId
+  const handleViewJobDetails = (jobId: string) => {
+    setCurrentJobId(jobId);
+    setCompletedJob(null);
+    setIsLoading(true);
+    setTimeout(() => {
+      setCurrentView("jobDetail");
+      setIsLoading(false);
+    }, 500);
   };
 
   const pageVariants: Variants = {
@@ -553,6 +551,7 @@ function App() {
             <WorkerDashboard
               worker={worker}
               onJobStart={handleJobStart}
+              onViewJobDetails={handleViewJobDetails}
               onSignOut={handleSignOut}
               onRegisterWorker={() => setCurrentView("workerRegister")}
             />
@@ -582,18 +581,32 @@ function App() {
           )}
 
         {/* Job Detail */}
-        {!isLoading && currentView === "jobDetail" && completedJob && (
-          <motion.div
-            key="jobDetail"
-            variants={pageVariants}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            transition={pageTransition}
-          >
-            <JobDetail job={completedJob} onBack={handleBackToDashboard} />
-          </motion.div>
-        )}
+        {!isLoading &&
+          currentView === "jobDetail" &&
+          (completedJob || currentJobId) && (
+            <motion.div
+              key="jobDetail"
+              variants={pageVariants}
+              initial="initial"
+              animate="animate"
+              exit="exit"
+              transition={pageTransition}
+            >
+              {/* 
+                If coming from completed job flow, pass full job. 
+                If coming from dashboard "View Details", pass jobId + workerId.
+              */}
+              {completedJob ? (
+                <JobDetail job={completedJob} onBack={handleBackToDashboard} />
+              ) : (
+                <JobDetail
+                  jobId={currentJobId!}
+                  workerId={worker?.deviceId || ""}
+                  onBack={handleBackToDashboard}
+                />
+              )}
+            </motion.div>
+          )}
       </AnimatePresence>
     </div>
   );

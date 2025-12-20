@@ -3,6 +3,8 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 import Worker from "../schemas/WorkerSchema.js";
 import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
+import { supabase } from "../utils/supabaseClient.js";
+import AdmZip from "adm-zip";
 
 const WorkerRouter = Router();
 
@@ -48,9 +50,9 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
 
     console.log("Worker created/updated:", worker);
 
-    res.status(201).json({ 
-      message: "Worker registered successfully", 
-      worker 
+    res.status(201).json({
+      message: "Worker registered successfully",
+      worker,
     });
   } catch (err) {
     console.error("Worker registration error:", err);
@@ -107,7 +109,9 @@ WorkerRouter.post("/push-log", async (req, res) => {
     const { jobId, deviceId, line } = req.body;
 
     if (!jobId || !deviceId || !line) {
-      return res.status(400).json({ message: "jobId, deviceId and line required" });
+      return res.status(400).json({
+        message: "jobId, deviceId and line required",
+      });
     }
 
     await Job.findByIdAndUpdate(jobId, {
@@ -171,7 +175,7 @@ WorkerRouter.post("/accept-job", async (req, res) => {
 WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
-    
+
     if (!worker) {
       return res.status(404).json({ message: "No worker found for this user" });
     }
@@ -179,6 +183,172 @@ WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
     res.status(200).json({ message: "Worker found", worker });
   } catch (err) {
     console.error("Error fetching user's worker:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// GET /job/:jobId/details - Get detailed job information including ZIP metadata
+WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
+  try {
+    const { jobId } = req.params;
+
+    // Fetch job from database
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Extract file path from the zipFileUrl
+    let zipMetadata = null;
+    let zipFilesList = [];
+    let filesExtractedFromZip = false;
+
+    if (job.zipFileUrl) {
+      try {
+        // Extract the file path from the public URL
+        const urlParts = job.zipFileUrl.split("/");
+        const fileName = urlParts[urlParts.length - 1];
+        const filePath = `jobs/${fileName}`;
+
+        console.log("Fetching metadata for:", filePath);
+
+        // Get file metadata from Supabase
+        const { data: fileData, error: fileError } = await supabase.storage
+          .from("jobs")
+          .list("jobs", {
+            limit: 100,
+            offset: 0,
+          });
+
+        if (!fileError && fileData) {
+          // Find the specific file
+          const fileInfo = fileData.find((f) => f.name === fileName);
+          if (fileInfo) {
+            zipMetadata = {
+              name: fileInfo.name,
+              size: fileInfo.metadata?.size || 0,
+              createdAt: fileInfo.created_at,
+              lastModified: fileInfo.updated_at,
+            };
+          }
+        }
+
+        // Download and extract actual ZIP contents from Supabase
+        try {
+          const { data: zipData, error: downloadError } = await supabase.storage
+            .from("jobs")
+            .download(filePath);
+
+          if (!downloadError && zipData) {
+            // Convert blob to buffer
+            const arrayBuffer = await zipData.arrayBuffer();
+            const buffer = Buffer.from(arrayBuffer);
+
+            // Extract ZIP contents using adm-zip
+            const zip = new AdmZip(buffer);
+            const entries = zip.getEntries();
+
+            // Map actual files from ZIP
+            zipFilesList = entries
+              .filter((entry) => !entry.isDirectory) // Exclude directories
+              .map((entry) => {
+                const fileName = entry.entryName;
+                let fileType = "File";
+                let required = false;
+
+                // Determine file type and if it's required
+                if (fileName === "requirements.txt") {
+                  fileType = "Dependencies";
+                  required = true;
+                } else if (fileName === job.config.entryFile) {
+                  fileType = "Entry Point";
+                  required = true;
+                } else if (fileName.endsWith(".py")) {
+                  fileType = "Python Script";
+                } else if (
+                  fileName.includes("dataset") ||
+                  fileName.includes("data")
+                ) {
+                  fileType = "Training Data";
+                } else if (fileName.endsWith(".txt")) {
+                  fileType = "Text File";
+                } else if (fileName.endsWith(".json")) {
+                  fileType = "Configuration";
+                } else if (fileName.endsWith(".csv")) {
+                  fileType = "Dataset";
+                }
+
+                return {
+                  name: fileName,
+                  type: fileType,
+                  required: required,
+                  size: entry.header.size,
+                };
+              });
+
+            filesExtractedFromZip = true;
+            console.log(
+              `Successfully extracted ${zipFilesList.length} files from ZIP`
+            );
+          }
+        } catch (zipError) {
+          console.error("Failed to extract ZIP contents:", zipError);
+          // Fallback to expected files if ZIP extraction fails
+          zipFilesList = [
+            {
+              name: "requirements.txt",
+              type: "Dependencies",
+              required: true,
+            },
+            {
+              name: job.config.entryFile || "main.py",
+              type: "Entry Point",
+              required: true,
+            },
+          ];
+        }
+      } catch (supabaseErr) {
+        console.error("Supabase metadata fetch error:", supabaseErr);
+        // Fallback to basic expected files
+        zipFilesList = [
+          {
+            name: "requirements.txt",
+            type: "Dependencies",
+            required: true,
+          },
+          {
+            name: job.config.entryFile || "main.py",
+            type: "Entry Point",
+            required: true,
+          },
+        ];
+      }
+    }
+
+    // Return complete job details
+    res.status(200).json({
+      message: "Job details fetched successfully",
+      job: {
+        _id: job._id,
+        userId: job.userId,
+        title: job.title,
+        description: job.description,
+        status: job.status,
+        zipFileUrl: job.zipFileUrl,
+        config: job.config,
+        assignedWorkerId: job.assignedWorkerId,
+        logs: job.logs,
+        modelUrl: job.modelUrl,
+        errorMessage: job.errorMessage,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+      },
+      zipMetadata,
+      zipFilesList,
+      filesExtractedFromZip, // Indicates if actual ZIP was read
+    });
+  } catch (err) {
+    console.error("Error fetching job details:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });

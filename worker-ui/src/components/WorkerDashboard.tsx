@@ -5,7 +5,7 @@ import {
   Activity, 
   CheckCircle, 
   Clock, 
-  PlayCircle,
+  FileText,
   LogOut,
   Zap,
   TrendingUp,
@@ -18,6 +18,7 @@ import type { Worker } from '../types';
 interface WorkerDashboardProps {
   worker: Worker | null;
   onJobStart: (jobId: string) => void;
+  onViewJobDetails: (jobId: string) => void;
   onSignOut: () => void;
   onRegisterWorker: () => void;
 }
@@ -37,8 +38,8 @@ interface WorkerStats {
 }
 
 const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ 
-  worker, 
-  onJobStart, 
+  worker,  
+  onViewJobDetails,
   onSignOut,
   onRegisterWorker 
 }) => {
@@ -158,39 +159,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         totalEarned: 0,
         currentStatus: 'offline',
       });
-    }
-  };
-
-  const handleAcceptJob = async (jobId: string) => {
-    if (!worker) {
-      alert('Please register as a worker first');
-      return;
-    }
-
-    try {
-      const response = await fetch('http://localhost:5000/api/worker/accept-job', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          jobId, 
-          deviceId: worker.deviceId 
-        }),
-      });
-
-      if (response.ok) {
-        // Refresh jobs list and stats
-        await fetchPendingJobs();
-        await fetchWorkerStats();
-        
-        // Navigate to running job view
-        onJobStart(jobId);
-      } else {
-        const error = await response.json();
-        alert(`Failed to accept job: ${error.message}`);
-      }
-    } catch (error) {
-      console.error('Failed to accept job:', error);
-      alert('Failed to accept job. Please try again.');
     }
   };
 
@@ -469,11 +437,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                             <motion.button
                               whileHover={{ y: -2 }}
                               whileTap={{ y: 0 }}
-                              onClick={() => handleAcceptJob(job._id)}
-                              className="flex items-center gap-2 px-6 py-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-slate-900 font-bold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] whitespace-nowrap"
+                              onClick={() => onViewJobDetails(job._id)}
+                              className="flex items-center gap-2 px-6 py-3 rounded-[12px] border-[3px] border-slate-900 bg-[#7CF2D0] text-slate-900 font-bold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] whitespace-nowrap"
                             >
-                              <PlayCircle className="w-5 h-5" />
-                              Accept Job
+                              <FileText className="w-5 h-5" />
+                              View Details
                             </motion.button>
                           </div>
                         </motion.div>
