@@ -22,19 +22,14 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     logsRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // Fetch job details on mount
+  // ✅ FIXED: Fetch job details using worker endpoint (no auth token)
   useEffect(() => {
     scrollToBottom();
     console.log('📡 Fetching job details for:', jobId);
     
-    const token = localStorage.getItem('dtrain_worker_token');
-    if (!token) {
-      setLogs(prev => [...prev, '\n❌ No auth token found']);
-      return;
-    }
-
-    fetch(`http://localhost:5000/api/jobs/${jobId}/status`, {
-      headers: { Authorization: `Bearer ${token}` }
+    fetch(`http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${workerId}`, {
+      headers: { 'Content-Type': 'application/json' }
+      // NO Authorization header - worker uses deviceId
     })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -42,14 +37,15 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
       })
       .then(data => {
         console.log('✅ Job fetched:', data);
-        setJob(data);
-        setLogs(prev => [...prev, `\n📋 Job: ${data.title || 'Untitled'}\n`]);
+        const jobData = data.job || data; // Handle both response formats
+        setJob(jobData);
+        setLogs(prev => [...prev, `\n📋 Job: ${jobData.title || 'Untitled'}\n`]);
       })
       .catch(err => {
         console.error('❌ Job fetch failed:', err);
         setLogs(prev => [...prev, `\n❌ Failed to fetch job: ${err.message}`]);
       });
-  }, [jobId, scrollToBottom]);
+  }, [jobId, workerId, scrollToBottom]);
 
   // Cleanup listener on unmount
   useEffect(() => {
@@ -71,13 +67,6 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
       return;
     }
     
-    // ✅ Get token from localStorage
-    const token = localStorage.getItem('dtrain_worker_token');
-    if (!token) {
-      setLogs(prev => [...prev, '\n❌ No auth token found in localStorage']);
-      return;
-    }
-    
     setIsRunning(true);
     setLogs(prev => [...prev, `\n> Starting job ${jobId.slice(-8)}...\n`]);
     
@@ -95,9 +84,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     }
     
     try {
-      // ✅ Pass token as second argument
-      console.log('📤 Calling Electron: runTestJob(', jobId, ', token)');
-      const result = await window.worker.runTestJob(jobId, token);
+      // ✅ CRITICAL: Pass workerId (deviceId) to Electron, not auth token
+      console.log('📤 Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
+      const result = await window.worker.runTestJob(jobId, workerId);
       console.log('📥 Electron result:', result);
       
       setIsCompleted(true);

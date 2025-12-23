@@ -85,18 +85,20 @@ const JobDetail: React.FC<JobDetailProps> = ({
   const fetchJobDetails = async (id: string) => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("dtrain_worker_token");
+      // ✅ FIXED: Use worker endpoint with deviceId query param (no auth token)
       const response = await fetch(
-        `http://localhost:5000/api/worker/job/${id}/details`,
+        `http://localhost:5000/api/worker/job/${id}/details?deviceId=${workerId}`,
         {
           headers: {
-            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+            // NO Authorization header - worker uses deviceId
           },
         }
       );
 
       if (!response.ok) {
-        throw new Error("Failed to fetch job details");
+        const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+        throw new Error(errorData.message || "Failed to fetch job details");
       }
 
       const data = await response.json();
@@ -111,35 +113,34 @@ const JobDetail: React.FC<JobDetailProps> = ({
   };
 
   const handleAccept = async () => {
-  if (!jobDetails || !workerId || !onAcceptJob) return;
-  
-  setAccepting(true);
-  try {
-    // Call accept API
-    const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        jobId: jobDetails.job._id, 
-        deviceId: workerId 
-      }),
-    });
+    if (!jobDetails || !workerId || !onAcceptJob) return;
     
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.message || "Failed to accept job");
+    setAccepting(true);
+    try {
+      // ✅ FIXED: Use worker endpoint (no auth token needed)
+      const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          jobId: jobDetails.job._id, 
+          deviceId: workerId 
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || "Failed to accept job");
+      }
+      
+      // Navigate to RunningJobs IMMEDIATELY
+      onAcceptJob(jobDetails.job._id);
+      
+    } catch (err: any) {
+      alert(err.message || "Failed to accept job");
+    } finally {
+      setAccepting(false);
     }
-    
-    // ✅ CRITICAL: Navigate to RunningJobs IMMEDIATELY
-    onAcceptJob(jobDetails.job._id); // This calls handleJobStart in App.tsx
-    
-  } catch (err: any) {
-    alert(err.message || "Failed to accept job");
-  } finally {
-    setAccepting(false);
-  }
-};
-
+  };
 
   const formatFileSize = (bytes: number): string => {
     if (bytes === 0) return "0 Bytes";
@@ -230,12 +231,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
           {/* Main content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
             {/* Top nav */}
-            <nav
-              className="flex items-center justify-between mb-8"
-              style={{
-                animation: "slideDown 0.6s ease-out",
-              }}
-            >
+            <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                   <img
@@ -261,12 +257,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
             </nav>
 
             {/* Header */}
-            <div
-              className="mb-8"
-              style={{
-                animation: "slideUp 0.7s ease-out 0.2s both",
-              }}
-            >
+            <div className="mb-8">
               <div className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#E4ECFF] text-[11px] font-semibold text-slate-900 shadow-[3px_3px_0_0_rgba(15,23,42,1)] mb-3">
                 {isCompletedView ? "Completed Job" : "Pending Job"}
               </div>
@@ -616,30 +607,6 @@ const JobDetail: React.FC<JobDetailProps> = ({
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-25px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
     </div>
   );
 };

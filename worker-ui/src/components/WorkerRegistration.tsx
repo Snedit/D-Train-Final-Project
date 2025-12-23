@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Server, Cpu, HardDrive, Zap, AlertCircle, LogOut } from 'lucide-react';
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Server, Cpu, HardDrive, Zap, AlertCircle, LogOut } from "lucide-react";
 
 interface WorkerRegistrationProps {
   onRegister: () => Promise<void>;
@@ -14,13 +14,13 @@ interface DeviceInfo {
   gpu?: string;
 }
 
-const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({ 
+const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
   onRegister,
   onSignOut,
 }) => {
   const [loading, setLoading] = useState(false);
   const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
 
   useEffect(() => {
     fetchDeviceInfo();
@@ -28,31 +28,31 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
 
   const fetchDeviceInfo = async () => {
     try {
-      if (window.electron) {
-        const info = await window.electron.getDeviceInfo();
+      if ((window as any).worker) {
+        const info = await (window as any).worker.getDeviceInfo();
         setDeviceInfo(info);
       } else {
         // Browser fallback
         setDeviceInfo({
-          os: navigator.platform || 'Web Browser',
+          os: navigator.platform || "Web Browser",
           cpu: `${navigator.hardwareConcurrency || 4} cores`,
           ram: `${(navigator as any).deviceMemory || 8}GB`,
-          gpu: 'WebGL GPU',
+          gpu: "WebGL GPU",
         });
       }
     } catch (err) {
-      console.error('Failed to fetch device info:', err);
-      setError('Failed to get device information');
+      console.error("Failed to fetch device info:", err);
+      setError("Failed to get device information");
     }
   };
 
   const handleRegister = async () => {
     setLoading(true);
-    setError('');
+    setError("");
     try {
       await onRegister();
     } catch (err: any) {
-      setError(err.message || 'Registration failed. Please try again.');
+      setError(err.message || "Registration failed. Please try again.");
       setLoading(false);
     }
   };
@@ -88,9 +88,9 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
           <nav className="flex items-center justify-between mb-6">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img 
-                  src="logo.png" 
-                  alt="DTrain Logo" 
+                <img
+                  src="logo.png"
+                  alt="DTrain Logo"
                   className="w-8 h-8 object-contain"
                 />
               </div>
@@ -145,8 +145,12 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
                   <Server className="w-5 h-5 text-slate-900" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-slate-600 mb-0.5">Operating System</p>
-                  <p className="text-sm font-bold text-slate-900">{deviceInfo.os}</p>
+                  <p className="text-xs font-semibold text-slate-600 mb-0.5">
+                    Operating System
+                  </p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {deviceInfo.os}
+                  </p>
                 </div>
               </div>
 
@@ -155,8 +159,12 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
                   <Cpu className="w-5 h-5 text-slate-900" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-slate-600 mb-0.5">CPU</p>
-                  <p className="text-sm font-bold text-slate-900">{deviceInfo.cpu}</p>
+                  <p className="text-xs font-semibold text-slate-600 mb-0.5">
+                    CPU
+                  </p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {deviceInfo.cpu}
+                  </p>
                 </div>
               </div>
 
@@ -165,8 +173,12 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
                   <HardDrive className="w-5 h-5 text-slate-900" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-slate-600 mb-0.5">RAM</p>
-                  <p className="text-sm font-bold text-slate-900">{deviceInfo.ram}</p>
+                  <p className="text-xs font-semibold text-slate-600 mb-0.5">
+                    RAM
+                  </p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {deviceInfo.ram}
+                  </p>
                 </div>
               </div>
 
@@ -175,8 +187,12 @@ const WorkerRegistration: React.FC<WorkerRegistrationProps> = ({
                   <Zap className="w-5 h-5 text-slate-900" />
                 </div>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-slate-600 mb-0.5">GPU</p>
-                  <p className="text-sm font-bold text-slate-900">{deviceInfo.gpu || 'N/A'}</p>
+                  <p className="text-xs font-semibold text-slate-600 mb-0.5">
+                    GPU
+                  </p>
+                  <p className="text-sm font-bold text-slate-900">
+                    {deviceInfo.gpu || "N/A"}
+                  </p>
                 </div>
               </div>
             </div>

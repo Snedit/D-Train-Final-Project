@@ -19,11 +19,10 @@ interface WorkerDashboardProps {
   worker: Worker | null;
   onJobStart: (jobId: string) => void;
   onViewJobDetails: (jobId: string) => void;
-  onAcceptJob: (jobId: string) => void;  // ✅ ADD THIS LINE
+  onAcceptJob: (jobId: string) => void;
   onSignOut: () => void;
   onRegisterWorker: () => void;
 }
-
 
 interface PendingJob {
   _id: string;
@@ -57,10 +56,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
   useEffect(() => {
     if (worker) {
+      console.log("✅ Worker loaded:", worker);
+      console.log("📱 Device ID:", worker.deviceId);
       fetchPendingJobs();
       fetchWorkerStats();
       
-      // Poll for new jobs every 10 seconds
       const interval = setInterval(() => {
         fetchPendingJobs();
         fetchWorkerStats();
@@ -74,26 +74,52 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
   const fetchPendingJobs = async () => {
     try {
-      const token = localStorage.getItem("dtrain_worker_token");
-      const response = await fetch('http://localhost:5000/api/jobs', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      });
+      if (!worker?.deviceId) {
+        console.log("❌ No deviceId found. Worker:", worker);
+        setPendingJobs([]);
+        setLoading(false);
+        setError('Worker device ID missing. Please re-register.');
+        return;
+      }
+
+      console.log("🔍 Fetching jobs for deviceId:", worker.deviceId);
+
+      // Fetch available jobs using worker endpoint
+      const response = await fetch(
+        `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
+        {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      console.log("📡 Jobs API status:", response.status);
 
       if (response.ok) {
         const data = await response.json();
-        // Filter only pending jobs (not assigned to anyone yet)
-        const pending = data.jobs.filter((job: PendingJob) => job.status === 'pending');
-        setPendingJobs(pending);
+        console.log("📦 Jobs data:", data);
+        
+        // Get available jobs from response
+        const availableJobs = data.jobs || data.availableJobs || [];
+        
+        console.log("✅ Available jobs:", availableJobs.length);
+        setPendingJobs(availableJobs);
         setError('');
       } else {
-        console.error('Failed to fetch jobs:', response.status);
+        const errorText = await response.text();
+        console.error('❌ Jobs fetch failed:', response.status, errorText);
         setPendingJobs([]);
+        
+        if (response.status === 404) {
+          setError('Worker not registered. Please register first.');
+        } else {
+          setError('Failed to load jobs');
+        }
       }
     } catch (error) {
-      console.error('Failed to fetch pending jobs:', error);
-      setError('Failed to fetch jobs. Please check your connection.');
+      console.error('❌ Network error:', error);
+      setError('Connection error. Check if backend is running on port 5000.');
       setPendingJobs([]);
     } finally {
       setLoading(false);
@@ -102,39 +128,37 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   };
 
   const fetchWorkerStats = async () => {
-    if (!worker) return;
+    if (!worker?.deviceId) return;
 
     try {
       const token = localStorage.getItem("dtrain_worker_token");
-      
-      // Fetch all jobs to calculate worker-specific stats
+      if (!token) {
+        setStats({
+          totalCompleted: 0,
+          totalEarned: 0,
+          currentStatus: 'idle',
+        });
+        return;
+      }
+
       const jobsResponse = await fetch('http://localhost:5000/api/jobs', {
         headers: {
           'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       });
-      const workersResponse = await fetch('http://localhost:5000/api/worker');
       
-      if (jobsResponse.ok && workersResponse.ok) {
+      if (jobsResponse.ok) {
         const jobsData = await jobsResponse.json();
-        const workersData = await workersResponse.json();
         
-        // Find current worker
-        const currentWorker = workersData.workers.find(
-          (w: Worker) => w.deviceId === worker.deviceId
-        );
-        
-        // Calculate completed jobs by this worker
         const completedJobs = jobsData.jobs.filter(
           (job: any) => 
             job.assignedWorkerId === worker.deviceId && 
             job.status === 'completed'
         );
         
-        // Calculate earnings (mock calculation - $5 per completed job)
         const totalEarned = completedJobs.length * 5.0;
         
-        // Determine current status
         const hasActiveJob = jobsData.jobs.some(
           (job: any) => 
             job.assignedWorkerId === worker.deviceId && 
@@ -144,23 +168,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         setStats({
           totalCompleted: completedJobs.length,
           totalEarned: totalEarned,
-          currentStatus: hasActiveJob ? 'working' : (currentWorker?.status || 'idle'),
-        });
-      } else {
-        // Set defaults if API fails
-        setStats({
-          totalCompleted: 0,
-          totalEarned: 0,
-          currentStatus: 'offline',
+          currentStatus: hasActiveJob ? 'working' : 'idle',
         });
       }
     } catch (error) {
-      console.error('Failed to fetch worker stats:', error);
-      setStats({
-        totalCompleted: 0,
-        totalEarned: 0,
-        currentStatus: 'offline',
-      });
+      console.error('Stats fetch failed:', error);
     }
   };
 
@@ -191,7 +203,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-7xl mx-auto">
         <div className="relative">
-          {/* Grid background card */}
           <div
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
@@ -201,7 +212,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
             }}
           />
 
-          {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
@@ -215,9 +225,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
             transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
           />
 
-          {/* Main content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
-            {/* Top nav */}
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
@@ -256,7 +264,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </div>
             </nav>
 
-            {/* Header */}
             <div className="mb-8">
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
                 Worker Dashboard
@@ -268,7 +275,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               )}
             </div>
 
-            {/* Error Message */}
             {error && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -280,7 +286,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </motion.div>
             )}
 
-            {/* Worker Not Registered Alert */}
             {!worker && (
               <motion.div
                 initial={{ opacity: 0, y: -10 }}
@@ -312,10 +317,8 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </motion.div>
             )}
 
-            {/* Worker Content */}
             {worker && (
               <>
-                {/* Worker Info Card */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] p-6 mb-8">
                   <h2 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
                     <Cpu className="w-5 h-5" />
@@ -324,26 +327,32 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#F0F9FF] p-4">
                       <p className="text-xs font-semibold text-slate-600 mb-1">Operating System</p>
-                      <p className="text-sm font-extrabold text-slate-900">{worker.os}</p>
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {(worker as any).os || (worker as any).systemInfo?.os || 'N/A'}
+                      </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#FEF3C7] p-4">
                       <p className="text-xs font-semibold text-slate-600 mb-1">CPU</p>
-                      <p className="text-sm font-extrabold text-slate-900">{worker.cpu}</p>
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {(worker as any).cpu || (worker as any).systemInfo?.cpu || 'N/A'}
+                      </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#DCFCE7] p-4">
                       <p className="text-xs font-semibold text-slate-600 mb-1">RAM</p>
-                      <p className="text-sm font-extrabold text-slate-900">{worker.ram}</p>
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {(worker as any).ram || (worker as any).systemInfo?.ram || 'N/A'}
+                      </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#FCE7F3] p-4">
                       <p className="text-xs font-semibold text-slate-600 mb-1">GPU</p>
-                      <p className="text-sm font-extrabold text-slate-900">{worker.gpu || 'N/A'}</p>
+                      <p className="text-sm font-extrabold text-slate-900">
+                        {(worker as any).gpu || (worker as any).systemInfo?.gpu || 'N/A'}
+                      </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Stats Grid */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  {/* Status */}
                   <motion.div 
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -361,7 +370,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Completed Jobs */}
                   <motion.div 
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -377,7 +385,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Total Earned */}
                   <motion.div 
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -396,7 +403,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   </motion.div>
                 </div>
 
-                {/* Available Jobs */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
                   <div className="p-5 border-b-[3px] border-slate-900 bg-[#DBEAFE]">
                     <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
@@ -454,7 +460,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </>
             )}
 
-            {/* If not registered, show limited view */}
             {!worker && (
               <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] p-12 text-center">
                 <div className="w-20 h-20 rounded-[16px] bg-[#E0E7FF] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">

@@ -1,10 +1,46 @@
+// electron-worker/main.js - Complete Fixed Version
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const AdmZip = require("adm-zip");
 const { spawn, exec } = require("child_process");
 const os = require("os");
-const fetch = require('node-fetch'); // ✅ node-fetch v2 (CommonJS)
+const fetch = require('node-fetch');
+const FormData = require('form-data');
+const crypto = require('crypto');
+
+// ✅ Generate persistent device ID
+function getOrCreateDeviceId() {
+  const configPath = path.join(app.getPath('userData'), 'device-config.json');
+  
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (config.deviceId) {
+        console.log('📱 Using existing deviceId:', config.deviceId);
+        return config.deviceId;
+      }
+    }
+  } catch (err) {
+    console.error('Error reading device config:', err);
+  }
+  
+  // Generate new deviceId based on machine fingerprint
+  const machineInfo = `${os.hostname()}-${os.platform()}-${os.arch()}-${os.cpus()[0].model}`;
+  const deviceId = crypto.createHash('sha256').update(machineInfo).digest('hex').substring(0, 16);
+  
+  // Save to disk
+  try {
+    fs.writeFileSync(configPath, JSON.stringify({ deviceId }, null, 2));
+    console.log('🆕 Generated new deviceId:', deviceId);
+  } catch (err) {
+    console.error('Error saving device config:', err);
+  }
+  
+  return deviceId;
+}
+
+let DEVICE_ID = null;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -24,17 +60,15 @@ function createWindow() {
   win.maximize();
   win.loadFile(path.join(__dirname, "dist", "index.html"));
   win.webContents.openDevTools();
-  
-  win.webContents.on('did-finish-load', () => {
-    console.log('✅ Window loaded - checking worker...');
-    win.webContents.executeJavaScript(`
-      setTimeout(() => {
-        console.log('🔍 PRELOAD CHECK - window.worker:', !!window.worker);
-        console.log('🔍 Methods:', Object.keys(window.worker || {}));
-      }, 1000);
-    `);
-  });
 }
+
+// ✅ Get Device ID Handler
+ipcMain.handle("get-device-id", async () => {
+  if (!DEVICE_ID) {
+    DEVICE_ID = getOrCreateDeviceId();
+  }
+  return DEVICE_ID;
+});
 
 // Device Info Handler
 ipcMain.handle("get-device-info", async () => {
@@ -66,56 +100,70 @@ ipcMain.handle("get-device-info", async () => {
   };
 });
 
-// ✅ FIXED: Job runner with proper fetch handling
-ipcMain.handle("run-test-job", async (event, jobId, authToken) => {
+// ✅ FIXED Complete Job Runner - uses PASSED deviceId
+ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const shortId = jobId.slice(-8);
   const jobDir = path.join(__dirname, "jobs", `job-${shortId}`);
   const zipPath = path.join(__dirname, "temp", `job-${jobId}.zip`);
   const outputDir = path.join(__dirname, "jobs", `job-${shortId}`, "output");
+  const outputZipPath = path.join(__dirname, "temp", `output-${jobId}.zip`);
 
-  console.log(`🚀 Starting job ${jobId} (${shortId})`);
+  const collectedLogs = [];
+  
+  // ✅ FIXED: Use PASSED deviceId from web (not local DEVICE_ID)
+  const deviceId = passedDeviceId || DEVICE_ID;
+
+  // Helper to send and collect logs
+  const sendLog = (msg) => {
+    event.sender.send("job-log", msg);
+    collectedLogs.push(msg.replace(/\n$/, ''));
+  };
+
+  console.log(`🚀 Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
 
   try {
     // 🔄 Cleanup previous run
     if (fs.existsSync(jobDir)) {
       fs.rmSync(jobDir, { recursive: true, force: true });
     }
-    if (fs.existsSync(zipPath)) {
-      fs.unlinkSync(zipPath);
-    }
+    if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
+    if (fs.existsSync(outputZipPath)) fs.unlinkSync(outputZipPath);
+    
     fs.mkdirSync(path.dirname(zipPath), { recursive: true });
     fs.mkdirSync(jobDir, { recursive: true });
     fs.mkdirSync(outputDir, { recursive: true });
 
-    event.sender.send("job-log", "🔍 Fetching job from backend...\n");
+    sendLog("🔍 Fetching job from backend...\n");
 
-    // 1️⃣ Get job details from YOUR backend
-    const token = authToken || 'test-token';
-    console.log('🔑 Using token:', token ? `${token.slice(0,10)}...` : 'none');
-
-    const jobResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}/status`, {
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
+    // ✅ 1️⃣ Get job details using worker endpoint (no auth required)
+    const jobResponse = await fetch(
+      `http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
+      {
+        headers: { 
+          'Content-Type': 'application/json'
+          // NO Authorization header - worker uses deviceId
+        }
       }
-    });
+    );
 
     if (!jobResponse.ok) {
-      throw new Error(`Job fetch failed: ${jobResponse.status} ${jobResponse.statusText}`);
+      const errorData = await jobResponse.text();
+      throw new Error(`Job fetch failed: ${jobResponse.status} - ${errorData}`);
     }
 
-    const jobData = await jobResponse.json();
-    event.sender.send("job-log", `✅ Job found: ${jobData.title || 'Untitled'}\n`);
-    event.sender.send("job-log", `📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
+    const responseData = await jobResponse.json();
+    const jobData = responseData.job || responseData; // Handle both response formats
+    
+    sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
+    sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
+    sendLog(`🤖 Worker ID: ${deviceId}\n`);
 
     // 2️⃣ Download ZIP from Supabase
     if (!jobData.zipFileUrl) {
       throw new Error('❌ No zipFileUrl in job data');
     }
 
-    event.sender.send("job-log", "📥 Downloading ZIP from Supabase...\n");
-    console.log('📎 ZIP URL:', jobData.zipFileUrl);
-
+    sendLog("📥 Downloading ZIP from Supabase...\n");
     const zipResponse = await fetch(jobData.zipFileUrl);
 
     if (!zipResponse.ok) {
@@ -124,24 +172,24 @@ ipcMain.handle("run-test-job", async (event, jobId, authToken) => {
 
     const zipBuffer = await zipResponse.buffer();
     fs.writeFileSync(zipPath, zipBuffer);
-    event.sender.send("job-log", `✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
+    sendLog(`✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
 
     // 3️⃣ Extract ZIP files
-    event.sender.send("job-log", "📦 Extracting job files...\n");
+    sendLog("📦 Extracting job files...\n");
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(jobDir, true);
     fs.unlinkSync(zipPath);
-    event.sender.send("job-log", "✅ Files extracted successfully\n\n");
+    sendLog("✅ Files extracted successfully\n\n");
 
-    // 4️⃣ Validate main file exists
+    // 4️⃣ Validate main file
     const mainFileName = jobData.config?.entryFile || 'main.py';
     const mainFilePath = path.join(jobDir, mainFileName);
     if (!fs.existsSync(mainFilePath)) {
       throw new Error(`❌ Main file '${mainFileName}' not found in ZIP`);
     }
-    event.sender.send("job-log", `🚀 Main file verified: ${mainFileName}\n`);
+    sendLog(`🚀 Main file verified: ${mainFileName}\n`);
 
-    // 5️⃣ Create dynamic Dockerfile
+    // 5️⃣ Create Dockerfile
     const dockerfile = `
 FROM python:3.11-slim
 WORKDIR /app
@@ -152,8 +200,8 @@ CMD ["python", "${mainFileName}"]
     `.trim();
 
     fs.writeFileSync(path.join(jobDir, "Dockerfile"), dockerfile);
-    event.sender.send("job-log", "🐳 Creating Dockerfile... ✅\n");
-    event.sender.send("job-log", "🐳 Building Docker image...\n");
+    sendLog("🐳 Creating Dockerfile... ✅\n");
+    sendLog("🐳 Building Docker image...\n");
 
     // 6️⃣ Build Docker image
     const imageName = `dtrain-job-${shortId}`;
@@ -163,25 +211,17 @@ CMD ["python", "${mainFileName}"]
         shell: true
       });
 
-      build.stdout.on("data", (data) => {
-        event.sender.send("job-log", data.toString());
-      });
-
-      build.stderr.on("data", (data) => {
-        event.sender.send("job-log", data.toString());
-      });
+      build.stdout.on("data", (data) => sendLog(data.toString()));
+      build.stderr.on("data", (data) => sendLog(data.toString()));
 
       build.on("close", (code) => {
-        if (code === 0) {
-          resolve(null);
-        } else {
-          reject(new Error(`Docker build failed with code ${code}`));
-        }
+        if (code === 0) resolve();
+        else reject(new Error(`Docker build failed with code ${code}`));
       });
     });
 
-    event.sender.send("job-log", "\n🚀 Docker image built successfully!\n");
-    event.sender.send("job-log", "▶️  Running training job...\n");
+    sendLog("\n🚀 Docker image built successfully!\n");
+    sendLog("▶️  Running training job...\n");
 
     // 7️⃣ Run Docker container
     const containerName = `dtrain-container-${shortId}`;
@@ -191,18 +231,13 @@ CMD ["python", "${mainFileName}"]
         shell: true
       });
 
-      run.stdout.on("data", (data) => {
-        event.sender.send("job-log", data.toString());
-      });
-
-      run.stderr.on("data", (data) => {
-        event.sender.send("job-log", data.toString());
-      });
+      run.stdout.on("data", (data) => sendLog(data.toString()));
+      run.stderr.on("data", (data) => sendLog(data.toString()));
 
       run.on("close", (code) => {
         if (code === 0) {
-          event.sender.send("job-log", "\n✅ Training completed!\n");
-          resolve(null);
+          sendLog("\n✅ Training completed!\n");
+          resolve();
         } else {
           reject(new Error(`Container failed with code ${code}`));
         }
@@ -210,15 +245,13 @@ CMD ["python", "${mainFileName}"]
     });
 
     // 8️⃣ Extract output files
-    event.sender.send("job-log", "📥 Extracting output files...\n");
+    sendLog("📥 Extracting output files...\n");
     await new Promise((resolve) => {
       exec(
         `docker cp ${containerName}:/app/. "${outputDir}"`,
         (error, stdout, stderr) => {
-          if (error) {
-            event.sender.send("job-log", `⚠️  Copy warning: ${stderr}\n`);
-          }
-          resolve(null);
+          if (error) sendLog(`⚠️  Copy warning: ${stderr}\n`);
+          resolve();
         }
       );
     });
@@ -226,75 +259,196 @@ CMD ["python", "${mainFileName}"]
     // 9️⃣ Cleanup container
     await new Promise((resolve) => {
       exec(`docker rm ${containerName}`, () => {
-        event.sender.send("job-log", "🧹 Container cleaned up\n");
-        resolve(null);
+        sendLog("🧹 Container cleaned up\n");
+        resolve();
       });
     });
 
-    // 🔟 List output files
+    // 🔟 List and ZIP output files
     const files = fs.readdirSync(outputDir);
     const outputFiles = files.filter(f => 
       !['main.py', 'requirements.txt', 'Dockerfile', '__pycache__'].includes(f) &&
       !f.startsWith('.')
     );
 
-    if (outputFiles.length > 0) {
-      event.sender.send("job-log", `\n✅ OUTPUT FILES GENERATED:\n`);
-      outputFiles.forEach(file => {
-        const filePath = path.join(outputDir, file);
-        const stats = fs.statSync(filePath);
-        const sizeKB = (stats.size / 1024).toFixed(1);
-        event.sender.send("job-log", `  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
+    if (outputFiles.length === 0) {
+      sendLog(`\n⚠️  No output files generated\n`);
+      
+      // Report failure to backend
+      await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId,
+          errorMessage: 'No output files generated',
+          logs: JSON.stringify(collectedLogs)
+        })
       });
-      event.sender.send("job-log", `\n📂 Output folder: ${outputDir}\n`);
-    } else {
-      event.sender.send("job-log", `\n⚠️  No output files generated (check logs above)\n`);
+      
+      throw new Error('No output files to upload');
     }
 
-    event.sender.send("job-log", `\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
-    event.sender.send("job-log", `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    sendLog(`\n✅ OUTPUT FILES GENERATED (${outputFiles.length}):\n`);
+    outputFiles.forEach(file => {
+      const filePath = path.join(outputDir, file);
+      const stats = fs.statSync(filePath);
+      const sizeKB = (stats.size / 1024).toFixed(1);
+      sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
+    });
+
+    // ✅ Create ZIP of output files ONLY
+    sendLog("\n📦 Creating output ZIP...\n");
+    const outputZip = new AdmZip();
+    
+    outputFiles.forEach(file => {
+      const filePath = path.join(outputDir, file);
+      outputZip.addLocalFile(filePath);
+    });
+    
+    outputZip.writeZip(outputZipPath);
+    const zipStats = fs.statSync(outputZipPath);
+    sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
+
+    // ✅ Upload ZIP and logs to JobRouter
+    sendLog("☁️  Uploading results to server...\n");
+    
+    const formData = new FormData();
+    formData.append('deviceId', deviceId);
+    formData.append('logs', JSON.stringify(collectedLogs));
+    formData.append('outputZip', fs.createReadStream(outputZipPath));
+
+    const uploadResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}/complete`, {
+      method: 'POST',
+      body: formData
+    });
+
+    if (!uploadResponse.ok) {
+      const errorData = await uploadResponse.json().catch(() => ({ message: uploadResponse.statusText }));
+      throw new Error(`Upload failed: ${errorData.message || uploadResponse.statusText}`);
+    }
+
+    const uploadResult = await uploadResponse.json();
+    sendLog(`✅ Results uploaded successfully!\n`);
+    sendLog(`🔗 Output URL: ${uploadResult.outputUrl}\n`);
+
+    // Cleanup local files
+    fs.unlinkSync(outputZipPath);
+    fs.rmSync(jobDir, { recursive: true, force: true });
+
+    sendLog(`\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
+    sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
     return { 
       success: true, 
-      outputDir, 
-      outputFiles,
+      outputUrl: uploadResult.outputUrl,
       jobId,
-      shortId 
+      shortId,
+      deviceId
     };
 
   } catch (err) {
     const errorMsg = err.message || 'Unknown error';
     console.error('❌ Job failed:', errorMsg);
     
-    event.sender.send("job-log", `\n❌ JOB FAILED:\n`);
-    event.sender.send("job-log", `   ${errorMsg}\n`);
-    event.sender.send("job-log", `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    sendLog(`\n❌ JOB FAILED:\n`);
+    sendLog(`   ${errorMsg}\n`);
+    sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    
+    // Report failure to backend
+    try {
+      await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          deviceId,
+          errorMessage: errorMsg,
+          logs: JSON.stringify(collectedLogs)
+        })
+      });
+    } catch (failErr) {
+      console.error('Failed to report job failure:', failErr);
+    }
     
     // Cleanup on error
     try {
-      const shortId = jobId.slice(-8);
       exec(`docker rm -f dtrain-container-${shortId}`, () => {});
-      if (fs.existsSync(jobDir)) {
-        fs.rmSync(jobDir, { recursive: true, force: true });
-      }
+      if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
+      if (fs.existsSync(outputZipPath)) fs.unlinkSync(outputZipPath);
     } catch (cleanupErr) {
       console.error('Cleanup failed:', cleanupErr);
     }
     
-    return { success: false, error: errorMsg };
+    return { success: false, error: errorMsg, deviceId };
   }
 });
 
-app.whenReady().then(createWindow);
+// ✅ Fetch available jobs handler
+ipcMain.handle("fetch-available-jobs", async () => {
+  try {
+    if (!DEVICE_ID) {
+      DEVICE_ID = getOrCreateDeviceId();
+    }
+
+    const response = await fetch(
+      `http://localhost:5000/api/worker/available-jobs?deviceId=${DEVICE_ID}`,
+      {
+        headers: { 'Content-Type': 'application/json' }
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { 
+      success: true, 
+      jobs: data.jobs || data.availableJobs || [],
+      count: data.count || 0
+    };
+  } catch (err) {
+    console.error('Failed to fetch jobs:', err);
+    return { success: false, error: err.message, jobs: [] };
+  }
+});
+
+// ✅ Accept job handler
+ipcMain.handle("accept-job", async (event, jobId) => {
+  try {
+    if (!DEVICE_ID) {
+      DEVICE_ID = getOrCreateDeviceId();
+    }
+
+    const response = await fetch(`http://localhost:5000/api/workers/accept-job`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId, deviceId: DEVICE_ID })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ message: 'Unknown error' }));
+      throw new Error(errorData.message || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return { success: true, job: data.job };
+  } catch (err) {
+    console.error('Failed to accept job:', err);
+    return { success: false, error: err.message };
+  }
+});
+
+app.whenReady().then(() => {
+  // Initialize deviceId on startup
+  DEVICE_ID = getOrCreateDeviceId();
+  console.log('🚀 Worker initialized with deviceId:', DEVICE_ID);
+  createWindow();
+});
 
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
+  if (process.platform !== "darwin") app.quit();
 });
 
 app.on("activate", () => {
-  if (BrowserWindow.getAllWindows().length === 0) {
-    createWindow();
-  }
+  if (BrowserWindow.getAllWindows().length === 0) createWindow();
 });

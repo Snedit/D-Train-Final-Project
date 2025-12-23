@@ -190,4 +190,164 @@ JobRouter.delete("/:jobId/cancel", authMiddleware, async (req, res) => {
   }
 });
 
+/**
+ * POST /:jobId/complete
+ * Worker uploads output ZIP and logs to complete the job
+ * No authMiddleware needed - worker uses deviceId verification
+ */
+JobRouter.post("/:jobId/complete", upload.single("outputZip"), async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { deviceId, logs } = req.body;
+
+    console.log(`📥 Completing job ${jobId} from worker ${deviceId}`);
+
+    // Validate required fields
+    if (!deviceId) {
+      return res.status(400).json({ message: "deviceId required" });
+    }
+
+    // Find job
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Verify this worker is assigned to this job
+    if (job.assignedWorkerId !== deviceId) {
+      return res.status(403).json({ 
+        message: "Unauthorized - this job is not assigned to this worker" 
+      });
+    }
+
+    // Check if output ZIP was uploaded
+    if (!req.file) {
+      return res.status(400).json({ message: "Output ZIP file required" });
+    }
+
+    console.log(`📦 Received ZIP: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+
+    // Upload ZIP to Supabase
+    const timestamp = Date.now();
+    const filePath = `outputs/job-${jobId}-${timestamp}.zip`;
+
+    const { data, error } = await supabase.storage
+      .from("jobs")
+      .upload(filePath, req.file.buffer, {
+        cacheControl: "3600",
+        upsert: false,
+        contentType: "application/zip"
+      });
+
+    if (error) {
+      console.error("❌ Supabase upload error:", error);
+      return res.status(500).json({ 
+        message: "Failed to upload output files to storage",
+        error: error.message 
+      });
+    }
+
+    // Get public URL
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("jobs").getPublicUrl(filePath);
+
+    console.log(`✅ Output uploaded to: ${publicUrl}`);
+
+    // Parse logs (sent as JSON string)
+    let parsedLogs = [];
+    try {
+      parsedLogs = logs ? JSON.parse(logs) : [];
+    } catch (err) {
+      console.warn("⚠️  Failed to parse logs, using raw:", err.message);
+      parsedLogs = [logs || "No logs provided"];
+    }
+
+    // Update job
+    job.status = "completed";
+    job.modelUrl = publicUrl; // Store ZIP URL
+    job.logs = parsedLogs; // Store logs array
+    job.completedAt = new Date();
+    await job.save();
+
+    console.log(`✅ Job ${jobId} marked as completed`);
+
+    res.status(200).json({ 
+      message: "Job completed successfully", 
+      job: {
+        _id: job._id,
+        title: job.title,
+        status: job.status,
+        modelUrl: job.modelUrl,
+        completedAt: job.completedAt
+      },
+      outputUrl: publicUrl 
+    });
+
+  } catch (err) {
+    console.error("❌ Complete job error:", err);
+    res.status(500).json({ 
+      message: "Server error while completing job", 
+      error: err.message 
+    });
+  }
+});
+
+/**
+ * POST /:jobId/fail
+ * Worker reports job failure with error message
+ */
+JobRouter.post("/:jobId/fail", async (req, res) => {
+  try {
+    const { jobId } = req.params;
+    const { deviceId, errorMessage, logs } = req.body;
+
+    if (!deviceId) {
+      return res.status(400).json({ message: "deviceId required" });
+    }
+
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // Verify worker assignment
+    if (job.assignedWorkerId !== deviceId) {
+      return res.status(403).json({ 
+        message: "Unauthorized - this job is not assigned to this worker" 
+      });
+    }
+
+    // Parse logs
+    let parsedLogs = [];
+    try {
+      parsedLogs = logs ? JSON.parse(logs) : [];
+    } catch (err) {
+      parsedLogs = [logs || "No logs provided"];
+    }
+
+    // Update job
+    job.status = "failed";
+    job.errorMessage = errorMessage || "Job failed without error message";
+    job.logs = parsedLogs;
+    job.completedAt = new Date();
+    await job.save();
+
+    console.log(`❌ Job ${jobId} marked as failed: ${errorMessage}`);
+
+    res.status(200).json({ 
+      message: "Job failure recorded", 
+      job: {
+        _id: job._id,
+        status: job.status,
+        errorMessage: job.errorMessage
+      }
+    });
+
+  } catch (err) {
+    console.error("❌ Fail job error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
 export default JobRouter;

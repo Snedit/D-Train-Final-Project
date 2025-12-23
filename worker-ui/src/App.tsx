@@ -193,6 +193,7 @@ function App() {
   };
 
   // Worker Registration Handler
+  // Worker Registration Handler
   const handleWorkerRegister = async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
@@ -208,15 +209,28 @@ function App() {
         gpu: string;
       };
 
-      if ((window as any).electron) {
-        const electronInfo = await (window as any).electron.getDeviceInfo();
+      // Check if we're in Electron environment
+      const isElectron = (window as any).worker && typeof (window as any).worker.getDeviceInfo === 'function';
+      console.log("🔍 Environment check:", {
+        hasWorkerAPI: !!(window as any).worker,
+        hasGetDeviceInfo: isElectron,
+        userAgent: navigator.userAgent.includes('Electron') ? 'Electron' : 'Browser'
+      });
+      
+      if (isElectron) {
+        console.log("⚡ Using Electron device info...");
+        const electronInfo = await (window as any).worker.getDeviceInfo();
+        console.log("📥 Electron info received:", electronInfo);
+        
         deviceInfo = {
-          os: electronInfo.os,
-          cpu: electronInfo.cpu,
-          ram: electronInfo.ram,
+          os: electronInfo.os || "Unknown OS",
+          cpu: electronInfo.cpu || `${navigator.hardwareConcurrency || 4} cores`,
+          ram: electronInfo.ram || `${(navigator as any).deviceMemory || 8}GB`,
           gpu: electronInfo.gpu || "Not detected",
         };
       } else {
+        console.log("🌐 Using browser fallback device info...");
+        
         deviceInfo = {
           os: navigator.platform || "Unknown OS",
           cpu: `${navigator.hardwareConcurrency || 4} cores`,
@@ -229,7 +243,7 @@ function App() {
         .toString(36)
         .substr(2, 9)}`;
 
-      console.log("Registering worker with device info:", {
+      console.log("📤 Sending device info to backend:", {
         deviceId,
         ...deviceInfo,
       });

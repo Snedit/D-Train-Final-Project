@@ -8,8 +8,22 @@ import AdmZip from "adm-zip";
 
 const WorkerRouter = Router();
 
-// GET / - Fetch all workers
-WorkerRouter.get("/", async (req, res) => {
+// ✅ HELPER: Optional authentication middleware
+const optionalAuth = (req, res, next) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+  
+  if (token) {
+    // Validate token if present
+    return authMiddleware(req, res, next);
+  }
+  
+  // No token - allow through (will check deviceId later)
+  req.user = null;
+  next();
+};
+
+// GET / - Fetch all workers (admin endpoint - keep auth)
+WorkerRouter.get("/", authMiddleware, async (req, res) => {
   try {
     const workers = await Worker.find();
     return res.status(200).json({ message: "workers available", workers });
@@ -19,7 +33,58 @@ WorkerRouter.get("/", async (req, res) => {
   }
 });
 
-// POST /register - Worker registration with authentication
+// ✅ FIXED: GET /available-jobs - Remove authMiddleware for workers
+WorkerRouter.get("/available-jobs", async (req, res) => {
+  try {
+    const { deviceId } = req.query; // Workers pass deviceId as query param
+    
+    console.log("Fetching available jobs for worker:", deviceId); 
+    
+    // Optional: Verify worker exists and is online
+    if (deviceId) {
+      const worker = await Worker.findOne({ deviceId });
+      if (!worker) {
+        return res.status(404).json({ 
+          message: "Worker not registered. Please register first." 
+        });
+      }
+      
+      // Update last seen
+      worker.lastHeartbeatAt = Date.now();
+      worker.currentStatus = "online";
+      await worker.save();
+    }
+    
+    // Find jobs that are pending or unassigned
+    const availableJobs = await Job.find({
+      status: { $in: ['pending', 'queued'] },
+      $or: [
+        { assignedWorkerId: { $exists: false } },
+        { assignedWorkerId: null },
+        { assignedWorkerId: '' }
+      ]
+    })
+    .sort({ createdAt: -1 })
+    .limit(50);
+
+    console.log(`Found ${availableJobs.length} available jobs`);
+
+    return res.status(200).json({ 
+      message: "Available jobs fetched successfully", 
+      jobs: availableJobs,
+      availableJobs: availableJobs,
+      count: availableJobs.length
+    });
+  } catch (error) {
+    console.error("Error fetching available jobs:", error);
+    return res.status(500).json({ 
+      message: "Error fetching available jobs",
+      error: error.message 
+    });
+  }
+});
+
+// POST /register - Worker registration with authentication (keep as-is)
 WorkerRouter.post("/register", authMiddleware, async (req, res) => {
   try {
     const { deviceId, os, cpu, ram, gpu } = req.body;
@@ -31,16 +96,16 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
       return res.status(400).json({ message: "deviceId required" });
     }
 
-    // Create/update worker with userId link
     const worker = await Worker.findOneAndUpdate(
       { deviceId },
       {
-        userId: req.user.userId, // Link to authenticated user
+        userId: req.user.userId,
         deviceId,
         systemInfo: {
+          os: os || "Unknown",      // ← ADD THIS LINE (was missing!)
           cpu: cpu || "Unknown",
+          ram: ram || "Unknown",    // ← ADD THIS LINE (was missing!)
           gpu: gpu || "N/A",
-          ram: ram || "Unknown",
         },
         currentStatus: "online",
         lastHeartbeatAt: Date.now(),
@@ -49,7 +114,6 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
     );
 
     console.log("Worker created/updated:", worker);
-
     res.status(201).json({
       message: "Worker registered successfully",
       worker,
@@ -60,7 +124,8 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
   }
 });
 
-// POST /metrics - Worker reports CPU/GPU/RAM usage during training
+
+// POST /metrics - Worker reports usage (no auth needed) ✅
 WorkerRouter.post("/metrics", async (req, res) => {
   try {
     const { jobId, deviceId, cpu, ram, gpu, durationMs } = req.body;
@@ -82,7 +147,7 @@ WorkerRouter.post("/metrics", async (req, res) => {
   }
 });
 
-// POST /complete - Worker uploads final model URL & logs
+// POST /complete - Worker uploads final model (no auth needed) ✅
 WorkerRouter.post("/complete", async (req, res) => {
   try {
     const { jobId, modelUrl, logsUrl } = req.body;
@@ -103,7 +168,7 @@ WorkerRouter.post("/complete", async (req, res) => {
   }
 });
 
-// POST /push-log - Stream logs to frontend
+// POST /push-log - Stream logs (no auth needed) ✅
 WorkerRouter.post("/push-log", async (req, res) => {
   try {
     const { jobId, deviceId, line } = req.body;
@@ -127,7 +192,7 @@ WorkerRouter.post("/push-log", async (req, res) => {
   }
 });
 
-// POST /heartbeat - Worker sends heartbeat
+// POST /heartbeat - Worker heartbeat (no auth needed) ✅
 WorkerRouter.post("/heartbeat", async (req, res) => {
   try {
     const { deviceId } = req.body;
@@ -148,7 +213,7 @@ WorkerRouter.post("/heartbeat", async (req, res) => {
   }
 });
 
-// POST /accept-job - Worker accepts a pending job
+// POST /accept-job - Worker accepts job (no auth needed) ✅
 WorkerRouter.post("/accept-job", async (req, res) => {
   try {
     const { jobId, deviceId } = req.body;
@@ -156,7 +221,7 @@ WorkerRouter.post("/accept-job", async (req, res) => {
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
-    if (job.status !== "pending") {
+    if (job.status !== "pending" && job.status !== "queued") {
       return res.status(400).json({ message: "Job already taken" });
     }
 
@@ -171,7 +236,7 @@ WorkerRouter.post("/accept-job", async (req, res) => {
   }
 });
 
-// GET /my-worker - Get current user's worker
+// GET /my-worker - Get current user's worker (user dashboard - keep auth) ✅
 WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
@@ -187,15 +252,30 @@ WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   }
 });
 
-// GET /job/:jobId/details - Get detailed job information including ZIP metadata
-WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
+// ✅ FIXED: GET /job/:jobId/details - Complete updated route
+WorkerRouter.get("/job/:jobId/details", async (req, res) => {
   try {
     const { jobId } = req.params;
+    const { deviceId } = req.query; // Worker passes deviceId
 
     // Fetch job from database
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
+    }
+
+    // ✅ FIXED: Allow PENDING/QUEUED jobs (anyone can view to accept) 
+    // OR ASSIGNED/COMPLETED to this specific worker
+    if (deviceId) {
+      // Only block if job is ASSIGNED/COMPLETED and NOT assigned to this worker
+      if ((job.status === 'assigned' || job.status === 'completed') && 
+          job.assignedWorkerId !== deviceId) {
+        return res.status(403).json({ 
+          message: "Unauthorized - job not assigned to this worker" 
+        });
+      }
+      // Pending/queued jobs: ANY worker can view (to accept)
+      // Assigned/completed: ONLY the assigned worker
     }
 
     // Extract file path from the zipFileUrl
@@ -205,7 +285,6 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
 
     if (job.zipFileUrl) {
       try {
-        // Extract the file path from the public URL
         const urlParts = job.zipFileUrl.split("/");
         const fileName = urlParts[urlParts.length - 1];
         const filePath = `jobs/${fileName}`;
@@ -221,7 +300,6 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
           });
 
         if (!fileError && fileData) {
-          // Find the specific file
           const fileInfo = fileData.find((f) => f.name === fileName);
           if (fileInfo) {
             zipMetadata = {
@@ -233,30 +311,26 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
           }
         }
 
-        // Download and extract actual ZIP contents from Supabase
+        // Download and extract ZIP contents
         try {
           const { data: zipData, error: downloadError } = await supabase.storage
             .from("jobs")
             .download(filePath);
 
           if (!downloadError && zipData) {
-            // Convert blob to buffer
             const arrayBuffer = await zipData.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
 
-            // Extract ZIP contents using adm-zip
             const zip = new AdmZip(buffer);
             const entries = zip.getEntries();
 
-            // Map actual files from ZIP
             zipFilesList = entries
-              .filter((entry) => !entry.isDirectory) // Exclude directories
+              .filter((entry) => !entry.isDirectory)
               .map((entry) => {
                 const fileName = entry.entryName;
                 let fileType = "File";
                 let required = false;
 
-                // Determine file type and if it's required
                 if (fileName === "requirements.txt") {
                   fileType = "Dependencies";
                   required = true;
@@ -265,10 +339,7 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
                   required = true;
                 } else if (fileName.endsWith(".py")) {
                   fileType = "Python Script";
-                } else if (
-                  fileName.includes("dataset") ||
-                  fileName.includes("data")
-                ) {
+                } else if (fileName.includes("dataset") || fileName.includes("data")) {
                   fileType = "Training Data";
                 } else if (fileName.endsWith(".txt")) {
                   fileType = "Text File";
@@ -287,45 +358,24 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
               });
 
             filesExtractedFromZip = true;
-            console.log(
-              `Successfully extracted ${zipFilesList.length} files from ZIP`
-            );
+            console.log(`Successfully extracted ${zipFilesList.length} files from ZIP`);
           }
         } catch (zipError) {
           console.error("Failed to extract ZIP contents:", zipError);
-          // Fallback to expected files if ZIP extraction fails
           zipFilesList = [
-            {
-              name: "requirements.txt",
-              type: "Dependencies",
-              required: true,
-            },
-            {
-              name: job.config.entryFile || "main.py",
-              type: "Entry Point",
-              required: true,
-            },
+            { name: "requirements.txt", type: "Dependencies", required: true },
+            { name: job.config.entryFile || "main.py", type: "Entry Point", required: true },
           ];
         }
       } catch (supabaseErr) {
         console.error("Supabase metadata fetch error:", supabaseErr);
-        // Fallback to basic expected files
         zipFilesList = [
-          {
-            name: "requirements.txt",
-            type: "Dependencies",
-            required: true,
-          },
-          {
-            name: job.config.entryFile || "main.py",
-            type: "Entry Point",
-            required: true,
-          },
+          { name: "requirements.txt", type: "Dependencies", required: true },
+          { name: job.config.entryFile || "main.py", type: "Entry Point", required: true },
         ];
       }
     }
 
-    // Return complete job details
     res.status(200).json({
       message: "Job details fetched successfully",
       job: {
@@ -345,12 +395,13 @@ WorkerRouter.get("/job/:jobId/details", authMiddleware, async (req, res) => {
       },
       zipMetadata,
       zipFilesList,
-      filesExtractedFromZip, // Indicates if actual ZIP was read
+      filesExtractedFromZip,
     });
   } catch (err) {
     console.error("Error fetching job details:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
+
 
 export default WorkerRouter;
