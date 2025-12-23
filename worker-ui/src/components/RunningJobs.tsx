@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, StopCircle, ArrowLeft } from 'lucide-react';
+import { Play, StopCircle, ArrowLeft, Terminal } from 'lucide-react';
 import type { Job } from '../types';
 
 interface RunningJobsProps {
@@ -50,7 +50,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   // Cleanup listener on unmount
   useEffect(() => {
     return () => {
-      if (logListenerRef.current && window.worker) {
+      if (logListenerRef.current && (window as any).worker) {
         console.log('🧹 Listener cleaned up');
       }
     };
@@ -59,9 +59,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   const handleStart = async () => {
     if (isRunning || isCompleted) return;
     
-    console.log('🚀 START JOB CLICKED - worker exists?', !!window.worker);
+    console.log('🚀 START JOB CLICKED - worker exists?', !!(window as any).worker);
     
-    if (!window.worker) {
+    if (!(window as any).worker) {
       setLogs(prev => [...prev, '\n❌ Worker runtime not available (run in Electron)']);
       console.error('❌ window.worker not found - must run in Electron');
       return;
@@ -78,15 +78,15 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     
     logListenerRef.current = logListener;
     
-    if (window.worker.onLog) {
+    if ((window as any).worker.onLog) {
       console.log('🔗 Setting up log listener');
-      window.worker.onLog(logListener);
+      (window as any).worker.onLog(logListener);
     }
     
     try {
       // ✅ Job is already accepted - just run it
       console.log('📤 Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
-      const result = await window.worker.runTestJob(jobId, workerId);
+      const result = await (window as any).worker.runTestJob(jobId, workerId);
       console.log('📥 Electron result:', result);
       
       setIsCompleted(true);
@@ -110,73 +110,149 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   };
 
   return (
-    <div className="min-h-screen bg-black text-green-400 font-mono">
-      {/* Terminal Header */}
-      <div className="p-4 border-b border-green-800/50 flex items-center gap-3">
-        <div className="flex gap-1">
-          <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-          <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-          <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-        </div>
-        <span>dtrain-worker@{workerId.slice(-8)}</span>
-        <span className="text-green-300 ml-auto">
-          job-{jobId.slice(-8)}
-        </span>
-        <motion.button
-          whileHover={{ scale: 1.05 }}
-          className="ml-4 text-green-400 hover:text-green-300 flex items-center gap-1 text-sm"
-          onClick={onBack}
-        >
-          <ArrowLeft className="w-4 h-4" /> Back
-        </motion.button>
-      </div>
+    <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
+      <div className="max-w-5xl mx-auto">
+        <div className="relative">
+          {/* Grid background card */}
+          <div 
+            className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
+            style={{
+              backgroundImage: `
+                linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)
+              `,
+              backgroundSize: '26px 26px',
+            }}
+          />
 
-      {/* Terminal Body */}
-      <div className="h-[calc(100vh-100px)] flex flex-col">
-        {/* Logs */}
-        <div className="flex-1 p-4 overflow-y-auto bg-black/50">
-          <div className="space-y-1 text-sm">
-            {logs.map((log, i) => (
-              <div key={i} className="whitespace-pre-wrap">{log}</div>
-            ))}
-            <div ref={logsRef} />
-          </div>
-        </div>
+          {/* Memphis shapes */}
+          <motion.div 
+            className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
+            animate={{ 
+              rotate: [0, 15, -15, 0],
+              scale: [1, 1.1, 1]
+            }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 4, 
+              ease: "easeInOut" 
+            }}
+          >
+            <Play className="w-8 h-8 text-slate-900" />
+          </motion.div>
 
-        {/* Controls */}
-        <div className="p-6 border-t border-green-800/50 bg-black/70">
-          <div className="flex items-center justify-between max-w-md mx-auto">
-            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-              isCompleted ? 'bg-green-500/20 text-green-400 border border-green-500/50' :
-              isRunning ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50' :
-              'bg-gray-500/20 text-gray-400 border border-gray-500/50'
-            }`}>
-              {isCompleted ? '✓ COMPLETED' : isRunning ? '▶ RUNNING' : '○ READY'}
-            </span>
-            
-            {!isRunning && !isCompleted && (
+          <motion.div 
+            className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#FFD447]"
+            animate={{ y: [0, -6, 0] }}
+            transition={{ 
+              repeat: Infinity, 
+              duration: 5, 
+              ease: "easeInOut" 
+            }}
+          />
+
+          {/* Main content */}
+          <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
+            {/* Top nav */}
+            <nav className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img src="logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
+                </div>
+                <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
+                  DTrain
+                </span>
+              </div>
+
               <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={handleStart}
-                className="flex items-center gap-2 px-6 py-3 bg-green-600 hover:bg-green-500 text-black font-bold rounded-lg shadow-lg border-2 border-green-400"
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onBack}
+                className="flex items-center gap-2 px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
               >
-                <Play className="w-5 h-5" />
-                START JOB
+                <ArrowLeft className="w-4 h-4" />
+                Back to Dashboard
               </motion.button>
-            )}
-            
-            {isRunning && (
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-500 text-white font-bold rounded-lg shadow-lg border-2 border-red-400"
-                onClick={handleStop}
-              >
-                <StopCircle className="w-5 h-5" />
-                STOP
-              </motion.button>
-            )}
+            </nav>
+
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
+                Running Job
+              </h1>
+              <p className="text-sm text-slate-700 font-medium font-mono">
+                worker@{workerId.slice(-8)} · job-{jobId.slice(-8)}
+              </p>
+            </div>
+
+            {/* Terminal Section */}
+            <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden mb-6">
+              <div className="flex items-center px-6 py-4 bg-[#F5F3FF] border-b-[3px] border-slate-900">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="flex space-x-2">
+                    <div className="w-3 h-3 bg-[#fb7185] rounded-full border border-slate-900"></div>
+                    <div className="w-3 h-3 bg-[#facc15] rounded-full border border-slate-900"></div>
+                    <div className="w-3 h-3 bg-[#22c55e] rounded-full border border-slate-900"></div>
+                  </div>
+                  <div className="w-10 h-10 bg-slate-900 rounded-[12px] flex items-center justify-center">
+                    <Terminal className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-extrabold text-slate-900">Live Output</h3>
+                    <p className="text-xs text-slate-700">Real-time execution logs</p>
+                  </div>
+                </div>
+                <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${
+                  isCompleted 
+                    ? 'bg-[#4ADE80] text-slate-900' 
+                    : isRunning 
+                    ? 'bg-[#7CF2D0] text-slate-900' 
+                    : 'bg-[#FFE66D] text-slate-900'
+                }`}>
+                  {isCompleted ? '✓ COMPLETED' : isRunning ? '▶ RUNNING' : '○ READY'}
+                </div>
+              </div>
+              
+              <div className="h-96 p-4 bg-slate-900 font-mono text-xs overflow-y-auto">
+                {logs.map((log, i) => (
+                  <div key={i} className="text-[#7CF2D0] whitespace-pre-wrap mb-1">
+                    {log}
+                  </div>
+                ))}
+                <div ref={logsRef} />
+                {isRunning && (
+                  <div className="text-[#7CF2D0] animate-pulse inline-block">
+                    ▋
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center justify-end gap-3">
+              {!isRunning && !isCompleted && (
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: 0 }}
+                  onClick={handleStart}
+                  className="flex items-center gap-2 px-8 py-4 rounded-[16px] border-[3px] border-slate-900 bg-[#4ADE80] text-slate-900 font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)]"
+                >
+                  <Play className="w-5 h-5" />
+                  START JOB
+                </motion.button>
+              )}
+              {isRunning && (
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: 0 }}
+                  onClick={handleStop}
+                  className="flex items-center gap-2 px-8 py-4 rounded-[16px] border-[3px] border-slate-900 bg-[#fb7185] text-white font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)]"
+                >
+                  <StopCircle className="w-5 h-5" />
+                  STOP
+                </motion.button>
+              )}
+            </div>
           </div>
         </div>
       </div>
