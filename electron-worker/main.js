@@ -1,4 +1,4 @@
-// electron-worker/main.js - Complete Fixed Version
+// electron-worker/main.js - FIXED: Use consistent deviceId
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -7,40 +7,9 @@ const { spawn, exec } = require("child_process");
 const os = require("os");
 const fetch = require('node-fetch');
 const FormData = require('form-data');
-const crypto = require('crypto');
 
-// ✅ Generate persistent device ID
-function getOrCreateDeviceId() {
-  const configPath = path.join(app.getPath('userData'), 'device-config.json');
-  
-  try {
-    if (fs.existsSync(configPath)) {
-      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
-      if (config.deviceId) {
-        console.log('📱 Using existing deviceId:', config.deviceId);
-        return config.deviceId;
-      }
-    }
-  } catch (err) {
-    console.error('Error reading device config:', err);
-  }
-  
-  // Generate new deviceId based on machine fingerprint
-  const machineInfo = `${os.hostname()}-${os.platform()}-${os.arch()}-${os.cpus()[0].model}`;
-  const deviceId = crypto.createHash('sha256').update(machineInfo).digest('hex').substring(0, 16);
-  
-  // Save to disk
-  try {
-    fs.writeFileSync(configPath, JSON.stringify({ deviceId }, null, 2));
-    console.log('🆕 Generated new deviceId:', deviceId);
-  } catch (err) {
-    console.error('Error saving device config:', err);
-  }
-  
-  return deviceId;
-}
-
-let DEVICE_ID = null;
+// ✅ FIXED: Store deviceId from registration instead of generating new one
+let REGISTERED_DEVICE_ID = null;
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -62,12 +31,44 @@ function createWindow() {
   win.webContents.openDevTools();
 }
 
-// ✅ Get Device ID Handler
-ipcMain.handle("get-device-id", async () => {
-  if (!DEVICE_ID) {
-    DEVICE_ID = getOrCreateDeviceId();
+// ✅ NEW: Set deviceId from frontend (called after registration)
+ipcMain.handle("set-device-id", async (event, deviceId) => {
+  console.log('📱 Setting deviceId from frontend:', deviceId);
+  REGISTERED_DEVICE_ID = deviceId;
+  
+  // Optionally save to disk for persistence
+  const configPath = path.join(app.getPath('userData'), 'device-config.json');
+  try {
+    fs.writeFileSync(configPath, JSON.stringify({ deviceId }, null, 2));
+  } catch (err) {
+    console.error('Error saving device config:', err);
   }
-  return DEVICE_ID;
+  
+  return { success: true, deviceId };
+});
+
+// ✅ Get Device ID Handler - returns registered ID or loads from disk
+ipcMain.handle("get-device-id", async () => {
+  if (REGISTERED_DEVICE_ID) {
+    return REGISTERED_DEVICE_ID;
+  }
+  
+  // Try loading from disk
+  const configPath = path.join(app.getPath('userData'), 'device-config.json');
+  try {
+    if (fs.existsSync(configPath)) {
+      const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+      if (config.deviceId) {
+        console.log('📱 Loaded deviceId from disk:', config.deviceId);
+        REGISTERED_DEVICE_ID = config.deviceId;
+        return config.deviceId;
+      }
+    }
+  } catch (err) {
+    console.error('Error reading device config:', err);
+  }
+  
+  return null; // Let frontend generate it
 });
 
 // Device Info Handler
@@ -100,7 +101,7 @@ ipcMain.handle("get-device-info", async () => {
   };
 });
 
-// ✅ FIXED Complete Job Runner - uses PASSED deviceId
+// ✅ FIXED Complete Job Runner - uses PASSED deviceId from frontend
 ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const shortId = jobId.slice(-8);
   const jobDir = path.join(__dirname, "jobs", `job-${shortId}`);
@@ -110,8 +111,12 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
 
   const collectedLogs = [];
   
-  // ✅ FIXED: Use PASSED deviceId from web (not local DEVICE_ID)
-  const deviceId = passedDeviceId || DEVICE_ID;
+  // ✅ CRITICAL: Use PASSED deviceId from frontend (already registered)
+  const deviceId = passedDeviceId || REGISTERED_DEVICE_ID;
+  
+  if (!deviceId) {
+    throw new Error('❌ No deviceId available. Please register first.');
+  }
 
   // Helper to send and collect logs
   const sendLog = (msg) => {
@@ -134,14 +139,14 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     fs.mkdirSync(outputDir, { recursive: true });
 
     sendLog("🔍 Fetching job from backend...\n");
+    sendLog(`🤖 Using Worker ID: ${deviceId}\n`);
 
-    // ✅ 1️⃣ Get job details using worker endpoint (no auth required)
+    // ✅ Get job details using worker endpoint
     const jobResponse = await fetch(
       `http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
       {
         headers: { 
           'Content-Type': 'application/json'
-          // NO Authorization header - worker uses deviceId
         }
       }
     );
@@ -152,11 +157,10 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     }
 
     const responseData = await jobResponse.json();
-    const jobData = responseData.job || responseData; // Handle both response formats
+    const jobData = responseData.job || responseData;
     
     sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
     sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
-    sendLog(`🤖 Worker ID: ${deviceId}\n`);
 
     // 2️⃣ Download ZIP from Supabase
     if (!jobData.zipFileUrl) {
@@ -264,17 +268,21 @@ CMD ["python", "${mainFileName}"]
       });
     });
 
-    // 🔟 List and ZIP output files
+    // 🔟 List and ZIP output files (only files, not directories)
     const files = fs.readdirSync(outputDir);
-    const outputFiles = files.filter(f => 
-      !['main.py', 'requirements.txt', 'Dockerfile', '__pycache__'].includes(f) &&
-      !f.startsWith('.')
-    );
+    const outputFiles = files.filter(f => {
+      const filePath = path.join(outputDir, f);
+      const stats = fs.statSync(filePath);
+      
+      // Only include files (not directories) and exclude input files
+      return stats.isFile() && 
+             !['main.py', 'requirements.txt', 'Dockerfile', '__pycache__'].includes(f) &&
+             !f.startsWith('.');
+    });
 
     if (outputFiles.length === 0) {
       sendLog(`\n⚠️  No output files generated\n`);
       
-      // Report failure to backend
       await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -296,20 +304,27 @@ CMD ["python", "${mainFileName}"]
       sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
     });
 
-    // ✅ Create ZIP of output files ONLY
+    // Create ZIP of output files
     sendLog("\n📦 Creating output ZIP...\n");
     const outputZip = new AdmZip();
     
     outputFiles.forEach(file => {
       const filePath = path.join(outputDir, file);
-      outputZip.addLocalFile(filePath);
+      const stats = fs.statSync(filePath);
+      
+      if (stats.isFile()) {
+        outputZip.addLocalFile(filePath);
+      } else if (stats.isDirectory()) {
+        // Add directory and its contents recursively
+        outputZip.addLocalFolder(filePath, file);
+      }
     });
     
     outputZip.writeZip(outputZipPath);
     const zipStats = fs.statSync(outputZipPath);
     sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
 
-    // ✅ Upload ZIP and logs to JobRouter
+    // Upload ZIP and logs
     sendLog("☁️  Uploading results to server...\n");
     
     const formData = new FormData();
@@ -354,7 +369,6 @@ CMD ["python", "${mainFileName}"]
     sendLog(`   ${errorMsg}\n`);
     sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
-    // Report failure to backend
     try {
       await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
         method: 'POST',
@@ -369,7 +383,6 @@ CMD ["python", "${mainFileName}"]
       console.error('Failed to report job failure:', failErr);
     }
     
-    // Cleanup on error
     try {
       exec(`docker rm -f dtrain-container-${shortId}`, () => {});
       if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
@@ -382,15 +395,17 @@ CMD ["python", "${mainFileName}"]
   }
 });
 
-// ✅ Fetch available jobs handler
+// Fetch available jobs handler
 ipcMain.handle("fetch-available-jobs", async () => {
   try {
-    if (!DEVICE_ID) {
-      DEVICE_ID = getOrCreateDeviceId();
+    const deviceId = REGISTERED_DEVICE_ID;
+    
+    if (!deviceId) {
+      return { success: false, error: 'No deviceId set', jobs: [] };
     }
 
     const response = await fetch(
-      `http://localhost:5000/api/worker/available-jobs?deviceId=${DEVICE_ID}`,
+      `http://localhost:5000/api/worker/available-jobs?deviceId=${deviceId}`,
       {
         headers: { 'Content-Type': 'application/json' }
       }
@@ -412,17 +427,19 @@ ipcMain.handle("fetch-available-jobs", async () => {
   }
 });
 
-// ✅ Accept job handler
+// Accept job handler
 ipcMain.handle("accept-job", async (event, jobId) => {
   try {
-    if (!DEVICE_ID) {
-      DEVICE_ID = getOrCreateDeviceId();
+    const deviceId = REGISTERED_DEVICE_ID;
+    
+    if (!deviceId) {
+      throw new Error('No deviceId set');
     }
 
-    const response = await fetch(`http://localhost:5000/api/workers/accept-job`, {
+    const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ jobId, deviceId: DEVICE_ID })
+      body: JSON.stringify({ jobId, deviceId })
     });
 
     if (!response.ok) {
@@ -439,9 +456,6 @@ ipcMain.handle("accept-job", async (event, jobId) => {
 });
 
 app.whenReady().then(() => {
-  // Initialize deviceId on startup
-  DEVICE_ID = getOrCreateDeviceId();
-  console.log('🚀 Worker initialized with deviceId:', DEVICE_ID);
   createWindow();
 });
 

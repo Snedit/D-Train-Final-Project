@@ -85,13 +85,13 @@ const JobDetail: React.FC<JobDetailProps> = ({
   const fetchJobDetails = async (id: string) => {
     setLoading(true);
     try {
-      // ✅ FIXED: Use worker endpoint with deviceId query param (no auth token)
+      console.log('🔍 Fetching job details for:', id, 'with workerId:', workerId);
+      
       const response = await fetch(
         `http://localhost:5000/api/worker/job/${id}/details?deviceId=${workerId}`,
         {
           headers: {
             'Content-Type': 'application/json'
-            // NO Authorization header - worker uses deviceId
           },
         }
       );
@@ -102,6 +102,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
       }
 
       const data = await response.json();
+      console.log('✅ Job details loaded:', data.job.status);
       setJobDetails(data);
       setError(null);
     } catch (err: any) {
@@ -115,28 +116,54 @@ const JobDetail: React.FC<JobDetailProps> = ({
   const handleAccept = async () => {
     if (!jobDetails || !workerId || !onAcceptJob) return;
     
+    const currentJobId = jobDetails.job._id;
+    const currentStatus = jobDetails.job.status;
+    
+    console.log('🎯 Attempting to accept job:', currentJobId);
+    console.log('📊 Current job status:', currentStatus);
+    
+    // Check if job is still pending/queued
+    if (currentStatus !== 'pending' && currentStatus !== 'queued') {
+      alert(`This job is no longer available. Current status: ${currentStatus}`);
+      await fetchJobDetails(currentJobId); // Refresh to show current state
+      return;
+    }
+    
     setAccepting(true);
     try {
-      // ✅ FIXED: Use worker endpoint (no auth token needed)
+      console.log('📤 Sending accept request with deviceId:', workerId);
+      
       const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          jobId: jobDetails.job._id, 
+          jobId: currentJobId, 
           deviceId: workerId 
         }),
       });
       
       if (!response.ok) {
         const errorData = await response.json();
+        console.error('❌ Accept failed:', errorData);
         throw new Error(errorData.message || "Failed to accept job");
       }
       
-      // Navigate to RunningJobs IMMEDIATELY
-      onAcceptJob(jobDetails.job._id);
+      const result = await response.json();
+      console.log('✅ Job accepted:', result);
+      
+      // Wait a moment for backend to update
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Navigate to RunningJobs to start execution
+      console.log('🚀 Navigating to RunningJobs');
+      onAcceptJob(currentJobId);
       
     } catch (err: any) {
+      console.error('❌ Accept job error:', err);
       alert(err.message || "Failed to accept job");
+      
+      // Refresh job details to show current state
+      await fetchJobDetails(currentJobId);
     } finally {
       setAccepting(false);
     }
@@ -196,6 +223,8 @@ const JobDetail: React.FC<JobDetailProps> = ({
   }
 
   const currentJob = jobDetails.job;
+  const canAcceptJob = isPendingView && 
+                       (currentJob.status === 'pending' || currentJob.status === 'queued');
 
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
@@ -259,7 +288,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
             {/* Header */}
             <div className="mb-8">
               <div className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#E4ECFF] text-[11px] font-semibold text-slate-900 shadow-[3px_3px_0_0_rgba(15,23,42,1)] mb-3">
-                {isCompletedView ? "Completed Job" : "Pending Job"}
+                {isCompletedView ? "Completed Job" : currentJob.status.toUpperCase()}
               </div>
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
                 {isCompletedView ? "Training Complete!" : "Job Details"}
@@ -287,6 +316,29 @@ const JobDetail: React.FC<JobDetailProps> = ({
                     </h2>
                     <p className="text-sm text-slate-900 font-medium">
                       Training completed successfully. Download your model and logs below.
+                    </p>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Warning banner if job is no longer available */}
+            {isPendingView && !canAcceptJob && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="rounded-[22px] border-[3px] border-slate-900 bg-[#FEE2E2] p-6 mb-6 shadow-[8px_8px_0_0_rgba(15,23,42,1)]"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-[12px] border-[3px] border-slate-900 bg-white flex items-center justify-center shadow-[3px_3px_0_0_rgba(15,23,42,1)]">
+                    <AlertCircle className="w-6 h-6 text-slate-900" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-extrabold text-slate-900 mb-1">
+                      Job Not Available
+                    </h3>
+                    <p className="text-sm text-slate-900 font-medium">
+                      This job is currently {currentJob.status}. It may have been accepted by another worker.
                     </p>
                   </div>
                 </div>
@@ -330,7 +382,11 @@ const JobDetail: React.FC<JobDetailProps> = ({
                       Status
                     </p>
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <div className={`w-2 h-2 rounded-full ${
+                        canAcceptJob ? 'bg-green-500' : 
+                        currentJob.status === 'completed' ? 'bg-blue-500' :
+                        'bg-yellow-500'
+                      }`} />
                       <p className="text-sm font-bold text-slate-900 capitalize">
                         {currentJob.status}
                       </p>
@@ -452,7 +508,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
             )}
 
             {/* Accept Job Button for pending jobs */}
-            {isPendingView && currentJob.status === "pending" && (
+            {canAcceptJob && (
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -492,7 +548,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
                   ) : (
                     <>
                       <PlayCircle className="w-5 h-5" />
-                      Accept Job
+                      Accept & Start Job
                     </>
                   )}
                 </motion.button>

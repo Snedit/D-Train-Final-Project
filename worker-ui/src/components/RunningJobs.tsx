@@ -84,7 +84,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     }
     
     try {
-      // ✅ CRITICAL: Pass workerId (deviceId) to Electron, not auth token
+      // ✅ Job is already accepted - just run it
       console.log('📤 Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
       const result = await window.worker.runTestJob(jobId, workerId);
       console.log('📥 Electron result:', result);
@@ -98,7 +98,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
         setLogs(prev => [...prev, `\n⚠️ Job completed but result.success=false:`, JSON.stringify(result)]);
       }
     } catch (error: any) {
-      console.error('❌ runTestJob FAILED:', error);
+      console.error('❌ Job execution FAILED:', error);
       setLogs(prev => [...prev, `\n❌ Failed: ${error.message || error}`]);
     } finally {
       setIsRunning(false);

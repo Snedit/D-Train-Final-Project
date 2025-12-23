@@ -6,19 +6,22 @@ const removeJobLogListeners = () => {
 };
 
 contextBridge.exposeInMainWorld("worker", {
+  // ✅ NEW: Set deviceId from frontend after registration
+  setDeviceId: (deviceId) => ipcRenderer.invoke("set-device-id", deviceId),
+  
   // ✅ Get persistent deviceId
   getDeviceId: () => ipcRenderer.invoke("get-device-id"),
   
   // ✅ Device hardware info
   getDeviceInfo: () => ipcRenderer.invoke("get-device-info"),
   
-  // ✅ Job execution with token
-  runTestJob: (jobId, authToken) => ipcRenderer.invoke("run-test-job", jobId, authToken),
+  // ✅ Job execution with deviceId (not token)
+  runTestJob: (jobId, deviceId) => ipcRenderer.invoke("run-test-job", jobId, deviceId),
   
-  // ✅ NEW: Fetch available jobs from backend
+  // ✅ Fetch available jobs from backend
   fetchAvailableJobs: () => ipcRenderer.invoke("fetch-available-jobs"),
   
-  // ✅ NEW: Accept/claim a job
+  // ✅ Accept/claim a job
   acceptJob: (jobId) => ipcRenderer.invoke("accept-job", jobId),
   
   // ✅ Real-time log streaming
