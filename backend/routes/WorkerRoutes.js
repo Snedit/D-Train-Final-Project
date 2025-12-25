@@ -13,11 +13,9 @@ const optionalAuth = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
   
   if (token) {
-    // Validate token if present
     return authMiddleware(req, res, next);
   }
   
-  // No token - allow through (will check deviceId later)
   req.user = null;
   next();
 };
@@ -33,14 +31,13 @@ WorkerRouter.get("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ FIXED: GET /available-jobs - Remove authMiddleware for workers
+// ✅ GET /available-jobs - Remove authMiddleware for workers
 WorkerRouter.get("/available-jobs", async (req, res) => {
   try {
-    const { deviceId } = req.query; // Workers pass deviceId as query param
+    const { deviceId } = req.query;
     
     console.log("Fetching available jobs for worker:", deviceId); 
     
-    // Optional: Verify worker exists and is online
     if (deviceId) {
       const worker = await Worker.findOne({ deviceId });
       if (!worker) {
@@ -49,13 +46,11 @@ WorkerRouter.get("/available-jobs", async (req, res) => {
         });
       }
       
-      // Update last seen
       worker.lastHeartbeatAt = Date.now();
       worker.currentStatus = "online";
       await worker.save();
     }
     
-    // Find jobs that are pending or unassigned
     const availableJobs = await Job.find({
       status: { $in: ['pending', 'queued'] },
       $or: [
@@ -84,7 +79,7 @@ WorkerRouter.get("/available-jobs", async (req, res) => {
   }
 });
 
-// POST /register - Worker registration with authentication (keep as-is)
+// POST /register - Worker registration with authentication
 WorkerRouter.post("/register", authMiddleware, async (req, res) => {
   try {
     const { deviceId, os, cpu, ram, gpu } = req.body;
@@ -102,9 +97,9 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
         userId: req.user.userId,
         deviceId,
         systemInfo: {
-          os: os || "Unknown",      // ← ADD THIS LINE (was missing!)
+          os: os || "Unknown",
           cpu: cpu || "Unknown",
-          ram: ram || "Unknown",    // ← ADD THIS LINE (was missing!)
+          ram: ram || "Unknown",
           gpu: gpu || "N/A",
         },
         currentStatus: "online",
@@ -124,8 +119,7 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
   }
 });
 
-
-// POST /metrics - Worker reports usage (no auth needed) ✅
+// POST /metrics - Worker reports usage
 WorkerRouter.post("/metrics", async (req, res) => {
   try {
     const { jobId, deviceId, cpu, ram, gpu, durationMs } = req.body;
@@ -147,7 +141,7 @@ WorkerRouter.post("/metrics", async (req, res) => {
   }
 });
 
-// POST /complete - Worker uploads final model (no auth needed) ✅
+// POST /complete - Worker uploads final model
 WorkerRouter.post("/complete", async (req, res) => {
   try {
     const { jobId, modelUrl, logsUrl } = req.body;
@@ -168,7 +162,7 @@ WorkerRouter.post("/complete", async (req, res) => {
   }
 });
 
-// POST /push-log - Stream logs (no auth needed) ✅
+// POST /push-log - Stream logs
 WorkerRouter.post("/push-log", async (req, res) => {
   try {
     const { jobId, deviceId, line } = req.body;
@@ -183,6 +177,7 @@ WorkerRouter.post("/push-log", async (req, res) => {
       $push: { logs: { ts: Date.now(), message: line } },
     });
 
+    // ✅ FIXED: Use consistent socket room naming
     req.app.get("io").to(`job:${jobId}`).emit("job:log", { jobId, line });
 
     res.json({ message: "Log streamed" });
@@ -192,7 +187,7 @@ WorkerRouter.post("/push-log", async (req, res) => {
   }
 });
 
-// POST /heartbeat - Worker heartbeat (no auth needed) ✅
+// POST /heartbeat - Worker heartbeat
 WorkerRouter.post("/heartbeat", async (req, res) => {
   try {
     const { deviceId } = req.body;
@@ -213,30 +208,70 @@ WorkerRouter.post("/heartbeat", async (req, res) => {
   }
 });
 
-// POST /accept-job - Worker accepts job (no auth needed) ✅
+// ✅ FIXED: POST /accept-job with Socket.io broadcast
 WorkerRouter.post("/accept-job", async (req, res) => {
   try {
     const { jobId, deviceId } = req.body;
 
-    const job = await Job.findById(jobId);
-    if (!job) return res.status(404).json({ message: "Job not found" });
+    console.log(`📥 Worker ${deviceId} attempting to accept job ${jobId}`);
 
-    if (job.status !== "pending" && job.status !== "queued") {
-      return res.status(400).json({ message: "Job already taken" });
+    const job = await Job.findById(jobId);
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
     }
 
+    // Check if job is still available
+    if (job.status !== "pending" && job.status !== "queued") {
+      console.log(`❌ Job ${jobId} already taken. Status: ${job.status}`);
+      return res.status(400).json({ 
+        message: "Job already taken",
+        currentStatus: job.status 
+      });
+    }
+
+    // Update job status
     job.status = "assigned";
     job.assignedWorkerId = deviceId;
     await job.save();
 
-    res.json({ message: "Job accepted", job });
+    console.log(`✅ Job ${jobId} assigned to worker ${deviceId}`);
+
+    // ✅ EMIT SOCKET EVENT to notify frontend
+    const io = req.app.get("io");
+    
+    // Emit to all connected clients
+    io.emit("job_status_changed", {
+      jobId: job._id,
+      status: "assigned",
+      assignedWorkerId: deviceId,
+      timestamp: new Date().toISOString()
+    });
+
+    // Also emit to specific job room (if frontend joins rooms)
+    io.to(`job:${jobId}`).emit("job_accepted", {
+      jobId: job._id,
+      workerId: deviceId,
+      status: "assigned"
+    });
+
+    console.log(`📡 Socket events emitted for job ${jobId}`);
+
+    res.json({ 
+      message: "Job accepted", 
+      job: {
+        _id: job._id,
+        title: job.title,
+        status: job.status,
+        assignedWorkerId: job.assignedWorkerId
+      }
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("❌ Accept job error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-// GET /my-worker - Get current user's worker (user dashboard - keep auth) ✅
+// GET /my-worker - Get current user's worker
 WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
@@ -252,30 +287,26 @@ WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ FIXED: GET /job/:jobId/details - Complete updated route
+// ✅ GET /job/:jobId/details - Complete updated route
 WorkerRouter.get("/job/:jobId/details", async (req, res) => {
   try {
     const { jobId } = req.params;
-    const { deviceId } = req.query; // Worker passes deviceId
+    const { deviceId } = req.query;
 
-    // Fetch job from database
     const job = await Job.findById(jobId);
     if (!job) {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // ✅ FIXED: Allow PENDING/QUEUED jobs (anyone can view to accept) 
+    // Allow PENDING/QUEUED jobs (anyone can view to accept) 
     // OR ASSIGNED/COMPLETED to this specific worker
     if (deviceId) {
-      // Only block if job is ASSIGNED/COMPLETED and NOT assigned to this worker
       if ((job.status === 'assigned' || job.status === 'completed') && 
           job.assignedWorkerId !== deviceId) {
         return res.status(403).json({ 
           message: "Unauthorized - job not assigned to this worker" 
         });
       }
-      // Pending/queued jobs: ANY worker can view (to accept)
-      // Assigned/completed: ONLY the assigned worker
     }
 
     // Extract file path from the zipFileUrl
@@ -291,7 +322,6 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
 
         console.log("Fetching metadata for:", filePath);
 
-        // Get file metadata from Supabase
         const { data: fileData, error: fileError } = await supabase.storage
           .from("jobs")
           .list("jobs", {
@@ -311,7 +341,6 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
           }
         }
 
-        // Download and extract ZIP contents
         try {
           const { data: zipData, error: downloadError } = await supabase.storage
             .from("jobs")
@@ -402,6 +431,5 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });
-
 
 export default WorkerRouter;

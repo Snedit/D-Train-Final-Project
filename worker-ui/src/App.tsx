@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence, type Variants } from "framer-motion";
+import { io, Socket } from "socket.io-client";
 import HeroSection from "./components/HeroSection";
 import SignIn from "./components/SignIn";
 import SignUp from "./components/SignUp";
@@ -27,10 +28,65 @@ function App() {
   const [completedJob, setCompletedJob] = useState<Job | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
 
-  // Consistent localStorage keys
   const TOKEN_KEY = "dtrain_worker_token";
   const WORKER_KEY = "dtrain_worker";
+
+  // ✅ Initialize Socket.io connection
+  useEffect(() => {
+    console.log('🔌 Initializing Worker Socket.IO connection...');
+    
+    const newSocket = io("http://localhost:5000", {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
+    });
+
+    // Connection handlers
+    newSocket.on('connect', () => {
+      console.log('✅ Worker Socket connected:', newSocket.id);
+    });
+
+    newSocket.on('disconnect', (reason) => {
+      console.log('⚠️ Worker Socket disconnected:', reason);
+    });
+
+    newSocket.on('connect_error', (error) => {
+      console.error('❌ Worker Socket connection error:', error);
+    });
+
+    // ✅ CRITICAL: Listen for job status changes
+    newSocket.on('job_status_changed', (data) => {
+      console.log('📡 Worker received job status change:', data);
+      
+      // If we're viewing this job in JobDetail, it will handle the update
+      // If we're in dashboard, WorkerDashboard will refetch
+    });
+
+    // ✅ CRITICAL: Listen for job accepted events
+    newSocket.on('job_accepted', (data) => {
+      console.log('📡 Worker received job accepted:', data);
+      
+      // This tells us a job was taken - dashboard should refresh
+      // Trigger a custom event that WorkerDashboard can listen to
+      window.dispatchEvent(new CustomEvent('job_accepted', { detail: data }));
+    });
+
+    setSocket(newSocket);
+
+    return () => {
+      console.log('🧹 Cleaning up Worker Socket.IO connection');
+      newSocket.off('connect');
+      newSocket.off('disconnect');
+      newSocket.off('connect_error');
+      newSocket.off('job_status_changed');
+      newSocket.off('job_accepted');
+      newSocket.close();
+    };
+  }, []);
 
   // Check if user is already logged in on mount
   useEffect(() => {
@@ -44,7 +100,6 @@ function App() {
     }
   }, []);
 
-  // Function to check if user already has a registered worker
   const checkExistingWorker = async (
     token: string
   ): Promise<WorkerType | null> => {
@@ -192,8 +247,6 @@ function App() {
     }
   };
 
-  // Worker Registration Handler
-  // Worker Registration Handler
   const handleWorkerRegister = async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
@@ -209,7 +262,6 @@ function App() {
         gpu: string;
       };
 
-      // Check if we're in Electron environment
       const isElectron = (window as any).worker && typeof (window as any).worker.getDeviceInfo === 'function';
       console.log("🔍 Environment check:", {
         hasWorkerAPI: !!(window as any).worker,
@@ -289,6 +341,12 @@ function App() {
       setWorker(workerObj);
       localStorage.setItem(WORKER_KEY, JSON.stringify(workerObj));
 
+      // ✅ Store deviceId in Electron if available
+      if ((window as any).worker && typeof (window as any).worker.setDeviceId === 'function') {
+        console.log('💾 Storing deviceId in Electron:', workerData.worker.deviceId);
+        await (window as any).worker.setDeviceId(workerData.worker.deviceId);
+      }
+
       setIsLoading(true);
       setTimeout(() => {
         setCurrentView("dashboard");
@@ -331,6 +389,13 @@ function App() {
 
   const handleJobStart = (jobId: string) => {
     setCurrentJobId(jobId);
+    
+    // ✅ Join job room for real-time updates
+    if (socket && jobId) {
+      socket.emit('join_job', { jobId });
+      console.log(`🚪 Worker joined room for job: ${jobId}`);
+    }
+    
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("runningJob");
@@ -339,6 +404,12 @@ function App() {
   };
 
   const handleJobComplete = (job: Job) => {
+    // ✅ Leave job room
+    if (socket && currentJobId) {
+      socket.emit('leave_job', { jobId: currentJobId });
+      console.log(`🚪 Worker left room for job: ${currentJobId}`);
+    }
+    
     setCompletedJob(job);
     setIsLoading(true);
     setTimeout(() => {
@@ -348,6 +419,13 @@ function App() {
   };
 
   const handleBackToDashboard = () => {
+    // ✅ Leave job room if we're viewing one
+    if (socket && (currentJobId || completedJob?._id)) {
+      const jobId = currentJobId || completedJob?._id;
+      socket.emit('leave_job', { jobId });
+      console.log(`🚪 Worker left room for job: ${jobId}`);
+    }
+    
     setCurrentJobId(null);
     setCompletedJob(null);
     setIsLoading(true);
@@ -357,10 +435,16 @@ function App() {
     }, 800);
   };
 
-  // NEW: open job detail from pending/available jobs list by jobId
   const handleViewJobDetails = (jobId: string) => {
     setCurrentJobId(jobId);
     setCompletedJob(null);
+    
+    // ✅ Join job room
+    if (socket && jobId) {
+      socket.emit('join_job', { jobId });
+      console.log(`🚪 Worker joined room for job: ${jobId}`);
+    }
+    
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("jobDetail");
@@ -382,7 +466,6 @@ function App() {
   return (
     <div className="min-h-screen bg-[#FFEFE1] text-slate-900 overflow-hidden">
       <AnimatePresence mode="wait">
-        {/* Loading Screen */}
         {isLoading && (
           <motion.div
             key="loading"
@@ -468,7 +551,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* Hero Section */}
         {!isLoading && currentView === "hero" && (
           <motion.div
             key="hero"
@@ -485,7 +567,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* Documentation */}
         {!isLoading && currentView === "documentation" && (
           <motion.div
             key="documentation"
@@ -499,7 +580,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* SignIn */}
         {!isLoading && currentView === "signin" && (
           <motion.div
             key="signin"
@@ -517,7 +597,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* SignUp */}
         {!isLoading && currentView === "signup" && (
           <motion.div
             key="signup"
@@ -535,7 +614,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* Worker Registration */}
         {!isLoading && currentView === "workerRegister" && (
           <motion.div
             key="workerRegister"
@@ -552,7 +630,6 @@ function App() {
           </motion.div>
         )}
 
-        {/* Worker Dashboard */}
         {!isLoading && currentView === "dashboard" && (
           <motion.div
             key="dashboard"
@@ -562,19 +639,18 @@ function App() {
             exit="exit"
             transition={pageTransition}
           >
-<WorkerDashboard
-  worker={worker}
-  onJobStart={handleJobStart}
-  onViewJobDetails={handleViewJobDetails}
-  onAcceptJob={handleJobStart}  // ✅ ADD THIS LINE
-  onSignOut={handleSignOut}
-  onRegisterWorker={() => setCurrentView("workerRegister")}
-/>
-
+            <WorkerDashboard
+              worker={worker}
+              onJobStart={handleJobStart}
+              onViewJobDetails={handleViewJobDetails}
+              onAcceptJob={handleJobStart}
+              onSignOut={handleSignOut}
+              onRegisterWorker={() => setCurrentView("workerRegister")}
+              socket={socket}
+            />
           </motion.div>
         )}
 
-        {/* Running Job */}
         {!isLoading &&
           currentView === "runningJob" &&
           currentJobId &&
@@ -596,7 +672,6 @@ function App() {
             </motion.div>
           )}
 
-        {/* Job Detail */}
         {!isLoading &&
           currentView === "jobDetail" &&
           (completedJob || currentJobId) && (
@@ -608,10 +683,6 @@ function App() {
               exit="exit"
               transition={pageTransition}
             >
-              {/* 
-                If coming from completed job flow, pass full job. 
-                If coming from dashboard "View Details", pass jobId + workerId.
-              */}
               {completedJob ? (
                 <JobDetail job={completedJob} onBack={handleBackToDashboard} />
               ) : (

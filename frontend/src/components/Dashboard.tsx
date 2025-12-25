@@ -30,10 +30,12 @@ const Dashboard: React.FC<DashboardProps> = ({
 }) => {
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState({ name: '', email: '' });
+  const [localJobs, setLocalJobs] = useState<Job[]>(jobs);
 
   const statusIcons = {
     pending: Clock,
     accepted: Play,
+    assigned: Play,
     running: Activity,
     completed: CheckCircle,
     failed: XCircle,
@@ -42,15 +44,20 @@ const Dashboard: React.FC<DashboardProps> = ({
   const statusColors = {
     pending: 'bg-[#FFE66D] text-slate-900',
     accepted: 'bg-[#7BC8FF] text-slate-900',
+    assigned: 'bg-[#7BC8FF] text-slate-900',
     running: 'bg-[#7CF2D0] text-slate-900',
     completed: 'bg-[#4ADE80] text-slate-900',
     failed: 'bg-[#FEE2E2] text-slate-900',
   };
 
+  // ✅ Update local jobs when props change
+  useEffect(() => {
+    setLocalJobs(jobs);
+  }, [jobs]);
+
   useEffect(() => {
     setLoading(false);
 
-    // Load user info from localStorage
     const savedUser = localStorage.getItem('dtrain_user');
     if (savedUser) {
       try {
@@ -64,16 +71,73 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     }
 
-    // Set up socket listeners
+    // ✅ Set up socket listeners for real-time updates
     if (socket) {
+      console.log('🔌 Setting up socket listeners in Dashboard');
+
+      // Listen for job status changes
+      socket.on('job_status_changed', (data) => {
+        console.log('📡 Job status changed:', data);
+        
+        // Update local jobs state
+        setLocalJobs(prevJobs => 
+          prevJobs.map(job => 
+            job._id === data.jobId 
+              ? { ...job, status: data.status, assignedWorkerId: data.assignedWorkerId }
+              : job
+          )
+        );
+      });
+
+      // Listen for job accepted events
+      socket.on('job_accepted', (data) => {
+        console.log('📡 Job accepted:', data);
+        
+        setLocalJobs(prevJobs => 
+          prevJobs.map(job => 
+            job._id === data.jobId 
+              ? { ...job, status: data.status, assignedWorkerId: data.workerId }
+              : job
+          )
+        );
+      });
+
+      // Legacy support for old event name
       socket.on('job_status', (data) => {
-        console.log('Job status updated:', data);
+        console.log('📡 Job status updated (legacy):', data);
+        
+        setLocalJobs(prevJobs => 
+          prevJobs.map(job => 
+            job._id === data.jobId 
+              ? { ...job, status: data.status }
+              : job
+          )
+        );
+      });
+
+      // Connection status
+      socket.on('connect', () => {
+        console.log('✅ Socket connected in Dashboard');
+      });
+
+      socket.on('disconnect', () => {
+        console.log('⚠️ Socket disconnected in Dashboard');
+      });
+
+      socket.on('connect_error', (error) => {
+        console.error('❌ Socket connection error:', error);
       });
     }
 
     return () => {
       if (socket) {
+        console.log('🧹 Cleaning up socket listeners');
+        socket.off('job_status_changed');
+        socket.off('job_accepted');
         socket.off('job_status');
+        socket.off('connect');
+        socket.off('disconnect');
+        socket.off('connect_error');
       }
     };
   }, [socket]);
@@ -104,7 +168,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-7xl mx-auto">
         <div className="relative">
-          {/* Grid background card */}
           <div
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
@@ -114,7 +177,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             }}
           />
 
-          {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFD447] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
@@ -135,9 +197,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Database className="w-8 h-8 text-slate-900" />
           </motion.div>
 
-          {/* Main content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
-            {/* Top nav */}
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
@@ -163,7 +223,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <span className="hidden sm:inline">New Job</span>
                 </motion.button>
 
-                {/* Replace LogOut button with ProfileDropdown */}
                 <ProfileDropdown 
                   onSignOut={onSignOut}
                   userName={userInfo.name}
@@ -172,7 +231,6 @@ const Dashboard: React.FC<DashboardProps> = ({
               </div>
             </nav>
 
-            {/* Header */}
             <div className="mb-8 text-center">
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
                 Training Dashboard
@@ -182,9 +240,8 @@ const Dashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
 
-            {/* Stats Grid */}
+            {/* Stats Grid - Use localJobs instead of jobs */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-              {/* Total Jobs */}
               <motion.div 
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -195,13 +252,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <Activity className="w-5 h-5 text-slate-900" />
                   </div>
                   <div>
-                    <p className="text-2xl font-extrabold text-slate-900">{jobs.length}</p>
+                    <p className="text-2xl font-extrabold text-slate-900">{localJobs.length}</p>
                     <p className="text-xs font-semibold text-slate-700">Total Jobs</p>
                   </div>
                 </div>
               </motion.div>
 
-              {/* Running Jobs */}
               <motion.div 
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -215,7 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {jobs.filter(j => j.status === 'running').length}
+                        {localJobs.filter(j => j.status === 'running' || j.status === 'assigned').length}
                       </p>
                       <p className="text-xs font-semibold text-slate-900">Running</p>
                     </div>
@@ -224,7 +280,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              {/* Pending Jobs */}
               <motion.div 
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -238,7 +293,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {jobs.filter(j => j.status === 'pending').length}
+                        {localJobs.filter(j => j.status === 'pending' || j.status === 'queued').length}
                       </p>
                       <p className="text-xs font-semibold text-slate-900">Pending</p>
                     </div>
@@ -247,7 +302,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              {/* Active Workers */}
               <motion.div 
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -269,13 +323,13 @@ const Dashboard: React.FC<DashboardProps> = ({
               </motion.div>
             </div>
 
-            {/* Jobs Table */}
+            {/* Jobs Table - Use localJobs */}
             <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
               <div className="p-5 border-b-[3px] border-slate-900 bg-[#F5F3FF]">
                 <h2 className="text-lg font-extrabold text-slate-900">Recent Jobs</h2>
               </div>
 
-              {jobs.length === 0 ? (
+              {localJobs.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                     <Activity className="w-8 h-8 text-white" />
@@ -303,9 +357,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {jobs.map((job, index) => {
-                        const StatusIcon = statusIcons[job.status];
-                        const statusStyle = statusColors[job.status];
+                      {localJobs.map((job, index) => {
+                        const StatusIcon = statusIcons[job.status as keyof typeof statusIcons] || Clock;
+                        const statusStyle = statusColors[job.status as keyof typeof statusColors] || statusColors.pending;
 
                         return (
                           <motion.tr
@@ -316,7 +370,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             className="border-b-[2px] border-slate-900/10 hover:bg-[#F9F5FF] transition-colors"
                           >
                             <td className="px-5 py-4">
-                              <p className="text-sm font-extrabold text-slate-900">{job.name}</p>
+                              <p className="text-sm font-extrabold text-slate-900">{job.title || job.name}</p>
                               <p className="text-xs text-slate-600 font-medium">#{index+1}</p>
                             </td>
                             <td className="px-5 py-4">
@@ -352,23 +406,6 @@ const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
-
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0) rotate(-8deg); }
-          50% { transform: translateY(-6px) rotate(-8deg); }
-        }
-        
-        @keyframes wiggle {
-          0%, 100% { transform: rotate(6deg); }
-          50% { transform: rotate(2deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-      `}</style>
     </div>
   );
 };

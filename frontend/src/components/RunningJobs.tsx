@@ -1,7 +1,7 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Play, Zap, Activity, Eye } from 'lucide-react';
-import { Job } from '../types';
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Play, Zap, Activity, Eye } from "lucide-react";
+import { Job } from "../types";
 
 interface RunningJobsProps {
   jobs: Job[];
@@ -9,7 +9,11 @@ interface RunningJobsProps {
   onBack: () => void;
 }
 
-const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) => {
+const RunningJobs: React.FC<RunningJobsProps> = ({
+  jobs,
+  onJobSelect,
+  onBack,
+}) => {
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-7xl mx-auto">
@@ -19,8 +23,8 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
               backgroundImage:
-                'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-              backgroundSize: '26px 26px',
+                "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+              backgroundSize: "26px 26px",
             }}
           />
 
@@ -51,9 +55,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img 
-                    src="/logo.png" 
-                    alt="DTrain Logo" 
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
                     className="w-8 h-8 object-contain"
                   />
                 </div>
@@ -78,7 +82,8 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                 Running Jobs
               </h1>
               <p className="text-sm text-slate-700 font-medium">
-                {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} currently executing
+                {jobs.length} {jobs.length === 1 ? "job" : "jobs"} currently
+                executing
               </p>
             </div>
 
@@ -88,7 +93,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                 <AnimatePresence>
                   {jobs.map((job, index) => (
                     <motion.div
-                      key={job.id}
+                      key={job._id}
                       initial={{ opacity: 0, y: 20, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: -20, scale: 0.95 }}
@@ -101,9 +106,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <motion.div
-                            animate={{ 
+                            animate={{
                               scale: [1, 1.2, 1],
-                              opacity: [0.7, 1, 0.7]
+                              opacity: [0.7, 1, 0.7],
                             }}
                             transition={{ duration: 2, repeat: Infinity }}
                             className="w-3 h-3 bg-[#22C55E] rounded-full border-[2px] border-slate-900"
@@ -125,14 +130,20 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                         <h3 className="text-base font-extrabold text-slate-900 mb-2">
                           {job.name}
                         </h3>
-                        <p className="text-xs text-slate-600 font-medium mb-1">ID: {job.id}</p>
-                        <p className="text-xs text-slate-900 font-mono font-semibold">{job.main_entry}</p>
+                        <p className="text-xs text-slate-600 font-medium mb-1">
+                          ID: {job._id}
+                        </p>
+                        <p className="text-xs text-slate-900 font-mono font-semibold">
+                          {job.main_entry}
+                        </p>
                       </div>
 
                       {/* Progress Indicators */}
                       <div className="space-y-3 mb-4">
                         <div className="flex items-center justify-between p-2 rounded-[10px] border-[2px] border-slate-900 bg-[#FFFDF8]">
-                          <span className="text-xs font-semibold text-slate-700">CPU Usage</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            CPU Usage
+                          </span>
                           <div className="flex items-center gap-1">
                             <motion.div
                               animate={{ scale: [1, 1.2, 1] }}
@@ -147,7 +158,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                         </div>
 
                         <div className="flex items-center justify-between p-2 rounded-[10px] border-[2px] border-slate-900 bg-[#FFFDF8]">
-                          <span className="text-xs font-semibold text-slate-700">Memory</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            Memory
+                          </span>
                           <div className="flex items-center gap-1">
                             <Activity className="w-3 h-3 text-blue-500" />
                             <span className="text-xs font-bold text-slate-900">
@@ -157,7 +170,9 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                         </div>
 
                         <div className="flex items-center justify-between p-2 rounded-[10px] border-[2px] border-slate-900 bg-[#FFFDF8]">
-                          <span className="text-xs font-semibold text-slate-700">Runtime</span>
+                          <span className="text-xs font-semibold text-slate-700">
+                            Runtime
+                          </span>
                           <span className="text-xs font-bold text-slate-900">
                             {Math.floor(Math.random() * 120 + 30)}m
                           </span>
@@ -169,12 +184,16 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
                         <div className="w-full bg-[#E5E7EB] rounded-full h-3 border-[2px] border-slate-900 overflow-hidden">
                           <motion.div
                             initial={{ width: 0 }}
-                            animate={{ width: `${Math.floor(Math.random() * 60 + 20)}%` }}
+                            animate={{
+                              width: `${Math.floor(Math.random() * 60 + 20)}%`,
+                            }}
                             transition={{ duration: 1, delay: index * 0.2 }}
                             className="bg-gradient-to-r from-[#22C55E] to-[#10B981] h-full"
                           />
                         </div>
-                        <p className="text-xs text-slate-600 font-medium mt-2">Training in progress...</p>
+                        <p className="text-xs text-slate-600 font-medium mt-2">
+                          Training in progress...
+                        </p>
                       </div>
                     </motion.div>
                   ))}
@@ -190,17 +209,21 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobs, onJobSelect, onBack }) 
               >
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white p-12 shadow-[8px_8px_0_0_rgba(15,23,42,1)] max-w-md mx-auto">
                   <motion.div
-                    animate={{ 
+                    animate={{
                       rotate: [0, 10, -10, 0],
-                      scale: [1, 1.1, 1]
+                      scale: [1, 1.1, 1],
                     }}
                     transition={{ duration: 3, repeat: Infinity }}
                     className="w-20 h-20 rounded-[16px] bg-[#7CF2D0] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
                   >
                     <Play className="w-10 h-10 text-slate-900" />
                   </motion.div>
-                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">No Running Jobs</h3>
-                  <p className="text-sm text-slate-700 font-medium mb-6">All jobs are either pending or completed</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">
+                    No Running Jobs
+                  </h3>
+                  <p className="text-sm text-slate-700 font-medium mb-6">
+                    All jobs are either pending or completed
+                  </p>
                   <motion.button
                     whileHover={{ y: -2 }}
                     whileTap={{ y: 0 }}

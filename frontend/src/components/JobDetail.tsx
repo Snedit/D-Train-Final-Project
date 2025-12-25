@@ -12,19 +12,18 @@ interface JobDetailProps {
 }
 
 const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
-  const [logs, setLogs] = useState<JobLog[]>([]);
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const terminalRef = useRef<HTMLDivElement>(null);
 
   // Socket connection and log fetching
   useEffect(() => {
-    fetch(`http://localhost:5000/api/jobs/${job.id}/logs`)
+    fetch(`http://localhost:5000/api/jobs/${job._id}/logs`)
       .then(res => res.json())
       .then(data => {
         console.log(data);
         console.table(data);
-        setLogs(data);
+        // Convert logs to terminal output
         setTerminalOutput(data.map((l: JobLog) => `[${l.level}] ${l.message}`));
       })
       .catch(error => {
@@ -32,16 +31,16 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       });
 
     if (socket) {
-      socket.emit('join_job', { job_id: job.id });
+      socket.emit('join_job', { job_id: job._id });
 
       const handleJobLog = (data: any) => {
-        if (data.job_id === job.id) {
+        if (data.job_id === job._id) {
           setTerminalOutput(prev => [...prev, data.line]);
         }
       };
 
       const handleJobStatus = (data: any) => {
-        if (data.job_id === job.id) {
+        if (data.job_id === job._id) {
           console.log('Job status updated:', data.status);
         }
       };
@@ -50,12 +49,12 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       socket.on('job_status', handleJobStatus);
 
       return () => {
-        socket.emit('leave_job', { job_id: job.id });
+        socket.emit('leave_job', { job_id: job._id });
         socket.off('job_log', handleJobLog);
         socket.off('job_status', handleJobStatus);
       };
     }
-  }, [socket, job.id]);
+  }, [socket, job._id]);
 
   // Mock metrics data generation
   useEffect(() => {

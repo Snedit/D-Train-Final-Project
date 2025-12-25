@@ -34,30 +34,111 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    // Check if user is already logged in (from localStorage)
     const savedUser = localStorage.getItem("dtrain_user");
 
     if (savedUser) {
       setIsAuthenticated(true);
     }
 
-    // Initialize Socket.IO connection
+    // ✅ Initialize Socket.IO with proper configuration
+    console.log("🔌 Initializing Socket.IO connection...");
     const newSocket = io("http://localhost:5000", {
       transports: ["websocket", "polling"],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 5,
     });
+
+    // ✅ Socket connection handlers
+    newSocket.on("connect", () => {
+      console.log("✅ Socket connected:", newSocket.id);
+    });
+
+    newSocket.on("disconnect", (reason) => {
+      console.log("⚠️ Socket disconnected:", reason);
+    });
+
+    newSocket.on("connect_error", (error) => {
+      console.error("❌ Socket connection error:", error);
+    });
+
+    // ✅ Listen for real-time job updates
+    newSocket.on("job_status_changed", (data) => {
+      console.log("📡 Job status changed:", data);
+
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job._id === data.jobId
+            ? {
+                ...job,
+                status: data.status,
+                assignedWorkerId: data.assignedWorkerId,
+              }
+            : job
+        )
+      );
+
+      // If viewing the specific job, update selectedJob too
+      setSelectedJob((prevJob) => {
+        if (!prevJob || prevJob._id !== data.jobId) {
+          return prevJob;
+        }
+        return {
+          ...prevJob,
+          status: data.status,
+          assignedWorkerId: data.assignedWorkerId,
+        };
+      });
+    });
+
+    newSocket.on("job_accepted", (data) => {
+      console.log("📡 Job accepted:", data);
+
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job._id === data.jobId
+            ? {
+                ...job,
+                status: data.status,
+                assignedWorkerId: data.workerId,
+              }
+            : job
+        )
+      );
+    });
+
+    // Legacy support
+    newSocket.on("job_status", (data) => {
+      console.log("📡 Job status (legacy):", data);
+
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job._id === data.jobId ? { ...job, status: data.status } : job
+        )
+      );
+    });
+
     setSocket(newSocket);
 
     // Fetch initial data
     fetchJobs();
     fetchWorkers();
 
-    // Set up periodic data refresh
+    // Set up periodic data refresh (less frequent now with Socket.io)
     const interval = setInterval(() => {
       fetchJobs();
       fetchWorkers();
-    }, 15000);
+    }, 30000); // Every 30 seconds instead of 15
 
     return () => {
+      console.log("🧹 Cleaning up Socket.IO connection");
+      newSocket.off("connect");
+      newSocket.off("disconnect");
+      newSocket.off("connect_error");
+      newSocket.off("job_status_changed");
+      newSocket.off("job_accepted");
+      newSocket.off("job_status");
       newSocket.close();
       clearInterval(interval);
     };
@@ -73,7 +154,7 @@ function App() {
       });
       if (response.ok) {
         const data = await response.json();
-        console.log(data);
+        console.log("📋 Jobs fetched:", data.jobs?.length || 0);
         setJobs(data.jobs);
       }
     } catch (error) {
@@ -83,10 +164,15 @@ function App() {
 
   const fetchWorkers = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/worker");
+      const token = localStorage.getItem("dtrain_token");
+      const response = await fetch("http://localhost:5000/api/worker", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
       if (response.ok) {
         const data = await response.json();
-        console.log(data);
+        console.log("👷 Workers fetched:", data.workers?.length || 0);
         setWorkers(data.workers);
       }
     } catch (error) {
@@ -97,7 +183,6 @@ function App() {
   const handleGetStarted = () => {
     setIsLoading(true);
     setTimeout(() => {
-      // Check if user is authenticated
       if (isAuthenticated) {
         setCurrentView("dashboard");
       } else {
@@ -124,7 +209,6 @@ function App() {
   };
 
   const handleSignIn = async (email: string, password: string) => {
-    // Don't set loading here - SignIn component handles it
     try {
       const res = await fetch("http://localhost:5000/api/user/login", {
         method: "POST",
@@ -140,10 +224,8 @@ function App() {
         throw new Error(data.message || "Login failed");
       }
 
-      // Save JWT token
       localStorage.setItem("dtrain_token", data.token);
 
-      // Save user info
       const user = {
         email,
         name: data.user?.name || email.split("@")[0],
@@ -152,14 +234,12 @@ function App() {
 
       setIsAuthenticated(true);
 
-      // Transition to dashboard
       setIsLoading(true);
       setTimeout(() => {
         setCurrentView("dashboard");
         setIsLoading(false);
       }, 500);
     } catch (err: any) {
-      // Re-throw error so SignIn component can catch and display it
       throw new Error(err.message || "Something went wrong");
     }
   };
@@ -172,7 +252,6 @@ function App() {
     try {
       setIsLoading(true);
 
-      // Step 1: Register the user
       const registerRes = await fetch(
         "http://localhost:5000/api/user/register",
         {
@@ -190,7 +269,6 @@ function App() {
         throw new Error(registerData.message || "Registration failed");
       }
 
-      // Step 2: If token is returned, save it directly
       if (registerData.token) {
         localStorage.setItem("dtrain_token", registerData.token);
 
@@ -204,7 +282,6 @@ function App() {
           setIsLoading(false);
         }, 800);
       } else {
-        // Step 3: If no token, perform auto-login
         const loginRes = await fetch("http://localhost:5000/api/user/login", {
           method: "POST",
           headers: {
@@ -233,22 +310,17 @@ function App() {
       }
     } catch (err: any) {
       setIsLoading(false);
-      throw err; // Re-throw to let SignUp component handle the error
+      throw err;
     }
   };
 
   const handleSignOut = () => {
-    // Clear authentication state
     setIsAuthenticated(false);
-
-    // Remove ALL auth data from localStorage
     localStorage.removeItem("dtrain_user");
     localStorage.removeItem("dtrain_token");
 
-    // Show loading animation
     setIsLoading(true);
     setTimeout(() => {
-      // Redirect to hero page
       setCurrentView("hero");
       setIsLoading(false);
     }, 800);
@@ -282,6 +354,13 @@ function App() {
   const handleJobSelect = (job: Job) => {
     setIsLoading(true);
     setSelectedJob(job);
+
+    // ✅ Join job room for real-time updates
+    if (socket && job._id) {
+      socket.emit("join_job", { jobId: job._id });
+      console.log(`🚪 Joined room for job: ${job._id}`);
+    }
+
     setTimeout(() => {
       setCurrentView("detail");
       setIsLoading(false);
@@ -290,6 +369,13 @@ function App() {
 
   const handleBackToDashboard = () => {
     setIsLoading(true);
+
+    // ✅ Leave job room when going back
+    if (socket && selectedJob?._id) {
+      socket.emit("leave_job", { jobId: selectedJob._id });
+      console.log(`🚪 Left room for job: ${selectedJob._id}`);
+    }
+
     setSelectedJob(null);
     setTimeout(() => {
       setCurrentView("dashboard");
@@ -329,7 +415,6 @@ function App() {
     }, 800);
   };
 
-  // Consistent page transition variants
   const pageVariants: Variants = {
     initial: {
       opacity: 0,
@@ -348,7 +433,6 @@ function App() {
     },
   };
 
-  // Transition configuration
   const pageTransition = {
     duration: 0.4,
     ease: "easeOut" as const,
@@ -366,16 +450,12 @@ function App() {
             className="fixed inset-0 bg-[#FFEFE1] z-50 flex items-center justify-center"
           >
             <div className="text-center">
-              {/* Neobrutalism loader */}
               <div className="relative w-24 h-24 mx-auto mb-6">
-                {/* Outer rotating square */}
                 <motion.div
                   animate={{ rotate: 360 }}
                   transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
                   className="absolute inset-0 rounded-[16px] border-[4px] border-slate-900 bg-blue-400 shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
                 />
-
-                {/* Inner pulsing circle */}
                 <motion.div
                   animate={{ scale: [1, 1.2, 1] }}
                   transition={{
@@ -385,8 +465,6 @@ function App() {
                   }}
                   className="absolute inset-4 rounded-full border-[4px] border-slate-900 bg-[#FFD447]"
                 />
-
-                {/* Center dot */}
                 <motion.div
                   animate={{
                     scale: [1, 0.8, 1],
@@ -400,8 +478,6 @@ function App() {
                   className="absolute inset-8 rounded-full border-[3px] border-slate-900"
                 />
               </div>
-
-              {/* Loading text with bouncing animation */}
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -491,7 +567,7 @@ function App() {
             <SignIn
               onSignIn={handleSignIn}
               onSwitchToSignUp={handleSwitchToSignUp}
-              onBack={handleBackToHero} // ✅ Add this line
+              onBack={handleBackToHero}
             />
           </motion.div>
         )}
@@ -508,7 +584,7 @@ function App() {
             <SignUp
               onSignUp={handleSignUp}
               onSwitchToSignIn={handleSwitchToSignIn}
-              onBack={handleBackToHero} // ✅ Add this line
+              onBack={handleBackToHero}
             />
           </motion.div>
         )}
@@ -579,7 +655,9 @@ function App() {
             transition={pageTransition}
           >
             <RunningJobs
-              jobs={jobs.filter((job) => job.status === "running")}
+              jobs={jobs.filter(
+                (job) => job.status === "running" || job.status === "assigned"
+              )}
               onJobSelect={handleJobSelect}
               onBack={handleBackToDashboard}
             />
@@ -596,7 +674,9 @@ function App() {
             transition={pageTransition}
           >
             <PendingJobs
-              jobs={jobs.filter((job) => job.status === "pending")}
+              jobs={jobs.filter(
+                (job) => job.status === "pending" || job.status === "queued"
+              )}
               onJobSelect={handleJobSelect}
               onBack={handleBackToDashboard}
             />

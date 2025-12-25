@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import { Socket } from 'socket.io-client';
 import { 
   Cpu,  
   Activity, 
@@ -22,6 +23,7 @@ interface WorkerDashboardProps {
   onAcceptJob: (jobId: string) => void;
   onSignOut: () => void;
   onRegisterWorker: () => void;
+  socket: Socket | null; // ✅ Added socket prop
 }
 
 interface PendingJob {
@@ -42,7 +44,8 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   worker,  
   onViewJobDetails,
   onSignOut,
-  onRegisterWorker 
+  onRegisterWorker,
+  socket // ✅ Receive socket
 }) => {
   const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -54,6 +57,53 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // ✅ Listen for Socket.io events
+  useEffect(() => {
+    if (!socket) return;
+
+    console.log('🔌 WorkerDashboard: Setting up socket listeners');
+
+    // Listen for job_accepted event (job was taken by another worker)
+    const handleJobAccepted = (data: any) => {
+      console.log('📡 WorkerDashboard: Job accepted by another worker:', data);
+      
+      // Remove the accepted job from our list
+      setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+    };
+
+    // Listen for job_status_changed
+    const handleJobStatusChanged = (data: any) => {
+      console.log('📡 WorkerDashboard: Job status changed:', data);
+      
+      // If job became available (status changed to pending/queued), refetch
+      if (data.status === 'pending' || data.status === 'queued') {
+        fetchPendingJobs();
+      }
+      // If job was assigned/completed, remove from list
+      else if (data.status === 'assigned' || data.status === 'completed') {
+        setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+      }
+    };
+
+    socket.on('job_accepted', handleJobAccepted);
+    socket.on('job_status_changed', handleJobStatusChanged);
+
+    // ✅ Also listen for custom window event (from App.tsx)
+    const handleWindowJobAccepted = (event: any) => {
+      const data = event.detail;
+      console.log('📡 WorkerDashboard: Window event - job accepted:', data);
+      setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+    };
+
+    window.addEventListener('job_accepted', handleWindowJobAccepted);
+
+    return () => {
+      socket.off('job_accepted', handleJobAccepted);
+      socket.off('job_status_changed', handleJobStatusChanged);
+      window.removeEventListener('job_accepted', handleWindowJobAccepted);
+    };
+  }, [socket]);
+
   useEffect(() => {
     if (worker) {
       console.log("✅ Worker loaded:", worker);
@@ -61,10 +111,11 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
       fetchPendingJobs();
       fetchWorkerStats();
       
+      // ✅ Reduced interval since Socket.io handles real-time updates
       const interval = setInterval(() => {
         fetchPendingJobs();
         fetchWorkerStats();
-      }, 10000);
+      }, 30000); // 30 seconds instead of 10
 
       return () => clearInterval(interval);
     } else {
@@ -84,7 +135,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
       console.log("🔍 Fetching jobs for deviceId:", worker.deviceId);
 
-      // Fetch available jobs using worker endpoint
       const response = await fetch(
         `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
         {
@@ -100,7 +150,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         const data = await response.json();
         console.log("📦 Jobs data:", data);
         
-        // Get available jobs from response
         const availableJobs = data.jobs || data.availableJobs || [];
         
         console.log("✅ Available jobs:", availableJobs.length);
@@ -271,6 +320,12 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               {worker && (
                 <p className="text-sm text-slate-700 font-medium">
                   Device ID: <span className="font-mono font-bold">{worker.deviceId}</span>
+                  {socket?.connected && (
+                    <span className="ml-3 inline-flex items-center gap-1 text-xs text-green-600">
+                      <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+                      Connected
+                    </span>
+                  )}
                 </p>
               )}
             </div>

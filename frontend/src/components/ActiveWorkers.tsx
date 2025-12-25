@@ -1,7 +1,15 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Users, Server, Cpu, HardDrive, Wifi, Clock, Activity} from 'lucide-react';
-import { Worker, Job } from '../types';
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Users,
+  Server,
+  Cpu,
+  HardDrive,
+  Wifi,
+  Clock,
+  Activity,
+} from "lucide-react";
+import { Worker, Job } from "../types";
 
 interface ActiveWorkersProps {
   workers: Worker[];
@@ -9,20 +17,30 @@ interface ActiveWorkersProps {
   onBack: () => void;
 }
 
-const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) => {
+const ActiveWorkers: React.FC<ActiveWorkersProps> = ({
+  workers,
+  jobs,
+  onBack,
+}) => {
   const getWorkerStatus = (worker: Worker) => {
-    const runningJob = jobs.find(job => job.accepted_by === worker.id && job.status === 'running');
-    if (runningJob) return { status: 'busy', job: runningJob };
-    return { status: worker.currentStatus, job: null };
-
+    const runningJob = jobs.find(
+      (job) =>
+        (job.accepted_by === worker.id ||
+          job.assignedWorkerId === worker._id) &&
+        job.status === "running"
+    );
+    if (runningJob) return { status: "busy", job: runningJob };
+    return { status: worker.currentStatus || worker.status, job: null }; // ✅ Now exists
   };
 
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
     const lastSeen = new Date(dateString);
-    const diffInMinutes = Math.floor((now.getTime() - lastSeen.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
+    const diffInMinutes = Math.floor(
+      (now.getTime() - lastSeen.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 1) return "Just now";
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
@@ -37,17 +55,17 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
               backgroundImage:
-                'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-              backgroundSize: '26px 26px',
+                "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+              backgroundSize: "26px 26px",
             }}
           />
 
           {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFB4D3] flex items-center justify-center"
-            animate={{ 
+            animate={{
               scale: [1, 1.1, 1],
-              rotate: [0, 5, -5, 0]
+              rotate: [0, 5, -5, 0],
             }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           >
@@ -72,9 +90,9 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img 
-                    src="/logo.png" 
-                    alt="DTrain Logo" 
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
                     className="w-8 h-8 object-contain"
                   />
                 </div>
@@ -99,13 +117,14 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                 Active Workers
               </h1>
               <p className="text-sm text-slate-700 font-medium">
-                {workers.length} {workers.length === 1 ? 'worker' : 'workers'} in the network
+                {workers.length} {workers.length === 1 ? "worker" : "workers"}{" "}
+                in the network
               </p>
             </div>
 
             {/* Network Stats - NO ANIMATIONS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 className="rounded-[18px] border-[3px] border-slate-900 bg-[#7CF2D0] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
               >
@@ -115,14 +134,20 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                   </div>
                   <div>
                     <p className="text-2xl font-extrabold text-slate-900">
-                      {workers.filter(w => getWorkerStatus(w).status === 'busy').length}
+                      {
+                        workers.filter(
+                          (w) => getWorkerStatus(w).status === "busy"
+                        ).length
+                      }
                     </p>
-                    <p className="text-xs font-semibold text-slate-900">Busy Workers</p>
+                    <p className="text-xs font-semibold text-slate-900">
+                      Busy Workers
+                    </p>
                   </div>
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 className="rounded-[18px] border-[3px] border-slate-900 bg-[#7BC8FF] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
               >
@@ -132,14 +157,20 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                   </div>
                   <div>
                     <p className="text-2xl font-extrabold text-slate-900">
-                      {workers.filter(w => getWorkerStatus(w).status === 'idle').length}
+                      {
+                        workers.filter(
+                          (w) => getWorkerStatus(w).status === "idle"
+                        ).length
+                      }
                     </p>
-                    <p className="text-xs font-semibold text-slate-900">Idle Workers</p>
+                    <p className="text-xs font-semibold text-slate-900">
+                      Idle Workers
+                    </p>
                   </div>
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 className="rounded-[18px] border-[3px] border-slate-900 bg-[#FFB4D3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]"
               >
@@ -148,8 +179,12 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                     <Wifi className="w-5 h-5 text-slate-900" />
                   </div>
                   <div>
-                    <p className="text-2xl font-extrabold text-slate-900">{workers.length}</p>
-                    <p className="text-xs font-semibold text-slate-900">Total Online</p>
+                    <p className="text-2xl font-extrabold text-slate-900">
+                      {workers.length}
+                    </p>
+                    <p className="text-xs font-semibold text-slate-900">
+                      Total Online
+                    </p>
                   </div>
                 </div>
               </motion.div>
@@ -161,7 +196,7 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                 <AnimatePresence>
                   {workers.map((worker, index) => {
                     const workerStatus = getWorkerStatus(worker);
-                    const isBusy = workerStatus.status === 'busy';
+                    const isBusy = workerStatus.status === "busy";
 
                     return (
                       <motion.div
@@ -177,25 +212,33 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                         <div className="flex items-center justify-between mb-4">
                           <div className="flex items-center gap-2">
                             <motion.div
-                              animate={isBusy ? { 
-                                scale: [1, 1.2, 1],
-                                opacity: [0.7, 1, 0.7]
-                              } : {}}
+                              animate={
+                                isBusy
+                                  ? {
+                                      scale: [1, 1.2, 1],
+                                      opacity: [0.7, 1, 0.7],
+                                    }
+                                  : {}
+                              }
                               transition={{ duration: 2, repeat: Infinity }}
                               className={`w-3 h-3 rounded-full border-[2px] border-slate-900 ${
-                                isBusy ? 'bg-[#22C55E]' : 'bg-[#7BC8FF]'
+                                isBusy ? "bg-[#22C55E]" : "bg-[#7BC8FF]"
                               }`}
                             />
-                            <span className={`px-2 py-1 rounded-full border-[2px] border-slate-900 text-[10px] font-bold ${
-                              isBusy ? 'bg-[#7CF2D0] text-slate-900' : 'bg-[#E4ECFF] text-slate-900'
-                            }`}>
-                              {isBusy ? 'BUSY' : 'IDLE'}
+                            <span
+                              className={`px-2 py-1 rounded-full border-[2px] border-slate-900 text-[10px] font-bold ${
+                                isBusy
+                                  ? "bg-[#7CF2D0] text-slate-900"
+                                  : "bg-[#E4ECFF] text-slate-900"
+                              }`}
+                            >
+                              {isBusy ? "BUSY" : "IDLE"}
                             </span>
                           </div>
                           <motion.div
                             whileHover={{ scale: 1.1 }}
                             className={`w-8 h-8 rounded-[10px] border-[2px] border-slate-900 flex items-center justify-center ${
-                              isBusy ? 'bg-[#7CF2D0]' : 'bg-[#FFB4D3]'
+                              isBusy ? "bg-[#7CF2D0]" : "bg-[#FFB4D3]"
                             }`}
                           >
                             <Server className="w-4 h-4 text-slate-900" />
@@ -207,10 +250,15 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                           <h3 className="text-base font-extrabold text-slate-900 mb-2">
                             {worker.name}
                           </h3>
-                          <p className="text-xs text-slate-600 font-medium mb-2">ID: {worker._id}</p>
+                          <p className="text-xs text-slate-600 font-medium mb-2">
+                            ID: {worker._id || worker.id}
+                          </p>
                           {workerStatus.job && (
                             <p className="text-xs text-slate-900 font-semibold">
-                              Running: <span className="font-mono">{workerStatus.job.name}</span>
+                              Running:{" "}
+                              <span className="font-mono">
+                                {workerStatus.job.name}
+                              </span>
                             </p>
                           )}
                         </div>
@@ -221,31 +269,47 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                             <div className="flex items-center gap-1">
                               <motion.div
                                 animate={isBusy ? { rotate: 360 } : {}}
-                                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                                transition={{
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "linear",
+                                }}
                               >
                                 <Cpu className="w-3 h-3 text-blue-500" />
                               </motion.div>
-                              <span className="text-xs font-semibold text-slate-700">CPU</span>
+                              <span className="text-xs font-semibold text-slate-700">
+                                CPU
+                              </span>
                             </div>
                             <span className="text-xs font-bold text-slate-900">
-                              {isBusy ? Math.floor(Math.random() * 40 + 50) : Math.floor(Math.random() * 20 + 5)}%
+                              {isBusy
+                                ? Math.floor(Math.random() * 40 + 50)
+                                : Math.floor(Math.random() * 20 + 5)}
+                              %
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between p-2 rounded-[10px] border-[2px] border-slate-900 bg-[#FFFDF8]">
                             <div className="flex items-center gap-1">
                               <HardDrive className="w-3 h-3 text-green-500" />
-                              <span className="text-xs font-semibold text-slate-700">Memory</span>
+                              <span className="text-xs font-semibold text-slate-700">
+                                Memory
+                              </span>
                             </div>
                             <span className="text-xs font-bold text-slate-900">
-                              {isBusy ? Math.floor(Math.random() * 30 + 40) : Math.floor(Math.random() * 15 + 10)}%
+                              {isBusy
+                                ? Math.floor(Math.random() * 30 + 40)
+                                : Math.floor(Math.random() * 15 + 10)}
+                              %
                             </span>
                           </div>
 
                           <div className="flex items-center justify-between p-2 rounded-[10px] border-[2px] border-slate-900 bg-[#FFFDF8]">
                             <div className="flex items-center gap-1">
                               <Clock className="w-3 h-3 text-purple-500" />
-                              <span className="text-xs font-semibold text-slate-700">Last Seen</span>
+                              <span className="text-xs font-semibold text-slate-700">
+                                Last Seen
+                              </span>
                             </div>
                             <span className="text-xs font-bold text-slate-900">
                               {getTimeAgo(worker.last_seen)}
@@ -256,17 +320,21 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
                         {/* Activity Indicator */}
                         <div className="border-t-[2px] border-slate-900 pt-4">
                           <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-slate-700">Network Status</span>
+                            <span className="text-xs font-semibold text-slate-700">
+                              Network Status
+                            </span>
                             <div className="flex items-center gap-1">
                               <motion.div
-                                animate={{ 
+                                animate={{
                                   scale: [1, 1.2, 1],
-                                  opacity: [0.5, 1, 0.5]
+                                  opacity: [0.5, 1, 0.5],
                                 }}
                                 transition={{ duration: 1.5, repeat: Infinity }}
                                 className="w-2 h-2 bg-[#22C55E] rounded-full border border-slate-900"
                               />
-                              <span className="text-xs font-bold text-slate-900">{worker.currentStatus}</span>
+                              <span className="text-xs font-bold text-slate-900">
+                                {worker.currentStatus || worker.status}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -285,17 +353,21 @@ const ActiveWorkers: React.FC<ActiveWorkersProps> = ({ workers, jobs, onBack }) 
               >
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white p-12 shadow-[8px_8px_0_0_rgba(15,23,42,1)] max-w-md mx-auto">
                   <motion.div
-                    animate={{ 
+                    animate={{
                       rotate: [0, 10, -10, 0],
-                      scale: [1, 1.1, 1]
+                      scale: [1, 1.1, 1],
                     }}
                     transition={{ duration: 3, repeat: Infinity }}
                     className="w-20 h-20 rounded-[16px] bg-[#FFB4D3] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
                   >
                     <Users className="w-10 h-10 text-slate-900" />
                   </motion.div>
-                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">No Active Workers</h3>
-                  <p className="text-sm text-slate-700 font-medium mb-6">No workers are currently connected to the network</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">
+                    No Active Workers
+                  </h3>
+                  <p className="text-sm text-slate-700 font-medium mb-6">
+                    No workers are currently connected to the network
+                  </p>
                   <motion.button
                     whileHover={{ y: -2 }}
                     whileTap={{ y: 0 }}

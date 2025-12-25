@@ -1,7 +1,14 @@
-import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Calendar, FileText, Settings, AlertCircle, ArrowRight } from 'lucide-react';
-import { Job } from '../types';
+import React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Clock,
+  Calendar,
+  FileText,
+  Settings,
+  AlertCircle,
+  ArrowRight,
+} from "lucide-react";
+import { Job } from "../types";
 
 interface PendingJobsProps {
   jobs: Job[];
@@ -9,13 +16,19 @@ interface PendingJobsProps {
   onBack: () => void;
 }
 
-const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) => {
+const PendingJobs: React.FC<PendingJobsProps> = ({
+  jobs,
+  onJobSelect,
+  onBack,
+}) => {
   const getTimeAgo = (dateString: string) => {
     const now = new Date();
     const created = new Date(dateString);
-    const diffInMinutes = Math.floor((now.getTime() - created.getTime()) / (1000 * 60));
-    
-    if (diffInMinutes < 1) return 'Just now';
+    const diffInMinutes = Math.floor(
+      (now.getTime() - created.getTime()) / (1000 * 60)
+    );
+
+    if (diffInMinutes < 1) return "Just now";
     if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
     if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
     return `${Math.floor(diffInMinutes / 1440)}d ago`;
@@ -30,17 +43,17 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
               backgroundImage:
-                'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-              backgroundSize: '26px 26px',
+                "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+              backgroundSize: "26px 26px",
             }}
           />
 
           {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFE66D] flex items-center justify-center"
-            animate={{ 
+            animate={{
               rotate: [0, 15, -15, 0],
-              scale: [1, 1.1, 1]
+              scale: [1, 1.1, 1],
             }}
             transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           >
@@ -65,9 +78,9 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img 
-                    src="/logo.png" 
-                    alt="DTrain Logo" 
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
                     className="w-8 h-8 object-contain"
                   />
                 </div>
@@ -92,7 +105,8 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                 Pending Jobs
               </h1>
               <p className="text-sm text-slate-700 font-medium">
-                {jobs.length} {jobs.length === 1 ? 'job' : 'jobs'} waiting for workers
+                {jobs.length} {jobs.length === 1 ? "job" : "jobs"} waiting for
+                workers
               </p>
             </div>
 
@@ -106,9 +120,9 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
               >
                 <div className="flex items-center gap-4">
                   <motion.div
-                    animate={{ 
+                    animate={{
                       scale: [1, 1.2, 1],
-                      opacity: [0.7, 1, 0.7]
+                      opacity: [0.7, 1, 0.7],
                     }}
                     transition={{ duration: 1.5, repeat: Infinity }}
                     className="w-12 h-12 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0 shadow-[3px_3px_0_0_rgba(15,23,42,1)]"
@@ -116,9 +130,12 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                     <AlertCircle className="w-6 h-6 text-slate-900" />
                   </motion.div>
                   <div>
-                    <h3 className="text-base font-extrabold text-slate-900 mb-1">Job Queue Status</h3>
+                    <h3 className="text-base font-extrabold text-slate-900 mb-1">
+                      Job Queue Status
+                    </h3>
                     <p className="text-sm text-slate-900 font-semibold">
-                      {jobs.length} jobs in queue • Waiting for available workers
+                      {jobs.length} jobs in queue • Waiting for available
+                      workers
                     </p>
                   </div>
                 </div>
@@ -131,7 +148,7 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                 <AnimatePresence>
                   {jobs.map((job, index) => (
                     <motion.div
-                      key={job.id}
+                      key={job._id}
                       initial={{ opacity: 0, x: -20, scale: 0.95 }}
                       animate={{ opacity: 1, x: 0, scale: 1 }}
                       exit={{ opacity: 0, x: 20, scale: 0.95 }}
@@ -147,7 +164,9 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                             whileHover={{ scale: 1.1 }}
                             className="w-14 h-14 rounded-[14px] bg-[#FFE66D] border-[3px] border-slate-900 flex items-center justify-center flex-shrink-0 shadow-[3px_3px_0_0_rgba(15,23,42,1)] group-hover:bg-[#FFD447]"
                           >
-                            <span className="text-slate-900 font-extrabold text-lg">#{index + 1}</span>
+                            <span className="text-slate-900 font-extrabold text-lg">
+                              #{index + 1}
+                            </span>
                           </motion.div>
 
                           {/* Job Info */}
@@ -157,27 +176,33 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                                 {job.name}
                               </h3>
                               <motion.div
-                                animate={{ 
+                                animate={{
                                   scale: [1, 1.3, 1],
-                                  opacity: [0.5, 1, 0.5]
+                                  opacity: [0.5, 1, 0.5],
                                 }}
                                 transition={{ duration: 2, repeat: Infinity }}
                                 className="w-2 h-2 bg-yellow-500 rounded-full border border-slate-900 flex-shrink-0"
                               />
                             </div>
-                            
+
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-700">
                               <div className="flex items-center gap-1">
                                 <FileText className="w-3 h-3" />
-                                <span className="font-mono font-semibold">{job.config?.entryFile}</span>
+                                <span className="font-mono font-semibold">
+                                  {job.config?.entryFile}
+                                </span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />
-                                <span className="font-medium">{getTimeAgo(job.createdAt)}</span>
+                                <span className="font-medium">
+                                  {getTimeAgo(job.createdAt)}
+                                </span>
                               </div>
                               <div className="flex items-center gap-1">
                                 <Settings className="w-3 h-3" />
-                                <span className="font-medium">ID: {job._id}</span>
+                                <span className="font-medium">
+                                  ID: {job._id}
+                                </span>
                               </div>
                             </div>
                           </div>
@@ -202,9 +227,9 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
                       <div className="mt-4">
                         <div className="w-full bg-[#E5E7EB] rounded-full h-2 border-[2px] border-slate-900 overflow-hidden">
                           <motion.div
-                            animate={{ 
-                              width: ['0%', '40%', '0%'],
-                              opacity: [0.5, 1, 0.5]
+                            animate={{
+                              width: ["0%", "40%", "0%"],
+                              opacity: [0.5, 1, 0.5],
                             }}
                             transition={{ duration: 3, repeat: Infinity }}
                             className="bg-gradient-to-r from-[#FFD447] to-[#FBBF24] h-full"
@@ -225,17 +250,21 @@ const PendingJobs: React.FC<PendingJobsProps> = ({ jobs, onJobSelect, onBack }) 
               >
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white p-12 shadow-[8px_8px_0_0_rgba(15,23,42,1)] max-w-md mx-auto">
                   <motion.div
-                    animate={{ 
+                    animate={{
                       rotate: [0, 10, -10, 0],
-                      scale: [1, 1.1, 1]
+                      scale: [1, 1.1, 1],
                     }}
                     transition={{ duration: 3, repeat: Infinity }}
                     className="w-20 h-20 rounded-[16px] bg-[#FFE66D] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-6 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
                   >
                     <Clock className="w-10 h-10 text-slate-900" />
                   </motion.div>
-                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">No Pending Jobs</h3>
-                  <p className="text-sm text-slate-700 font-medium mb-6">All jobs have been picked up by workers</p>
+                  <h3 className="text-xl font-extrabold text-slate-900 mb-2">
+                    No Pending Jobs
+                  </h3>
+                  <p className="text-sm text-slate-700 font-medium mb-6">
+                    All jobs have been picked up by workers
+                  </p>
                   <motion.button
                     whileHover={{ y: -2 }}
                     whileTap={{ y: 0 }}
