@@ -1,4 +1,4 @@
-// electron-worker/main.js - FIXED: Use consistent deviceId
+// electron-worker/main.js - FIXED: Use consistent deviceId + Real-time Log Streaming
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -10,6 +10,24 @@ const FormData = require('form-data');
 
 // ✅ FIXED: Store deviceId from registration instead of generating new one
 let REGISTERED_DEVICE_ID = null;
+
+// ✅ NEW: Helper function to stream logs to backend for real-time display in frontend
+const streamLogToBackend = async (jobId, deviceId, logLine) => {
+  try {
+    await fetch('http://localhost:5000/api/worker/push-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jobId,
+        deviceId,
+        line: logLine
+      })
+    });
+  } catch (err) {
+    // Silently fail - don't block job execution if log streaming fails
+    console.error('Failed to stream log to backend:', err.message);
+  }
+};
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -101,7 +119,7 @@ ipcMain.handle("get-device-info", async () => {
   };
 });
 
-// ✅ FIXED Complete Job Runner - uses PASSED deviceId from frontend
+// ✅ UPDATED: Complete Job Runner with Real-time Log Streaming
 ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const shortId = jobId.slice(-8);
   const jobDir = path.join(__dirname, "jobs", `job-${shortId}`);
@@ -118,10 +136,17 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     throw new Error('❌ No deviceId available. Please register first.');
   }
 
-  // Helper to send and collect logs
-  const sendLog = (msg) => {
+  // ✅ UPDATED: Helper to send logs to worker UI AND stream to backend for frontend dashboard
+  const sendLog = async (msg) => {
+    // Send to worker UI (electron window)
     event.sender.send("job-log", msg);
-    collectedLogs.push(msg.replace(/\n$/, ''));
+    
+    // Clean and collect for batch upload at end
+    const cleanMsg = msg.replace(/\n$/, '');
+    collectedLogs.push(cleanMsg);
+    
+    // ✅ NEW: Stream to backend in real-time for frontend dashboard
+    await streamLogToBackend(jobId, deviceId, cleanMsg);
   };
 
   console.log(`🚀 Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
@@ -138,8 +163,8 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     fs.mkdirSync(jobDir, { recursive: true });
     fs.mkdirSync(outputDir, { recursive: true });
 
-    sendLog("🔍 Fetching job from backend...\n");
-    sendLog(`🤖 Using Worker ID: ${deviceId}\n`);
+    await sendLog("🔍 Fetching job from backend...\n");
+    await sendLog(`🤖 Using Worker ID: ${deviceId}\n`);
 
     // ✅ Get job details using worker endpoint
     const jobResponse = await fetch(
@@ -159,15 +184,15 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     const responseData = await jobResponse.json();
     const jobData = responseData.job || responseData;
     
-    sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
-    sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
+    await sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
+    await sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
 
     // 2️⃣ Download ZIP from Supabase
     if (!jobData.zipFileUrl) {
       throw new Error('❌ No zipFileUrl in job data');
     }
 
-    sendLog("📥 Downloading ZIP from Supabase...\n");
+    await sendLog("📥 Downloading ZIP from Supabase...\n");
     const zipResponse = await fetch(jobData.zipFileUrl);
 
     if (!zipResponse.ok) {
@@ -176,14 +201,14 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
 
     const zipBuffer = await zipResponse.buffer();
     fs.writeFileSync(zipPath, zipBuffer);
-    sendLog(`✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
+    await sendLog(`✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
 
     // 3️⃣ Extract ZIP files
-    sendLog("📦 Extracting job files...\n");
+    await sendLog("📦 Extracting job files...\n");
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(jobDir, true);
     fs.unlinkSync(zipPath);
-    sendLog("✅ Files extracted successfully\n\n");
+    await sendLog("✅ Files extracted successfully\n\n");
 
     // 4️⃣ Validate main file
     const mainFileName = jobData.config?.entryFile || 'main.py';
@@ -191,7 +216,7 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     if (!fs.existsSync(mainFilePath)) {
       throw new Error(`❌ Main file '${mainFileName}' not found in ZIP`);
     }
-    sendLog(`🚀 Main file verified: ${mainFileName}\n`);
+    await sendLog(`🚀 Main file verified: ${mainFileName}\n`);
 
     // 5️⃣ Create Dockerfile
     const dockerfile = `
@@ -204,8 +229,8 @@ CMD ["python", "${mainFileName}"]
     `.trim();
 
     fs.writeFileSync(path.join(jobDir, "Dockerfile"), dockerfile);
-    sendLog("🐳 Creating Dockerfile... ✅\n");
-    sendLog("🐳 Building Docker image...\n");
+    await sendLog("🐳 Creating Dockerfile... ✅\n");
+    await sendLog("🐳 Building Docker image...\n");
 
     // 6️⃣ Build Docker image
     const imageName = `dtrain-job-${shortId}`;
@@ -215,8 +240,8 @@ CMD ["python", "${mainFileName}"]
         shell: true
       });
 
-      build.stdout.on("data", (data) => sendLog(data.toString()));
-      build.stderr.on("data", (data) => sendLog(data.toString()));
+      build.stdout.on("data", async (data) => await sendLog(data.toString()));
+      build.stderr.on("data", async (data) => await sendLog(data.toString()));
 
       build.on("close", (code) => {
         if (code === 0) resolve();
@@ -224,8 +249,8 @@ CMD ["python", "${mainFileName}"]
       });
     });
 
-    sendLog("\n🚀 Docker image built successfully!\n");
-    sendLog("▶️  Running training job...\n");
+    await sendLog("\n🚀 Docker image built successfully!\n");
+    await sendLog("▶️  Running training job...\n");
 
     // 7️⃣ Run Docker container
     const containerName = `dtrain-container-${shortId}`;
@@ -235,12 +260,12 @@ CMD ["python", "${mainFileName}"]
         shell: true
       });
 
-      run.stdout.on("data", (data) => sendLog(data.toString()));
-      run.stderr.on("data", (data) => sendLog(data.toString()));
+      run.stdout.on("data", async (data) => await sendLog(data.toString()));
+      run.stderr.on("data", async (data) => await sendLog(data.toString()));
 
-      run.on("close", (code) => {
+      run.on("close", async (code) => {
         if (code === 0) {
-          sendLog("\n✅ Training completed!\n");
+          await sendLog("\n✅ Training completed!\n");
           resolve();
         } else {
           reject(new Error(`Container failed with code ${code}`));
@@ -249,12 +274,12 @@ CMD ["python", "${mainFileName}"]
     });
 
     // 8️⃣ Extract output files
-    sendLog("📥 Extracting output files...\n");
+    await sendLog("📥 Extracting output files...\n");
     await new Promise((resolve) => {
       exec(
         `docker cp ${containerName}:/app/. "${outputDir}"`,
-        (error, stdout, stderr) => {
-          if (error) sendLog(`⚠️  Copy warning: ${stderr}\n`);
+        async (error, stdout, stderr) => {
+          if (error) await sendLog(`⚠️  Copy warning: ${stderr}\n`);
           resolve();
         }
       );
@@ -262,8 +287,8 @@ CMD ["python", "${mainFileName}"]
 
     // 9️⃣ Cleanup container
     await new Promise((resolve) => {
-      exec(`docker rm ${containerName}`, () => {
-        sendLog("🧹 Container cleaned up\n");
+      exec(`docker rm ${containerName}`, async () => {
+        await sendLog("🧹 Container cleaned up\n");
         resolve();
       });
     });
@@ -281,7 +306,7 @@ CMD ["python", "${mainFileName}"]
     });
 
     if (outputFiles.length === 0) {
-      sendLog(`\n⚠️  No output files generated\n`);
+      await sendLog(`\n⚠️  No output files generated\n`);
       
       await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
         method: 'POST',
@@ -296,16 +321,16 @@ CMD ["python", "${mainFileName}"]
       throw new Error('No output files to upload');
     }
 
-    sendLog(`\n✅ OUTPUT FILES GENERATED (${outputFiles.length}):\n`);
-    outputFiles.forEach(file => {
+    await sendLog(`\n✅ OUTPUT FILES GENERATED (${outputFiles.length}):\n`);
+    for (const file of outputFiles) {
       const filePath = path.join(outputDir, file);
       const stats = fs.statSync(filePath);
       const sizeKB = (stats.size / 1024).toFixed(1);
-      sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
-    });
+      await sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
+    }
 
     // Create ZIP of output files
-    sendLog("\n📦 Creating output ZIP...\n");
+    await sendLog("\n📦 Creating output ZIP...\n");
     const outputZip = new AdmZip();
     
     outputFiles.forEach(file => {
@@ -322,10 +347,10 @@ CMD ["python", "${mainFileName}"]
     
     outputZip.writeZip(outputZipPath);
     const zipStats = fs.statSync(outputZipPath);
-    sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
+    await sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
 
     // Upload ZIP and logs
-    sendLog("☁️  Uploading results to server...\n");
+    await sendLog("☁️  Uploading results to server...\n");
     
     const formData = new FormData();
     formData.append('deviceId', deviceId);
@@ -343,15 +368,15 @@ CMD ["python", "${mainFileName}"]
     }
 
     const uploadResult = await uploadResponse.json();
-    sendLog(`✅ Results uploaded successfully!\n`);
-    sendLog(`🔗 Output URL: ${uploadResult.outputUrl}\n`);
+    await sendLog(`✅ Results uploaded successfully!\n`);
+    await sendLog(`🔗 Output URL: ${uploadResult.outputUrl}\n`);
 
     // Cleanup local files
     fs.unlinkSync(outputZipPath);
     fs.rmSync(jobDir, { recursive: true, force: true });
 
-    sendLog(`\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
-    sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    await sendLog(`\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
+    await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
     return { 
       success: true, 
@@ -365,9 +390,9 @@ CMD ["python", "${mainFileName}"]
     const errorMsg = err.message || 'Unknown error';
     console.error('❌ Job failed:', errorMsg);
     
-    sendLog(`\n❌ JOB FAILED:\n`);
-    sendLog(`   ${errorMsg}\n`);
-    sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+    await sendLog(`\n❌ JOB FAILED:\n`);
+    await sendLog(`   ${errorMsg}\n`);
+    await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
     try {
       await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {

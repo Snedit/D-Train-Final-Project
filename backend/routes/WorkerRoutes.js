@@ -162,7 +162,7 @@ WorkerRouter.post("/complete", async (req, res) => {
   }
 });
 
-// POST /push-log - Stream logs
+// ✅ UPDATED: POST /push-log - Stream logs with Socket.IO
 WorkerRouter.post("/push-log", async (req, res) => {
   try {
     const { jobId, deviceId, line } = req.body;
@@ -173,12 +173,27 @@ WorkerRouter.post("/push-log", async (req, res) => {
       });
     }
 
-    await Job.findByIdAndUpdate(jobId, {
-      $push: { logs: { ts: Date.now(), message: line } },
-    });
+    // ✅ Save log to database
+    const job = await Job.findByIdAndUpdate(
+      jobId,
+      { $push: { logs: line } },
+      { new: true }
+    );
 
-    // ✅ FIXED: Use consistent socket room naming
-    req.app.get("io").to(`job:${jobId}`).emit("job:log", { jobId, line });
+    if (!job) {
+      return res.status(404).json({ message: "Job not found" });
+    }
+
+    // ✅ Emit real-time log to frontend via Socket.IO
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`job:${jobId}`).emit("job:log", { 
+        jobId, 
+        line,
+        timestamp: new Date().toISOString()
+      });
+      console.log(`📡 Log streamed for job ${jobId.slice(-8)}: ${line.substring(0, 50)}...`);
+    }
 
     res.json({ message: "Log streamed" });
   } catch (err) {

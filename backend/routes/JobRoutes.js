@@ -12,105 +12,99 @@ const JobRouter = Router();
 const upload = multer({ storage: multer.memoryStorage() }); // handle zip upload
 
 JobRouter.get('/', authMiddleware, async (req, res)=>{
-
   try{
-
     const jobs  = await Job.find({
-    userId : req.user.userId
-  });
-  return res.status(200).json({message: "jobs fetched", jobs})
-}
-catch (err)
-{
-  console.log(err);
-  return res.status(500).json({messae: " error fetching the jobs"})
-}
-
+      userId : req.user.userId
+    });
+    return res.status(200).json({message: "jobs fetched", jobs})
+  }
+  catch (err)
+  {
+    console.log(err);
+    return res.status(500).json({messae: " error fetching the jobs"})
+  }
 });
 
-
 JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res) => {
-    try {
-      const { mainFileName, title, description } = req.body;
-      console.table(req.body);
-      console.log(  req. user);
-      if (!req.file)
-        return res.status(400).json({ message: "ZIP file is required." });
-      if (!mainFileName)
-        return res.status(400).json({ message: "mainFileName is required." });
+  try {
+    const { mainFileName, title, description } = req.body;
+    console.table(req.body);
+    console.log(req.user);
+    if (!req.file)
+      return res.status(400).json({ message: "ZIP file is required." });
+    if (!mainFileName)
+      return res.status(400).json({ message: "mainFileName is required." });
 
-      // validate zip
+    // validate zip
+    const zip = new AdmZip(req.file.buffer);
+    const entries = zip.getEntries().map((e) => e.entryName);
 
-      const zip = new AdmZip(req.file.buffer);
-      const entries = zip.getEntries().map((e) => e.entryName);
+    if (!entries.includes("requirements.txt"))
+      return res
+        .status(400)
+        .json({ message: "requirements.txt missing in ZIP." });
 
-      if (!entries.includes("requirements.txt"))
-        return res
-          .status(400)
-          .json({ message: "requirements.txt missing in ZIP." });
+    if (!entries.includes(mainFileName))
+      return res
+        .status(400)
+        .json({ message: `Main file '${mainFileName}' not found.` });
 
-      if (!entries.includes(mainFileName))
-        return res
-          .status(400)
-          .json({ message: `Main file '${mainFileName}' not found.` });
+    // -----------------------------
+    // 2. Upload ZIP to Supabase
+    // -----------------------------
+    const filePath = `jobs/${Date.now()}-${req.file.originalname}`;
 
-      // -----------------------------
-      // 2. Upload ZIP to Supabase
-      // -----------------------------
-      const filePath = `jobs/${Date.now()}-${req.file.originalname}`;
-
-      const { data, error } = await supabase.storage
-        .from("jobs")
-        .upload(filePath, req.file.buffer, {
-          cacheControl: "3600",
-          upsert: false,
-        });
-
-      if (error) {
-        console.error(error);
-        return res.status(500).json({ message: "Supabase upload failed." });
-      }
-
-      // Public link
-      const {
-        data: { publicUrl },
-      } = supabase.storage.from("jobs").getPublicUrl(filePath);
-
-      // -----------------------------
-      // 3. Create Job in MongoDB
-      // -----------------------------
-      const job = await Job.create({
-        userId: req.user.userId,
-        config: {entryFile: mainFileName},
-        zipFileUrl: publicUrl,
-        status: "pending",
-        title: title,
-        description: description,
-        logs: [],
-        createdAt: new Date(),
+    const { data, error } = await supabase.storage
+      .from("jobs")
+      .upload(filePath, req.file.buffer, {
+        cacheControl: "3600",
+        upsert: false,
       });
 
-      // -----------------------------
-      // 4. Publish Redis Event
-      // -----------------------------
-      await redisPublisher.publish(
-        "new_job",
-        JSON.stringify({ jobId: job._id, title: title, description: description })
-      );
-
-      // -----------------------------
-      // 5. Response
-      // -----------------------------
-      res.status(201).json({
-        message: "Request submitted",
-        jobId: job._id,
-      });
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Server error" });
+    if (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Supabase upload failed." });
     }
+
+    // Public link
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("jobs").getPublicUrl(filePath);
+
+    // -----------------------------
+    // 3. Create Job in MongoDB
+    // -----------------------------
+    const job = await Job.create({
+      userId: req.user.userId,
+      config: {entryFile: mainFileName},
+      zipFileUrl: publicUrl,
+      status: "pending",
+      title: title,
+      description: description,
+      logs: [],
+      createdAt: new Date(),
+    });
+
+    // -----------------------------
+    // 4. Publish Redis Event
+    // -----------------------------
+    await redisPublisher.publish(
+      "new_job",
+      JSON.stringify({ jobId: job._id, title: title, description: description })
+    );
+
+    // -----------------------------
+    // 5. Response
+    // -----------------------------
+    res.status(201).json({
+      message: "Request submitted",
+      jobId: job._id,
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
   }
-);
+});
 
 JobRouter.get("/:jobId/status", authMiddleware, async (req, res) => {
   try {
@@ -121,6 +115,25 @@ JobRouter.get("/:jobId/status", authMiddleware, async (req, res) => {
       return res.status(403).json({ message: "Unauthorized" });
 
     res.json(job);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ✅ NEW: Get job logs endpoint for frontend
+JobRouter.get("/:jobId/logs", authMiddleware, async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.jobId);
+    
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.userId.toString() !== req.user.userId)
+      return res.status(403).json({ message: "Unauthorized" });
+
+    res.json({ 
+      logs: job.logs || [],
+      status: job.status 
+    });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server error" });
@@ -272,6 +285,18 @@ JobRouter.post("/:jobId/complete", upload.single("outputZip"), async (req, res) 
 
     console.log(`✅ Job ${jobId} marked as completed`);
 
+    // ✅ NEW: Emit completion event to frontend via Socket.IO
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`job:${jobId}`).emit("job_completed", {
+        jobId: job._id,
+        status: "completed",
+        modelUrl: publicUrl,
+        completedAt: job.completedAt
+      });
+      console.log(`📡 Emitted job_completed event for ${jobId}`);
+    }
+
     res.status(200).json({ 
       message: "Job completed successfully", 
       job: {
@@ -334,6 +359,17 @@ JobRouter.post("/:jobId/fail", async (req, res) => {
     await job.save();
 
     console.log(`❌ Job ${jobId} marked as failed: ${errorMessage}`);
+
+    // ✅ NEW: Emit failure event to frontend via Socket.IO
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`job:${jobId}`).emit("job_failed", {
+        jobId: job._id,
+        status: "failed",
+        errorMessage: job.errorMessage
+      });
+      console.log(`📡 Emitted job_failed event for ${jobId}`);
+    }
 
     res.status(200).json({ 
       message: "Job failure recorded", 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Terminal, Activity, Cpu, HardDrive, Zap, Clock, FileCode, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { Job, JobLog, MetricData } from '../types';
+import { Job, MetricData } from '../types';
 import { Socket } from 'socket.io-client';
 import { XAxis, YAxis, ResponsiveContainer, AreaChart, Area } from 'recharts';
 
@@ -14,46 +14,115 @@ interface JobDetailProps {
 const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<MetricData[]>([]);
+  const [jobStatus, setJobStatus] = useState(job.status);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const terminalRef = useRef<HTMLDivElement>(null);
 
-  // Socket connection and log fetching
+  // ✅ Fetch initial logs from database
   useEffect(() => {
-    fetch(`http://localhost:5000/api/jobs/${job._id}/logs`)
-      .then(res => res.json())
-      .then(data => {
-        console.log(data);
-        console.table(data);
-        // Convert logs to terminal output
-        setTerminalOutput(data.map((l: JobLog) => `[${l.level}] ${l.message}`));
-      })
-      .catch(error => {
+    const fetchLogs = async () => {
+      try {
+        setIsLoadingLogs(true);
+        const token = localStorage.getItem('dtrain_token');
+        
+        const response = await fetch(
+          `http://localhost:5000/api/jobs/${job._id}/logs`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('📋 Logs fetched from DB:', data.logs?.length || 0);
+          
+          // Set initial logs from database
+          setTerminalOutput(data.logs || []);
+          
+          // Update status if changed
+          if (data.status) {
+            setJobStatus(data.status);
+          }
+        }
+      } catch (error) {
         console.error('Error fetching logs:', error);
-      });
+        setTerminalOutput(['❌ Failed to load logs']);
+      } finally {
+        setIsLoadingLogs(false);
+      }
+    };
 
-    if (socket) {
-      socket.emit('join_job', { job_id: job._id });
+    fetchLogs();
+  }, [job._id]);
 
-      const handleJobLog = (data: any) => {
-        if (data.job_id === job._id) {
-          setTerminalOutput(prev => [...prev, data.line]);
-        }
-      };
+  // ✅ Socket connection and real-time log streaming
+  useEffect(() => {
+    if (!socket) return;
 
-      const handleJobStatus = (data: any) => {
-        if (data.job_id === job._id) {
-          console.log('Job status updated:', data.status);
-        }
-      };
+    // Join job room for real-time updates
+    socket.emit('join_job', { jobId: job._id });
+    console.log(`🚪 Joined room for job: ${job._id}`);
 
-      socket.on('job_log', handleJobLog);
-      socket.on('job_status', handleJobStatus);
+    // ✅ Listen for real-time logs
+    const handleJobLog = (data: any) => {
+      console.log('📡 Real-time log received:', data);
+      
+      if (data.jobId === job._id) {
+        setTerminalOutput(prev => [...prev, data.line]);
+      }
+    };
 
-      return () => {
-        socket.emit('leave_job', { job_id: job._id });
-        socket.off('job_log', handleJobLog);
-        socket.off('job_status', handleJobStatus);
-      };
-    }
+    // ✅ Listen for job status changes
+    const handleJobStatus = (data: any) => {
+      console.log('📡 Job status updated:', data);
+      
+      if (data.jobId === job._id) {
+        setJobStatus(data.status);
+      }
+    };
+
+    // ✅ Listen for job completion
+    const handleJobCompleted = (data: any) => {
+      console.log('📡 Job completed:', data);
+      
+      if (data.jobId === job._id) {
+        setJobStatus('completed');
+        setTerminalOutput(prev => [
+          ...prev,
+          '\n✅ JOB COMPLETED SUCCESSFULLY!',
+          `🔗 Output available at: ${data.modelUrl}`
+        ]);
+      }
+    };
+
+    // ✅ Listen for job failure
+    const handleJobFailed = (data: any) => {
+      console.log('📡 Job failed:', data);
+      
+      if (data.jobId === job._id) {
+        setJobStatus('failed');
+        setTerminalOutput(prev => [
+          ...prev,
+          `\n❌ JOB FAILED: ${data.errorMessage}`
+        ]);
+      }
+    };
+
+    socket.on('job:log', handleJobLog);
+    socket.on('job_status', handleJobStatus);
+    socket.on('job_completed', handleJobCompleted);
+    socket.on('job_failed', handleJobFailed);
+
+    return () => {
+      socket.emit('leave_job', { jobId: job._id });
+      socket.off('job:log', handleJobLog);
+      socket.off('job_status', handleJobStatus);
+      socket.off('job_completed', handleJobCompleted);
+      socket.off('job_failed', handleJobFailed);
+      console.log(`🚪 Left room for job: ${job._id}`);
+    };
   }, [socket, job._id]);
 
   // Mock metrics data generation
@@ -68,7 +137,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
           timestamp: timestamp.toISOString(),
           cpu: 20 + Math.random() * 60,
           memory: 30 + Math.random() * 50,
-          gpu: job.status === 'running' ? 40 + Math.random() * 40 : 0,
+          gpu: jobStatus === 'running' || jobStatus === 'assigned' ? 40 + Math.random() * 40 : 0,
         });
       }
       
@@ -79,7 +148,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     const interval = setInterval(generateMockMetrics, 5000);
     
     return () => clearInterval(interval);
-  }, [job.status]);
+  }, [jobStatus]);
 
   // Auto-scroll terminal to bottom
   useEffect(() => {
@@ -88,16 +157,16 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     }
   }, [terminalOutput]);
 
-  const formatTime = (timestamp: string) => {
-    return new Date(timestamp).toLocaleTimeString();
-  };
+  // const formatTime = (timestamp: string) => {
+  //   return new Date(timestamp).toLocaleTimeString();
+  // };
 
   const statusColors = {
-    pending: 'bg-FFE66D text-slate-900',
-    accepted: 'bg-7BC8FF text-slate-900',
-    running: 'bg-7CF2D0 text-slate-900',
-    completed: 'bg-4ADE80 text-slate-900',
-    failed: 'bg-FEE2E2 text-slate-900',
+    pending: 'bg-[#FFE66D] text-slate-900',
+    assigned: 'bg-[#7BC8FF] text-slate-900',
+    running: 'bg-[#7CF2D0] text-slate-900',
+    completed: 'bg-[#4ADE80] text-slate-900',
+    failed: 'bg-[#FEE2E2] text-slate-900',
   };
 
   return (
@@ -189,12 +258,12 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                 </div>
                 
                 <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${
-                  statusColors[job.status as keyof typeof statusColors] || 'bg-slate-300 text-slate-900'
+                  statusColors[jobStatus as keyof typeof statusColors] || 'bg-slate-300 text-slate-900'
                 }`}>
-                  {job.status === 'running' && <Activity className="w-3 h-3 mr-1.5" />}
-                  {job.status === 'pending' && <Clock className="w-3 h-3 mr-1.5" />}
-                  {job.status === 'completed' && <CheckCircle className="w-3 h-3 mr-1.5" />}
-                  {job.status.charAt(0).toUpperCase() + job.status.slice(1)}
+                  {(jobStatus === 'running' || jobStatus === 'assigned') && <Activity className="w-3 h-3 mr-1.5" />}
+                  {jobStatus === 'pending' && <Clock className="w-3 h-3 mr-1.5" />}
+                  {jobStatus === 'completed' && <CheckCircle className="w-3 h-3 mr-1.5" />}
+                  {jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)}
                 </div>
               </div>
             </div>
@@ -209,7 +278,9 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                     </div>
                     <div>
                       <h3 className="text-base font-extrabold text-slate-900">Live Output</h3>
-                      <p className="text-xs text-slate-700">Real-time execution logs</p>
+                      <p className="text-xs text-slate-700">
+                        {isLoadingLogs ? 'Loading logs...' : 'Real-time execution logs'}
+                      </p>
                     </div>
                     <div className="ml-auto flex space-x-2">
                       <div className="w-3 h-3 bg-[#fb7185] rounded-full border border-slate-900"></div>
@@ -222,23 +293,31 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                     ref={terminalRef}
                     className="h-96 p-4 bg-slate-900 font-mono text-xs overflow-y-auto"
                   >
-                    {terminalOutput.map((line, index) => (
-                      <div
-                        key={index}
-                        className={`mb-1 ${
-                          line.includes('[ERROR]') 
-                            ? 'text-red-400' 
-                            : line.includes('[WARNING]')
-                            ? 'text-yellow-400'
-                            : line.includes('[INFO]')
-                            ? 'text-blue-400'
-                            : 'text-[#E0E7FF]'
-                        }`}
-                      >
-                        <span className="text-slate-500">[{formatTime(new Date().toISOString())}]</span> {line}
-                      </div>
-                    ))}
-                    {job.status === 'running' && (
+                    {isLoadingLogs && terminalOutput.length === 0 ? (
+                      <div className="text-[#7CF2D0] animate-pulse">Loading logs...</div>
+                    ) : terminalOutput.length === 0 ? (
+                      <div className="text-slate-500">No logs yet. Waiting for job to start...</div>
+                    ) : (
+                      terminalOutput.map((line, index) => (
+                        <div
+                          key={index}
+                          className={`mb-1 ${
+                            line.includes('❌') || line.includes('FAILED') || line.includes('[ERROR]')
+                              ? 'text-red-400' 
+                              : line.includes('⚠️') || line.includes('[WARNING]')
+                              ? 'text-yellow-400'
+                              : line.includes('✅') || line.includes('SUCCESS')
+                              ? 'text-green-400'
+                              : line.includes('[INFO]')
+                              ? 'text-blue-400'
+                              : 'text-[#E0E7FF]'
+                          }`}
+                        >
+                          {line}
+                        </div>
+                      ))
+                    )}
+                    {(jobStatus === 'running' || jobStatus === 'assigned') && (
                       <div className="text-[#7CF2D0] animate-pulse inline-block">
                         ▋
                       </div>
@@ -259,7 +338,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                   <div className="space-y-3 text-xs">
                     <div className="flex justify-between items-center py-2 border-b border-slate-200">
                       <span className="text-slate-700 font-semibold">Status:</span>
-                      <span className="font-mono font-bold text-slate-900">{job.status}</span>
+                      <span className="font-mono font-bold text-slate-900">{jobStatus}</span>
                     </div>
                     <div className="flex justify-between items-center py-2 border-b border-slate-200">
                       <span className="text-slate-700 font-semibold">Main Entry:</span>
@@ -273,12 +352,14 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                       <span className="text-slate-700 font-semibold">Created:</span>
                       <span className="font-medium text-slate-900">{new Date(job.createdAt).toLocaleDateString()}</span>
                     </div>
-                    <div className="flex flex-col py-2">
-                      <span className="text-slate-700 font-semibold mb-1">Docker Image:</span>
-                      <span className="font-mono text-[10px] text-slate-900 break-all bg-[#FFFDF8] p-2 rounded-lg border border-slate-200">
-                        {job.docker_image_tag}
-                      </span>
-                    </div>
+                    {job.assignedWorkerId && (
+                      <div className="flex flex-col py-2">
+                        <span className="text-slate-700 font-semibold mb-1">Worker:</span>
+                        <span className="font-mono text-[10px] text-slate-900 break-all bg-[#FFFDF8] p-2 rounded-lg border border-slate-200">
+                          {job.assignedWorkerId}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
