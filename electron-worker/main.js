@@ -8,10 +8,8 @@ const os = require("os");
 const fetch = require('node-fetch');
 const FormData = require('form-data');
 
-// ✅ FIXED: Store deviceId from registration instead of generating new one
 let REGISTERED_DEVICE_ID = null;
 
-// ✅ NEW: Helper function to stream logs to backend for real-time display in frontend
 const streamLogToBackend = async (jobId, deviceId, logLine) => {
   try {
     await fetch('http://localhost:5000/api/worker/push-log', {
@@ -24,7 +22,6 @@ const streamLogToBackend = async (jobId, deviceId, logLine) => {
       })
     });
   } catch (err) {
-    // Silently fail - don't block job execution if log streaming fails
     console.error('Failed to stream log to backend:', err.message);
   }
 };
@@ -49,12 +46,10 @@ function createWindow() {
   win.webContents.openDevTools();
 }
 
-// ✅ NEW: Set deviceId from frontend (called after registration)
 ipcMain.handle("set-device-id", async (event, deviceId) => {
   console.log('📱 Setting deviceId from frontend:', deviceId);
   REGISTERED_DEVICE_ID = deviceId;
   
-  // Optionally save to disk for persistence
   const configPath = path.join(app.getPath('userData'), 'device-config.json');
   try {
     fs.writeFileSync(configPath, JSON.stringify({ deviceId }, null, 2));
@@ -65,13 +60,11 @@ ipcMain.handle("set-device-id", async (event, deviceId) => {
   return { success: true, deviceId };
 });
 
-// ✅ Get Device ID Handler - returns registered ID or loads from disk
 ipcMain.handle("get-device-id", async () => {
   if (REGISTERED_DEVICE_ID) {
     return REGISTERED_DEVICE_ID;
   }
   
-  // Try loading from disk
   const configPath = path.join(app.getPath('userData'), 'device-config.json');
   try {
     if (fs.existsSync(configPath)) {
@@ -86,10 +79,9 @@ ipcMain.handle("get-device-id", async () => {
     console.error('Error reading device config:', err);
   }
   
-  return null; // Let frontend generate it
+  return null;
 });
 
-// Device Info Handler
 ipcMain.handle("get-device-info", async () => {
   const cpus = os.cpus();
   const totalRAM = (os.totalmem() / (1024 ** 3)).toFixed(1);
@@ -119,40 +111,34 @@ ipcMain.handle("get-device-info", async () => {
   };
 });
 
-// ✅ UPDATED: Complete Job Runner with Real-time Log Streaming
 ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const shortId = jobId.slice(-8);
-  const jobDir = path.join(__dirname, "jobs", `job-${shortId}`);
-  const zipPath = path.join(__dirname, "temp", `job-${jobId}.zip`);
-  const outputDir = path.join(__dirname, "jobs", `job-${shortId}`, "output");
-  const outputZipPath = path.join(__dirname, "temp", `output-${jobId}.zip`);
+  // ✅ Use OS temp directory instead of project folder
+  const jobDir = path.join(os.tmpdir(), "dtrain-jobs", `job-${shortId}`);
+  const zipPath = path.join(os.tmpdir(), "dtrain-temp", `job-${jobId}.zip`);
+  const outputDir = path.join(os.tmpdir(), "dtrain-jobs", `job-${shortId}`, "output");
+  const outputZipPath = path.join(os.tmpdir(), "dtrain-temp", `output-${jobId}.zip`);
 
   const collectedLogs = [];
-  
-  // ✅ CRITICAL: Use PASSED deviceId from frontend (already registered)
   const deviceId = passedDeviceId || REGISTERED_DEVICE_ID;
   
   if (!deviceId) {
     throw new Error('❌ No deviceId available. Please register first.');
   }
 
-  // ✅ UPDATED: Helper to send logs to worker UI AND stream to backend for frontend dashboard
   const sendLog = async (msg) => {
-    // Send to worker UI (electron window)
     event.sender.send("job-log", msg);
-    
-    // Clean and collect for batch upload at end
     const cleanMsg = msg.replace(/\n$/, '');
     collectedLogs.push(cleanMsg);
-    
-    // ✅ NEW: Stream to backend in real-time for frontend dashboard
     await streamLogToBackend(jobId, deviceId, cleanMsg);
   };
 
   console.log(`🚀 Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
 
+  const imageName = `dtrain-job-${shortId}`;
+  const containerName = `dtrain-container-${shortId}`;
+
   try {
-    // 🔄 Cleanup previous run
     if (fs.existsSync(jobDir)) {
       fs.rmSync(jobDir, { recursive: true, force: true });
     }
@@ -166,7 +152,6 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     await sendLog("🔍 Fetching job from backend...\n");
     await sendLog(`🤖 Using Worker ID: ${deviceId}\n`);
 
-    // ✅ Get job details using worker endpoint
     const jobResponse = await fetch(
       `http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
       {
@@ -187,7 +172,6 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     await sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
     await sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
 
-    // 2️⃣ Download ZIP from Supabase
     if (!jobData.zipFileUrl) {
       throw new Error('❌ No zipFileUrl in job data');
     }
@@ -203,14 +187,12 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     fs.writeFileSync(zipPath, zipBuffer);
     await sendLog(`✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
 
-    // 3️⃣ Extract ZIP files
     await sendLog("📦 Extracting job files...\n");
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(jobDir, true);
     fs.unlinkSync(zipPath);
     await sendLog("✅ Files extracted successfully\n\n");
 
-    // 4️⃣ Validate main file
     const mainFileName = jobData.config?.entryFile || 'main.py';
     const mainFilePath = path.join(jobDir, mainFileName);
     if (!fs.existsSync(mainFilePath)) {
@@ -218,7 +200,6 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     }
     await sendLog(`🚀 Main file verified: ${mainFileName}\n`);
 
-    // 5️⃣ Create Dockerfile
     const dockerfile = `
 FROM python:3.11-slim
 WORKDIR /app
@@ -232,8 +213,6 @@ CMD ["python", "${mainFileName}"]
     await sendLog("🐳 Creating Dockerfile... ✅\n");
     await sendLog("🐳 Building Docker image...\n");
 
-    // 6️⃣ Build Docker image
-    const imageName = `dtrain-job-${shortId}`;
     await new Promise((resolve, reject) => {
       const build = spawn("docker", ["build", "-t", imageName, "."], {
         cwd: jobDir,
@@ -251,9 +230,6 @@ CMD ["python", "${mainFileName}"]
 
     await sendLog("\n🚀 Docker image built successfully!\n");
     await sendLog("▶️  Running training job...\n");
-
-    // 7️⃣ Run Docker container
-    const containerName = `dtrain-container-${shortId}`;
     
     await new Promise((resolve, reject) => {
       const run = spawn("docker", ["run", "--name", containerName, imageName], {
@@ -273,7 +249,6 @@ CMD ["python", "${mainFileName}"]
       });
     });
 
-    // 8️⃣ Extract output files
     await sendLog("📥 Extracting output files...\n");
     await new Promise((resolve) => {
       exec(
@@ -285,21 +260,28 @@ CMD ["python", "${mainFileName}"]
       );
     });
 
-    // 9️⃣ Cleanup container
+    // ✅ FIX 2: Remove Docker container AND image (only this specific job's resources)
+    await sendLog("🧹 Cleaning up Docker resources...\n");
     await new Promise((resolve) => {
-      exec(`docker rm ${containerName}`, async () => {
-        await sendLog("🧹 Container cleaned up\n");
+      exec(`docker rm ${containerName}`, async (error) => {
+        if (!error) await sendLog("   ✓ Container removed\n");
+        resolve();
+      });
+    });
+    
+    // ✅ NEW: Remove Docker image to free disk space
+    await new Promise((resolve) => {
+      exec(`docker rmi ${imageName}`, async (error) => {
+        if (!error) await sendLog("   ✓ Image removed\n");
         resolve();
       });
     });
 
-    // 🔟 List and ZIP output files (only files, not directories)
     const files = fs.readdirSync(outputDir);
     const outputFiles = files.filter(f => {
       const filePath = path.join(outputDir, f);
       const stats = fs.statSync(filePath);
       
-      // Only include files (not directories) and exclude input files
       return stats.isFile() && 
              !['main.py', 'requirements.txt', 'Dockerfile', '__pycache__'].includes(f) &&
              !f.startsWith('.');
@@ -329,7 +311,6 @@ CMD ["python", "${mainFileName}"]
       await sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
     }
 
-    // Create ZIP of output files
     await sendLog("\n📦 Creating output ZIP...\n");
     const outputZip = new AdmZip();
     
@@ -340,7 +321,6 @@ CMD ["python", "${mainFileName}"]
       if (stats.isFile()) {
         outputZip.addLocalFile(filePath);
       } else if (stats.isDirectory()) {
-        // Add directory and its contents recursively
         outputZip.addLocalFolder(filePath, file);
       }
     });
@@ -349,7 +329,6 @@ CMD ["python", "${mainFileName}"]
     const zipStats = fs.statSync(outputZipPath);
     await sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
 
-    // Upload ZIP and logs
     await sendLog("☁️  Uploading results to server...\n");
     
     const formData = new FormData();
@@ -371,9 +350,16 @@ CMD ["python", "${mainFileName}"]
     await sendLog(`✅ Results uploaded successfully!\n`);
     await sendLog(`🔗 Output URL: ${uploadResult.outputUrl}\n`);
 
-    // Cleanup local files
-    fs.unlinkSync(outputZipPath);
-    fs.rmSync(jobDir, { recursive: true, force: true });
+    // ✅ FIX 1: Complete cleanup - remove ALL local files
+    await sendLog("🧹 Cleaning up local files...\n");
+    if (fs.existsSync(outputZipPath)) {
+      fs.unlinkSync(outputZipPath);
+      await sendLog("   ✓ Output ZIP removed\n");
+    }
+    if (fs.existsSync(jobDir)) {
+      fs.rmSync(jobDir, { recursive: true, force: true });
+      await sendLog("   ✓ Job directory removed\n");
+    }
 
     await sendLog(`\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
     await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
@@ -408,10 +394,14 @@ CMD ["python", "${mainFileName}"]
       console.error('Failed to report job failure:', failErr);
     }
     
+    // ✅ FIX 1 & 2: Cleanup on error - remove Docker resources AND files
     try {
-      exec(`docker rm -f dtrain-container-${shortId}`, () => {});
+      await sendLog("🧹 Cleaning up after error...\n");
+      exec(`docker rm -f ${containerName}`, () => {});
+      exec(`docker rmi -f ${imageName}`, () => {});
       if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
       if (fs.existsSync(outputZipPath)) fs.unlinkSync(outputZipPath);
+      await sendLog("   ✓ Cleanup complete\n");
     } catch (cleanupErr) {
       console.error('Cleanup failed:', cleanupErr);
     }
@@ -420,7 +410,6 @@ CMD ["python", "${mainFileName}"]
   }
 });
 
-// Fetch available jobs handler
 ipcMain.handle("fetch-available-jobs", async () => {
   try {
     const deviceId = REGISTERED_DEVICE_ID;
@@ -452,7 +441,6 @@ ipcMain.handle("fetch-available-jobs", async () => {
   }
 });
 
-// Accept job handler
 ipcMain.handle("accept-job", async (event, jobId) => {
   try {
     const deviceId = REGISTERED_DEVICE_ID;
