@@ -1,5 +1,29 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Terminal, Activity, Cpu, HardDrive, Zap, Clock, FileCode, CheckCircle } from 'lucide-react';
+import { 
+  Terminal, 
+  Activity, 
+  Cpu, 
+  HardDrive, 
+  Zap, 
+  Clock, 
+  FileCode, 
+  CheckCircle,
+  Search,
+  Info,
+  Download,
+  Package,
+  Rocket,
+  Play,
+  FileText,
+  Cloud,
+  Link,
+  Trash2,
+  PartyPopper,
+  XCircle,
+  AlertTriangle,
+  Smartphone,
+  Bot
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Job, MetricData } from '../types';
 import { Socket } from 'socket.io-client';
@@ -10,6 +34,65 @@ interface JobDetailProps {
   onBack: () => void;
   socket: Socket | null;
 }
+
+// Map icon tags to actual Lucide components
+const iconMap: Record<string, React.ReactNode> = {
+  '[SEARCH]': <Search className="inline w-3 h-3 mr-1" />,
+  '[OK]': <CheckCircle className="inline w-3 h-3 mr-1" />,
+  '[INFO]': <Info className="inline w-3 h-3 mr-1" />,
+  '[DOWNLOAD]': <Download className="inline w-3 h-3 mr-1" />,
+  '[EXTRACT]': <Package className="inline w-3 h-3 mr-1" />,
+  '[DOCKER]': <Package className="inline w-3 h-3 mr-1" />,
+  '[RUN]': <Play className="inline w-3 h-3 mr-1" />,
+  '[START]': <Rocket className="inline w-3 h-3 mr-1" />,
+  '[OUTPUT]': <FileText className="inline w-3 h-3 mr-1" />,
+  '[FILE]': <FileText className="inline w-3 h-3 mr-1" />,
+  '[CLOUD]': <Cloud className="inline w-3 h-3 mr-1" />,
+  '[UPLOAD]': <Cloud className="inline w-3 h-3 mr-1" />,
+  '[LINK]': <Link className="inline w-3 h-3 mr-1" />,
+  '[CLEAN]': <Trash2 className="inline w-3 h-3 mr-1" />,
+  '[SUCCESS]': <PartyPopper className="inline w-3 h-3 mr-1" />,
+  '[ERROR]': <XCircle className="inline w-3 h-3 mr-1" />,
+  '[WARN]': <AlertTriangle className="inline w-3 h-3 mr-1" />,
+  '[DEVICE]': <Smartphone className="inline w-3 h-3 mr-1" />,
+  '[WORKER]': <Bot className="inline w-3 h-3 mr-1" />,
+  '[PACKAGE]': <Package className="inline w-3 h-3 mr-1" />,
+  '[CLIPBOARD]': <Info className="inline w-3 h-3 mr-1" />,
+};
+
+// Function to parse log lines and replace icon tags with actual icons
+const parseLogLine = (line: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  
+  // Find all icon tags in the line
+  const regex = /\[(SEARCH|OK|INFO|DOWNLOAD|EXTRACT|DOCKER|RUN|START|OUTPUT|FILE|CLOUD|UPLOAD|LINK|CLEAN|SUCCESS|ERROR|WARN|DEVICE|WORKER|PACKAGE|CLIPBOARD)\]/g;
+  let match;
+  
+  while ((match = regex.exec(line)) !== null) {
+    // Add text before the icon
+    if (match.index > lastIndex) {
+      parts.push(line.substring(lastIndex, match.index));
+    }
+    
+    // Add the icon
+    const iconKey = match[0];
+    parts.push(
+      <span key={match.index} className="inline-flex items-center">
+        {iconMap[iconKey]}
+      </span>
+    );
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < line.length) {
+    parts.push(line.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : line;
+};
 
 const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
@@ -36,7 +119,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
         if (response.ok) {
           const data = await response.json();
-          console.log('📋 Logs fetched from DB:', data.logs?.length || 0);
+          console.log('[INFO] Logs fetched from DB:', data.logs?.length || 0);
           
           // Set initial logs from database
           setTerminalOutput(data.logs || []);
@@ -48,7 +131,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
         }
       } catch (error) {
         console.error('Error fetching logs:', error);
-        setTerminalOutput(['❌ Failed to load logs']);
+        setTerminalOutput(['[ERROR] Failed to load logs']);
       } finally {
         setIsLoadingLogs(false);
       }
@@ -63,11 +146,11 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
     // Join job room for real-time updates
     socket.emit('join_job', { jobId: job._id });
-    console.log(`🚪 Joined room for job: ${job._id}`);
+    console.log(`[INFO] Joined room for job: ${job._id}`);
 
     // ✅ Listen for real-time logs
     const handleJobLog = (data: any) => {
-      console.log('📡 Real-time log received:', data);
+      console.log('[INFO] Real-time log received:', data);
       
       if (data.jobId === job._id) {
         setTerminalOutput(prev => [...prev, data.line]);
@@ -76,7 +159,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
     // ✅ Listen for job status changes
     const handleJobStatus = (data: any) => {
-      console.log('📡 Job status updated:', data);
+      console.log('[INFO] Job status updated:', data);
       
       if (data.jobId === job._id) {
         setJobStatus(data.status);
@@ -85,27 +168,27 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
     // ✅ Listen for job completion
     const handleJobCompleted = (data: any) => {
-      console.log('📡 Job completed:', data);
+      console.log('[INFO] Job completed:', data);
       
       if (data.jobId === job._id) {
         setJobStatus('completed');
         setTerminalOutput(prev => [
           ...prev,
-          '\n✅ JOB COMPLETED SUCCESSFULLY!',
-          `🔗 Output available at: ${data.modelUrl}`
+          '\n[SUCCESS] JOB COMPLETED SUCCESSFULLY!',
+          `[LINK] Output available at: ${data.modelUrl}`
         ]);
       }
     };
 
     // ✅ Listen for job failure
     const handleJobFailed = (data: any) => {
-      console.log('📡 Job failed:', data);
+      console.log('[ERROR] Job failed:', data);
       
       if (data.jobId === job._id) {
         setJobStatus('failed');
         setTerminalOutput(prev => [
           ...prev,
-          `\n❌ JOB FAILED: ${data.errorMessage}`
+          `\n[ERROR] JOB FAILED: ${data.errorMessage}`
         ]);
       }
     };
@@ -121,7 +204,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       socket.off('job_status', handleJobStatus);
       socket.off('job_completed', handleJobCompleted);
       socket.off('job_failed', handleJobFailed);
-      console.log(`🚪 Left room for job: ${job._id}`);
+      console.log(`[INFO] Left room for job: ${job._id}`);
     };
   }, [socket, job._id]);
 
@@ -156,10 +239,6 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalOutput]);
-
-  // const formatTime = (timestamp: string) => {
-  //   return new Date(timestamp).toLocaleTimeString();
-  // };
 
   const statusColors = {
     pending: 'bg-[#FFE66D] text-slate-900',
@@ -273,19 +352,21 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
               <div className="lg:col-span-2">
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
                   <div className="flex items-center px-6 py-4 bg-[#F5F3FF] border-b-[3px] border-slate-900">
-                    <div className="w-10 h-10 bg-slate-900 rounded-[12px] flex items-center justify-center mr-3">
-                      <Terminal className="w-5 h-5 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="text-base font-extrabold text-slate-900">Live Output</h3>
-                      <p className="text-xs text-slate-700">
-                        {isLoadingLogs ? 'Loading logs...' : 'Real-time execution logs'}
-                      </p>
-                    </div>
-                    <div className="ml-auto flex space-x-2">
-                      <div className="w-3 h-3 bg-[#fb7185] rounded-full border border-slate-900"></div>
-                      <div className="w-3 h-3 bg-[#facc15] rounded-full border border-slate-900"></div>
-                      <div className="w-3 h-3 bg-[#22c55e] rounded-full border border-slate-900"></div>
+                    <div className="flex items-center gap-3 flex-1">
+                      <div className="flex space-x-2">
+                        <div className="w-3 h-3 bg-[#fb7185] rounded-full border border-slate-900"></div>
+                        <div className="w-3 h-3 bg-[#facc15] rounded-full border border-slate-900"></div>
+                        <div className="w-3 h-3 bg-[#22c55e] rounded-full border border-slate-900"></div>
+                      </div>
+                      <div className="w-10 h-10 bg-slate-900 rounded-[12px] flex items-center justify-center">
+                        <Terminal className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-extrabold text-slate-900">Live Output</h3>
+                        <p className="text-xs text-slate-700">
+                          {isLoadingLogs ? 'Loading logs...' : 'Real-time execution logs'}
+                        </p>
+                      </div>
                     </div>
                   </div>
                   
@@ -296,24 +377,14 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                     {isLoadingLogs && terminalOutput.length === 0 ? (
                       <div className="text-[#7CF2D0] animate-pulse">Loading logs...</div>
                     ) : terminalOutput.length === 0 ? (
-                      <div className="text-slate-500">No logs yet. Waiting for job to start...</div>
+                      <div className="text-[#7CF2D0]">No logs yet. Waiting for job to start...</div>
                     ) : (
                       terminalOutput.map((line, index) => (
                         <div
                           key={index}
-                          className={`mb-1 ${
-                            line.includes('❌') || line.includes('FAILED') || line.includes('[ERROR]')
-                              ? 'text-red-400' 
-                              : line.includes('⚠️') || line.includes('[WARNING]')
-                              ? 'text-yellow-400'
-                              : line.includes('✅') || line.includes('SUCCESS')
-                              ? 'text-green-400'
-                              : line.includes('[INFO]')
-                              ? 'text-blue-400'
-                              : 'text-[#E0E7FF]'
-                          }`}
+                          className="text-[#7CF2D0] whitespace-pre-wrap mb-1 flex items-start"
                         >
-                          {line}
+                          {parseLogLine(line)}
                         </div>
                       ))
                     )}

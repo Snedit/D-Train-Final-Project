@@ -1,4 +1,4 @@
-// electron-worker/main.js - FIXED: Use consistent deviceId + Real-time Log Streaming
+// electron-worker/main.js - FIXED: Use Lucide-style symbols instead of emojis
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -9,6 +9,28 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 
 let REGISTERED_DEVICE_ID = null;
+
+// Icon replacements (using text symbols that match Lucide style)
+const icons = {
+  mobile: '[DEVICE]',
+  rocket: '[START]',
+  robot: '[WORKER]',
+  search: '[SEARCH]',
+  check: '[OK]',
+  clipboard: '[INFO]',
+  download: '[DOWNLOAD]',
+  package: '[EXTRACT]',
+  docker: '[DOCKER]',
+  play: '[RUN]',
+  inbox: '[OUTPUT]',
+  file: '[FILE]',
+  cloud: '[UPLOAD]',
+  link: '[LINK]',
+  broom: '[CLEAN]',
+  party: '[SUCCESS]',
+  error: '[ERROR]',
+  warning: '[WARN]'
+};
 
 const streamLogToBackend = async (jobId, deviceId, logLine) => {
   try {
@@ -47,7 +69,7 @@ function createWindow() {
 }
 
 ipcMain.handle("set-device-id", async (event, deviceId) => {
-  console.log('📱 Setting deviceId from frontend:', deviceId);
+  console.log(`${icons.mobile} Setting deviceId from frontend:`, deviceId);
   REGISTERED_DEVICE_ID = deviceId;
   
   const configPath = path.join(app.getPath('userData'), 'device-config.json');
@@ -70,7 +92,7 @@ ipcMain.handle("get-device-id", async () => {
     if (fs.existsSync(configPath)) {
       const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
       if (config.deviceId) {
-        console.log('📱 Loaded deviceId from disk:', config.deviceId);
+        console.log(`${icons.mobile} Loaded deviceId from disk:`, config.deviceId);
         REGISTERED_DEVICE_ID = config.deviceId;
         return config.deviceId;
       }
@@ -113,7 +135,6 @@ ipcMain.handle("get-device-info", async () => {
 
 ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const shortId = jobId.slice(-8);
-  // ✅ Use OS temp directory instead of project folder
   const jobDir = path.join(os.tmpdir(), "dtrain-jobs", `job-${shortId}`);
   const zipPath = path.join(os.tmpdir(), "dtrain-temp", `job-${jobId}.zip`);
   const outputDir = path.join(os.tmpdir(), "dtrain-jobs", `job-${shortId}`, "output");
@@ -123,7 +144,7 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   const deviceId = passedDeviceId || REGISTERED_DEVICE_ID;
   
   if (!deviceId) {
-    throw new Error('❌ No deviceId available. Please register first.');
+    throw new Error(`${icons.error} No deviceId available. Please register first.`);
   }
 
   const sendLog = async (msg) => {
@@ -133,7 +154,7 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     await streamLogToBackend(jobId, deviceId, cleanMsg);
   };
 
-  console.log(`🚀 Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
+  console.log(`${icons.rocket} Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
 
   const imageName = `dtrain-job-${shortId}`;
   const containerName = `dtrain-container-${shortId}`;
@@ -149,8 +170,8 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     fs.mkdirSync(jobDir, { recursive: true });
     fs.mkdirSync(outputDir, { recursive: true });
 
-    await sendLog("🔍 Fetching job from backend...\n");
-    await sendLog(`🤖 Using Worker ID: ${deviceId}\n`);
+    await sendLog(`${icons.search} Fetching job from backend...\n`);
+    await sendLog(`${icons.robot} Using Worker ID: ${deviceId}\n`);
 
     const jobResponse = await fetch(
       `http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
@@ -169,14 +190,14 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     const responseData = await jobResponse.json();
     const jobData = responseData.job || responseData;
     
-    await sendLog(`✅ Job found: ${jobData.title || 'Untitled'}\n`);
-    await sendLog(`📋 Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
+    await sendLog(`${icons.check} Job found: ${jobData.title || 'Untitled'}\n`);
+    await sendLog(`${icons.clipboard} Main file: ${jobData.config?.entryFile || 'main.py'}\n`);
 
     if (!jobData.zipFileUrl) {
-      throw new Error('❌ No zipFileUrl in job data');
+      throw new Error(`${icons.error} No zipFileUrl in job data`);
     }
 
-    await sendLog("📥 Downloading ZIP from Supabase...\n");
+    await sendLog(`${icons.download} Downloading ZIP from Supabase...\n`);
     const zipResponse = await fetch(jobData.zipFileUrl);
 
     if (!zipResponse.ok) {
@@ -185,20 +206,20 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
 
     const zipBuffer = await zipResponse.buffer();
     fs.writeFileSync(zipPath, zipBuffer);
-    await sendLog(`✅ ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
+    await sendLog(`${icons.check} ZIP downloaded (${(zipBuffer.length/1024/1024).toFixed(1)}MB)\n`);
 
-    await sendLog("📦 Extracting job files...\n");
+    await sendLog(`${icons.package} Extracting job files...\n`);
     const zip = new AdmZip(zipPath);
     zip.extractAllTo(jobDir, true);
     fs.unlinkSync(zipPath);
-    await sendLog("✅ Files extracted successfully\n\n");
+    await sendLog(`${icons.check} Files extracted successfully\n\n`);
 
     const mainFileName = jobData.config?.entryFile || 'main.py';
     const mainFilePath = path.join(jobDir, mainFileName);
     if (!fs.existsSync(mainFilePath)) {
-      throw new Error(`❌ Main file '${mainFileName}' not found in ZIP`);
+      throw new Error(`${icons.error} Main file '${mainFileName}' not found in ZIP`);
     }
-    await sendLog(`🚀 Main file verified: ${mainFileName}\n`);
+    await sendLog(`${icons.rocket} Main file verified: ${mainFileName}\n`);
 
     const dockerfile = `
 FROM python:3.11-slim
@@ -210,8 +231,8 @@ CMD ["python", "${mainFileName}"]
     `.trim();
 
     fs.writeFileSync(path.join(jobDir, "Dockerfile"), dockerfile);
-    await sendLog("🐳 Creating Dockerfile... ✅\n");
-    await sendLog("🐳 Building Docker image...\n");
+    await sendLog(`${icons.docker} Creating Dockerfile... ${icons.check}\n`);
+    await sendLog(`${icons.docker} Building Docker image...\n`);
 
     await new Promise((resolve, reject) => {
       const build = spawn("docker", ["build", "-t", imageName, "."], {
@@ -228,8 +249,8 @@ CMD ["python", "${mainFileName}"]
       });
     });
 
-    await sendLog("\n🚀 Docker image built successfully!\n");
-    await sendLog("▶️  Running training job...\n");
+    await sendLog(`\n${icons.rocket} Docker image built successfully!\n`);
+    await sendLog(`${icons.play} Running training job...\n`);
     
     await new Promise((resolve, reject) => {
       const run = spawn("docker", ["run", "--name", containerName, imageName], {
@@ -241,7 +262,7 @@ CMD ["python", "${mainFileName}"]
 
       run.on("close", async (code) => {
         if (code === 0) {
-          await sendLog("\n✅ Training completed!\n");
+          await sendLog(`\n${icons.check} Training completed!\n`);
           resolve();
         } else {
           reject(new Error(`Container failed with code ${code}`));
@@ -249,30 +270,28 @@ CMD ["python", "${mainFileName}"]
       });
     });
 
-    await sendLog("📥 Extracting output files...\n");
+    await sendLog(`${icons.download} Extracting output files...\n`);
     await new Promise((resolve) => {
       exec(
         `docker cp ${containerName}:/app/. "${outputDir}"`,
         async (error, stdout, stderr) => {
-          if (error) await sendLog(`⚠️  Copy warning: ${stderr}\n`);
+          if (error) await sendLog(`${icons.warning} Copy warning: ${stderr}\n`);
           resolve();
         }
       );
     });
 
-    // ✅ FIX 2: Remove Docker container AND image (only this specific job's resources)
-    await sendLog("🧹 Cleaning up Docker resources...\n");
+    await sendLog(`${icons.broom} Cleaning up Docker resources...\n`);
     await new Promise((resolve) => {
       exec(`docker rm ${containerName}`, async (error) => {
-        if (!error) await sendLog("   ✓ Container removed\n");
+        if (!error) await sendLog(`   ${icons.check} Container removed\n`);
         resolve();
       });
     });
     
-    // ✅ NEW: Remove Docker image to free disk space
     await new Promise((resolve) => {
       exec(`docker rmi ${imageName}`, async (error) => {
-        if (!error) await sendLog("   ✓ Image removed\n");
+        if (!error) await sendLog(`   ${icons.check} Image removed\n`);
         resolve();
       });
     });
@@ -288,7 +307,7 @@ CMD ["python", "${mainFileName}"]
     });
 
     if (outputFiles.length === 0) {
-      await sendLog(`\n⚠️  No output files generated\n`);
+      await sendLog(`\n${icons.warning} No output files generated\n`);
       
       await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
         method: 'POST',
@@ -303,15 +322,15 @@ CMD ["python", "${mainFileName}"]
       throw new Error('No output files to upload');
     }
 
-    await sendLog(`\n✅ OUTPUT FILES GENERATED (${outputFiles.length}):\n`);
+    await sendLog(`\n${icons.check} OUTPUT FILES GENERATED (${outputFiles.length}):\n`);
     for (const file of outputFiles) {
       const filePath = path.join(outputDir, file);
       const stats = fs.statSync(filePath);
       const sizeKB = (stats.size / 1024).toFixed(1);
-      await sendLog(`  📄 ${file.padEnd(25)} ${sizeKB} KB\n`);
+      await sendLog(`  ${icons.file} ${file.padEnd(25)} ${sizeKB} KB\n`);
     }
 
-    await sendLog("\n📦 Creating output ZIP...\n");
+    await sendLog(`\n${icons.package} Creating output ZIP...\n`);
     const outputZip = new AdmZip();
     
     outputFiles.forEach(file => {
@@ -327,9 +346,9 @@ CMD ["python", "${mainFileName}"]
     
     outputZip.writeZip(outputZipPath);
     const zipStats = fs.statSync(outputZipPath);
-    await sendLog(`✅ Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
+    await sendLog(`${icons.check} Output ZIP created: ${(zipStats.size / 1024 / 1024).toFixed(2)} MB\n`);
 
-    await sendLog("☁️  Uploading results to server...\n");
+    await sendLog(`${icons.cloud} Uploading results to server...\n`);
     
     const formData = new FormData();
     formData.append('deviceId', deviceId);
@@ -347,21 +366,19 @@ CMD ["python", "${mainFileName}"]
     }
 
     const uploadResult = await uploadResponse.json();
-    await sendLog(`✅ Results uploaded successfully!\n`);
-    await sendLog(`🔗 Output URL: ${uploadResult.outputUrl}\n`);
+    await sendLog(`${icons.check} Results uploaded successfully!\n`);
 
-    // ✅ FIX 1: Complete cleanup - remove ALL local files
-    await sendLog("🧹 Cleaning up local files...\n");
+    await sendLog(`${icons.broom} Cleaning up local files...\n`);
     if (fs.existsSync(outputZipPath)) {
       fs.unlinkSync(outputZipPath);
-      await sendLog("   ✓ Output ZIP removed\n");
+      await sendLog(`   ${icons.check} Output ZIP removed\n`);
     }
     if (fs.existsSync(jobDir)) {
       fs.rmSync(jobDir, { recursive: true, force: true });
-      await sendLog("   ✓ Job directory removed\n");
+      await sendLog(`   ${icons.check} Job directory removed\n`);
     }
 
-    await sendLog(`\n🎉 JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
+    await sendLog(`\n${icons.party} JOB ${shortId.toUpperCase()} COMPLETED SUCCESSFULLY!\n`);
     await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
     return { 
@@ -374,9 +391,9 @@ CMD ["python", "${mainFileName}"]
 
   } catch (err) {
     const errorMsg = err.message || 'Unknown error';
-    console.error('❌ Job failed:', errorMsg);
+    console.error(`${icons.error} Job failed:`, errorMsg);
     
-    await sendLog(`\n❌ JOB FAILED:\n`);
+    await sendLog(`\n${icons.error} JOB FAILED:\n`);
     await sendLog(`   ${errorMsg}\n`);
     await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
     
@@ -394,14 +411,13 @@ CMD ["python", "${mainFileName}"]
       console.error('Failed to report job failure:', failErr);
     }
     
-    // ✅ FIX 1 & 2: Cleanup on error - remove Docker resources AND files
     try {
-      await sendLog("🧹 Cleaning up after error...\n");
+      await sendLog(`${icons.broom} Cleaning up after error...\n`);
       exec(`docker rm -f ${containerName}`, () => {});
       exec(`docker rmi -f ${imageName}`, () => {});
       if (fs.existsSync(jobDir)) fs.rmSync(jobDir, { recursive: true, force: true });
       if (fs.existsSync(outputZipPath)) fs.unlinkSync(outputZipPath);
-      await sendLog("   ✓ Cleanup complete\n");
+      await sendLog(`   ${icons.check} Cleanup complete\n`);
     } catch (cleanupErr) {
       console.error('Cleanup failed:', cleanupErr);
     }

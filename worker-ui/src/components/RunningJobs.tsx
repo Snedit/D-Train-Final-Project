@@ -1,6 +1,26 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Play, StopCircle, ArrowLeft, Terminal } from 'lucide-react';
+import { 
+  Play, 
+  StopCircle, 
+  ArrowLeft, 
+  Terminal,
+  Search,
+  CheckCircle,
+  Info,
+  Download,
+  Package,
+  Rocket,
+  FileText,
+  Cloud,
+  Link,
+  Trash2,
+  PartyPopper,
+  XCircle,
+  AlertTriangle,
+  Smartphone,
+  Bot
+} from 'lucide-react';
 import type { Job } from '../types';
 
 interface RunningJobsProps {
@@ -9,6 +29,65 @@ interface RunningJobsProps {
   onJobComplete?: (job: Job) => void;
   onBack: () => void;
 }
+
+// Map icon tags to actual Lucide components
+const iconMap: Record<string, React.ReactNode> = {
+  '[SEARCH]': <Search className="inline w-3 h-3 mr-1" />,
+  '[OK]': <CheckCircle className="inline w-3 h-3 mr-1" />,
+  '[INFO]': <Info className="inline w-3 h-3 mr-1" />,
+  '[DOWNLOAD]': <Download className="inline w-3 h-3 mr-1" />,
+  '[EXTRACT]': <Package className="inline w-3 h-3 mr-1" />,
+  '[DOCKER]': <Package className="inline w-3 h-3 mr-1" />,
+  '[RUN]': <Play className="inline w-3 h-3 mr-1" />,
+  '[START]': <Rocket className="inline w-3 h-3 mr-1" />,
+  '[OUTPUT]': <FileText className="inline w-3 h-3 mr-1" />,
+  '[FILE]': <FileText className="inline w-3 h-3 mr-1" />,
+  '[CLOUD]': <Cloud className="inline w-3 h-3 mr-1" />,
+  '[UPLOAD]': <Cloud className="inline w-3 h-3 mr-1" />,
+  '[LINK]': <Link className="inline w-3 h-3 mr-1" />,
+  '[CLEAN]': <Trash2 className="inline w-3 h-3 mr-1" />,
+  '[SUCCESS]': <PartyPopper className="inline w-3 h-3 mr-1" />,
+  '[ERROR]': <XCircle className="inline w-3 h-3 mr-1" />,
+  '[WARN]': <AlertTriangle className="inline w-3 h-3 mr-1" />,
+  '[DEVICE]': <Smartphone className="inline w-3 h-3 mr-1" />,
+  '[WORKER]': <Bot className="inline w-3 h-3 mr-1" />,
+  '[PACKAGE]': <Package className="inline w-3 h-3 mr-1" />,
+  '[CLIPBOARD]': <Info className="inline w-3 h-3 mr-1" />,
+};
+
+// Function to parse log lines and replace icon tags with actual icons
+const parseLogLine = (line: string): React.ReactNode => {
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  
+  // Find all icon tags in the line
+  const regex = /\[(SEARCH|OK|INFO|DOWNLOAD|EXTRACT|DOCKER|RUN|START|OUTPUT|FILE|CLOUD|UPLOAD|LINK|CLEAN|SUCCESS|ERROR|WARN|DEVICE|WORKER|PACKAGE|CLIPBOARD)\]/g;
+  let match;
+  
+  while ((match = regex.exec(line)) !== null) {
+    // Add text before the icon
+    if (match.index > lastIndex) {
+      parts.push(line.substring(lastIndex, match.index));
+    }
+    
+    // Add the icon
+    const iconKey = match[0];
+    parts.push(
+      <span key={match.index} className="inline-flex items-center">
+        {iconMap[iconKey]}
+      </span>
+    );
+    
+    lastIndex = match.index + match[0].length;
+  }
+  
+  // Add remaining text
+  if (lastIndex < line.length) {
+    parts.push(line.substring(lastIndex));
+  }
+  
+  return parts.length > 0 ? parts : line;
+};
 
 const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplete, onBack }) => {
   const [logs, setLogs] = useState<string[]>(['> dtrain-worker ready\n> waiting for job...']);
@@ -22,36 +101,33 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     logsRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
-  // ✅ FIXED: Fetch job details using worker endpoint (no auth token)
   useEffect(() => {
     scrollToBottom();
-    console.log('📡 Fetching job details for:', jobId);
+    console.log('[SEARCH] Fetching job details for:', jobId);
     
     fetch(`http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${workerId}`, {
       headers: { 'Content-Type': 'application/json' }
-      // NO Authorization header - worker uses deviceId
     })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
       })
       .then(data => {
-        console.log('✅ Job fetched:', data);
-        const jobData = data.job || data; // Handle both response formats
+        console.log('[OK] Job fetched:', data);
+        const jobData = data.job || data;
         setJob(jobData);
-        setLogs(prev => [...prev, `\n📋 Job: ${jobData.title || 'Untitled'}\n`]);
+        setLogs(prev => [...prev, `\n[INFO] Job: ${jobData.title || 'Untitled'}\n`]);
       })
       .catch(err => {
-        console.error('❌ Job fetch failed:', err);
-        setLogs(prev => [...prev, `\n❌ Failed to fetch job: ${err.message}`]);
+        console.error('[ERROR] Job fetch failed:', err);
+        setLogs(prev => [...prev, `\n[ERROR] Failed to fetch job: ${err.message}`]);
       });
   }, [jobId, workerId, scrollToBottom]);
 
-  // Cleanup listener on unmount
   useEffect(() => {
     return () => {
       if (logListenerRef.current && (window as any).worker) {
-        console.log('🧹 Listener cleaned up');
+        console.log('[CLEAN] Listener cleaned up');
       }
     };
   }, []);
@@ -59,11 +135,11 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   const handleStart = async () => {
     if (isRunning || isCompleted) return;
     
-    console.log('🚀 START JOB CLICKED - worker exists?', !!(window as any).worker);
+    console.log('[START] START JOB CLICKED - worker exists?', !!(window as any).worker);
     
     if (!(window as any).worker) {
-      setLogs(prev => [...prev, '\n❌ Worker runtime not available (run in Electron)']);
-      console.error('❌ window.worker not found - must run in Electron');
+      setLogs(prev => [...prev, '\n[ERROR] Worker runtime not available (run in Electron)']);
+      console.error('[ERROR] window.worker not found - must run in Electron');
       return;
     }
     
@@ -71,7 +147,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     setLogs(prev => [...prev, `\n> Starting job ${jobId.slice(-8)}...\n`]);
     
     const logListener = (data: string) => {
-      console.log('📨 Log received:', data.trim());
+      console.log('[INFO] Log received:', data.trim());
       setLogs(prev => [...prev, data.replace(/\n$/, '')]);
       scrollToBottom();
     };
@@ -79,34 +155,33 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     logListenerRef.current = logListener;
     
     if ((window as any).worker.onLog) {
-      console.log('🔗 Setting up log listener');
+      console.log('[LINK] Setting up log listener');
       (window as any).worker.onLog(logListener);
     }
     
     try {
-      // ✅ Job is already accepted - just run it
-      console.log('📤 Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
+      console.log('[CLOUD] Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
       const result = await (window as any).worker.runTestJob(jobId, workerId);
-      console.log('📥 Electron result:', result);
+      console.log('[DOWNLOAD] Electron result:', result);
       
       setIsCompleted(true);
       
       if (result.success && onJobComplete && job) {
-        console.log('✅ Calling onJobComplete');
+        console.log('[OK] Calling onJobComplete');
         onJobComplete({ ...job, status: 'completed' });
       } else {
-        setLogs(prev => [...prev, `\n⚠️ Job completed but result.success=false:`, JSON.stringify(result)]);
+        setLogs(prev => [...prev, `\n[WARN] Job completed but result.success=false:`, JSON.stringify(result)]);
       }
     } catch (error: any) {
-      console.error('❌ Job execution FAILED:', error);
-      setLogs(prev => [...prev, `\n❌ Failed: ${error.message || error}`]);
+      console.error('[ERROR] Job execution FAILED:', error);
+      setLogs(prev => [...prev, `\n[ERROR] Failed: ${error.message || error}`]);
     } finally {
       setIsRunning(false);
     }
   };
 
   const handleStop = () => {
-    setLogs(prev => [...prev, '\n> ⚠️  Press Ctrl+C in Docker terminal or restart app to stop']);
+    setLogs(prev => [...prev, '\n> [WARN] Press Ctrl+C in Docker terminal or restart app to stop']);
   };
 
   return (
@@ -215,8 +290,8 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
               
               <div className="h-96 p-4 bg-slate-900 font-mono text-xs overflow-y-auto">
                 {logs.map((log, i) => (
-                  <div key={i} className="text-[#7CF2D0] whitespace-pre-wrap mb-1">
-                    {log}
+                  <div key={i} className="text-[#7CF2D0] whitespace-pre-wrap mb-1 flex items-start">
+                    {parseLogLine(log)}
                   </div>
                 ))}
                 <div ref={logsRef} />
