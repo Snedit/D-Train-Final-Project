@@ -1,16 +1,77 @@
 {
-  "name": "electron-worker",
+  "name": "dtrain-worker",
   "version": "1.0.0",
-  "description": "DTrain Electron Worker Client",
+  "description": "DTrain Electron Worker Client - Distributed ML Training",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
   },
-  "keywords": [],
-  "author": "",
+  "build": {
+    "appId": "com.dtrain.worker",
+    "productName": "DTrain Worker",
+    "directories": {
+      "output": "release",
+      "buildResources": "assets"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "dist/**/*",
+      "assets/**/*",
+      "node_modules/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        }
+      ],
+      "icon": "assets/icon.ico",
+      "signAndEditExecutable": false
+    },
+    "mac": {
+      "target": ["dmg"],
+      "icon": "assets/icon.icns",
+      "category": "public.app-category.utilities"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "assets/icon.png",
+      "category": "Utility"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DTrain Worker",
+      "perMachine": false,
+      "installerIcon": "assets/icon.ico",
+      "uninstallerIcon": "assets/icon.ico"
+    },
+    "compression": "maximum",
+    "asar": true,
+    "electronVersion": "39.2.7"
+  },
+  "keywords": [
+    "electron",
+    "ml",
+    "training",
+    "distributed",
+    "worker"
+  ],
+  "author": "DTrain Team",
   "license": "ISC",
   "devDependencies": {
-    "electron": "^39.2.7"
+    "electron": "^39.2.7",
+    "electron-builder": "^26.0.12"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",

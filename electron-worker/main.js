@@ -43,7 +43,7 @@ function createWindow() {
   win.setMenu(null);
   win.maximize();
   win.loadFile(path.join(__dirname, "dist", "index.html"));
-  win.webContents.openDevTools();
+  // win.webContents.openDevTools();
 }
 
 ipcMain.handle("set-device-id", async (event, deviceId) => {
