@@ -64,7 +64,7 @@ function createWindow() {
 
   win.setMenu(null);
   win.maximize();
-  win.loadFile(path.join(__dirname, "dist", "index.html"));
+  win.loadFile(path.join(__dirname, "../worker-ui","dist", "index.html"));
   // win.webContents.openDevTools();
 }
 
