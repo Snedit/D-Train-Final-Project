@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D-Train Wallet - Razorpay Test</title>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .wallet-balance {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 15px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .balance-label {
+            font-size: 14px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+
+        .balance-amount {
+            font-size: 42px;
+            font-weight: bold;
+        }
+
+        .input-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 500;
+        }
+
+        input {
+            width: 100%;
+            padding: 12px 15px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 10px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+        }
+
+        .btn-secondary:hover {
+            background: #e0e0e0;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .status {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .quick-amounts {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .quick-amount-btn {
+            padding: 10px;
+            border: 2px solid #667eea;
+            background: white;
+            color: #667eea;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .quick-amount-btn:hover {
+            background: #667eea;
+            color: white;
+        }
+
+        .test-info {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            color: #856404;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            font-size: 13px;
+        }
+
+        .test-info strong {
+            display: block;
+            margin-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>💰 D-Train Wallet</h1>
+        <p class="subtitle">Razorpay Payment Integration Test</p>
+
+        <div class="wallet-balance">
+            <div class="balance-label">Current Balance</div>
+            <div class="balance-amount" id="balance">₹0.00</div>
+        </div>
+
+        <div class="input-group">
+            <label for="jwtToken">JWT Token (Required)</label>
+            <input type="text" id="jwtToken" placeholder="Paste your JWT token here">
+        </div>
+
+        <div class="input-group">
+            <label>Quick Amounts</label>
+            <div class="quick-amounts">
+                <button class="quick-amount-btn" onclick="setAmount(50)">₹50</button>
+                <button class="quick-amount-btn" onclick="setAmount(100)">₹100</button>
+                <button class="quick-amount-btn" onclick="setAmount(500)">₹500</button>
+            </div>
+        </div>
+
+        <div class="input-group">
+            <label for="amount">Amount (₹)</label>
+            <input type="number" id="amount" placeholder="Enter amount (min ₹10)" min="10" value="100">
+        </div>
+
+        <button class="btn btn-primary" onclick="addMoney()">
+            💳 Add Money with Razorpay
+        </button>
+
+        <button class="btn btn-secondary" onclick="fakeTopup()">
+            🧪 Fake Top-up (Testing)
+        </button>
+
+        <button class="btn btn-secondary" onclick="refreshBalance()">
+            🔄 Refresh Balance
+        </button>
+
+        <div id="status"></div>
+
+        <div class="test-info">
+            <strong>🧪 Test Card Details:</strong>
+            Card: 4111 1111 1111 1111<br>
+            CVV: 123 | Expiry: 12/25 | OTP: 123456
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000/api/payment';
+
+        // Configuration
+        const RAZORPAY_KEY_ID = 'rzp_test_SEkIf7zpx0v0Lc';
+
+        // Load balance on page load
+        window.onload = function () {
+            const savedToken = localStorage.getItem('jwt_token');
+            if (savedToken) {
+                document.getElementById('jwtToken').value = savedToken;
+                refreshBalance();
+            }
+        };
+
+        function setAmount(value) {
+            document.getElementById('amount').value = value;
+        }
+
+        function getToken() {
+            const token = document.getElementById('jwtToken').value.trim();
+            if (!token) {
+                showStatus('Please enter your JWT token', 'error');
+                return null;
+            }
+            localStorage.setItem('jwt_token', token);
+            return token;
+        }
+
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+
+        async function refreshBalance() {
+            const token = getToken();
+            if (!token) return;
+
+            try {
+                const response = await fetch(`${API_BASE}/wallet/balance`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch balance');
+                }
+
+                const data = await response.json();
+                document.getElementById('balance').textContent = `₹${data.balance.toFixed(2)}`;
+                showStatus('Balance refreshed successfully', 'success');
+            } catch (error) {
+                showStatus('Error fetching balance: ' + error.message, 'error');
+            }
+        }
+
+        async function addMoney() {
+            const token = getToken();
+            if (!token) return;
+
+            const amount = parseFloat(document.getElementById('amount').value);
+
+            if (!amount || amount < 10) {
+                showStatus('Please enter an amount of at least ₹10', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Creating payment order...', 'info');
+
+                // Step 1: Create Razorpay order
+                const orderResponse = await fetch(`${API_BASE}/wallet/topup`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount })
+                });
+
+                if (!orderResponse.ok) {
+                    const error = await orderResponse.json();
+                    throw new Error(error.message || 'Failed to create order');
+                }
+
+                const orderData = await orderResponse.json();
+
+                // Step 2: Open Razorpay checkout
+                const options = {
+                    key: RAZORPAY_KEY_ID,
+                    amount: orderData.amount,
+                    currency: orderData.currency,
+                    name: 'D-Train Platform',
+                    description: 'Wallet Top-up',
+                    order_id: orderData.orderId,
+                    handler: function (response) {
+                        verifyPayment(response, token);
+                    },
+                    prefill: {
+                        name: 'Test User',
+                        email: 'test@example.com',
+                        contact: '9999999999'
+                    },
+                    theme: {
+                        color: '#667eea'
+                    },
+                    modal: {
+                        ondismiss: function () {
+                            showStatus('Payment cancelled', 'error');
+                        }
+                    }
+                };
+
+                const rzp = new Razorpay(options);
+                rzp.open();
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+
+        async function verifyPayment(response, token) {
+            try {
+                showStatus('Verifying payment...', 'info');
+
+                const verifyResponse = await fetch(`${API_BASE}/razorpay/verify`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        razorpay_order_id: response.razorpay_order_id,
+                        razorpay_payment_id: response.razorpay_payment_id,
+                        razorpay_signature: response.razorpay_signature
+                    })
+                });
+
+                if (!verifyResponse.ok) {
+                    const error = await verifyResponse.json();
+                    throw new Error(error.message || 'Payment verification failed');
+                }
+
+                const data = await verifyResponse.json();
+                document.getElementById('balance').textContent = `₹${data.newBalance.toFixed(2)}`;
+                showStatus(`✅ Payment successful! New balance: ₹${data.newBalance.toFixed(2)}`, 'success');
+
+            } catch (error) {
+                showStatus('Verification error: ' + error.message, 'error');
+            }
+        }
+
+        async function fakeTopup() {
+            const token = getToken();
+            if (!token) return;
+
+            const amount = parseFloat(document.getElementById('amount').value);
+
+            if (!amount || amount <= 0) {
+                showStatus('Please enter a valid amount', 'error');
+                return;
+            }
+
+            if (amount > 10000) {
+                showStatus('Maximum fake top-up is ₹10,000', 'error');
+                return;
+            }
+
+            try {
+                showStatus('Processing fake top-up...', 'info');
+
+                const response = await fetch(`${API_BASE}/wallet/fake-topup`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount })
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.message || 'Fake top-up failed');
+                }
+
+                const data = await response.json();
+                document.getElementById('balance').textContent = `₹${data.newBalance.toFixed(2)}`;
+                showStatus(`✅ Fake top-up successful! New balance: ₹${data.newBalance.toFixed(2)}`, 'success');
+
+            } catch (error) {
+                showStatus('Error: ' + error.message, 'error');
+            }
+        }
+    </script>
+</body>
+
+</html>

@@ -28,6 +28,17 @@ const workerSchema = new mongoose.Schema(
     totalJobsCompleted: { type: Number, default: 0 },
     walletAddress: String,
     ratings: { type: Number, default: 5 },
+
+    // Pricing configuration
+    pricing: {
+      hourlyRate: { type: Number, default: 0.10 }, // Default $0.10/hour
+      minimumCharge: { type: Number, default: 0.05 }, // Minimum charge per job
+      currency: { type: String, default: "INR" }, // Indian Rupees for Razorpay
+    },
+
+    // Earnings tracking
+    totalEarnings: { type: Number, default: 0 },
+    pendingEarnings: { type: Number, default: 0 }, // From in-progress jobs
   },
   { timestamps: true }
 );

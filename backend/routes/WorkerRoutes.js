@@ -5,17 +5,18 @@ import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
 import { supabase } from "../utils/supabaseClient.js";
 import AdmZip from "adm-zip";
+import { calculateEstimatedCost, reserveFunds } from "../utils/paymentHelpers.js";
 
 const WorkerRouter = Router();
 
 // ✅ HELPER: Optional authentication middleware
 const optionalAuth = (req, res, next) => {
   const token = req.headers.authorization?.replace('Bearer ', '');
-  
+
   if (token) {
     return authMiddleware(req, res, next);
   }
-  
+
   req.user = null;
   next();
 };
@@ -35,22 +36,22 @@ WorkerRouter.get("/", authMiddleware, async (req, res) => {
 WorkerRouter.get("/available-jobs", async (req, res) => {
   try {
     const { deviceId } = req.query;
-    
-    console.log("Fetching available jobs for worker:", deviceId); 
-    
+
+    console.log("Fetching available jobs for worker:", deviceId);
+
     if (deviceId) {
       const worker = await Worker.findOne({ deviceId });
       if (!worker) {
-        return res.status(404).json({ 
-          message: "Worker not registered. Please register first." 
+        return res.status(404).json({
+          message: "Worker not registered. Please register first."
         });
       }
-      
+
       worker.lastHeartbeatAt = Date.now();
       worker.currentStatus = "online";
       await worker.save();
     }
-    
+
     const availableJobs = await Job.find({
       status: { $in: ['pending', 'queued'] },
       $or: [
@@ -59,22 +60,22 @@ WorkerRouter.get("/available-jobs", async (req, res) => {
         { assignedWorkerId: '' }
       ]
     })
-    .sort({ createdAt: -1 })
-    .limit(50);
+      .sort({ createdAt: -1 })
+      .limit(50);
 
     console.log(`Found ${availableJobs.length} available jobs`);
 
-    return res.status(200).json({ 
-      message: "Available jobs fetched successfully", 
+    return res.status(200).json({
+      message: "Available jobs fetched successfully",
       jobs: availableJobs,
       availableJobs: availableJobs,
       count: availableJobs.length
     });
   } catch (error) {
     console.error("Error fetching available jobs:", error);
-    return res.status(500).json({ 
+    return res.status(500).json({
       message: "Error fetching available jobs",
-      error: error.message 
+      error: error.message
     });
   }
 });
@@ -187,8 +188,8 @@ WorkerRouter.post("/push-log", async (req, res) => {
     // ✅ Emit real-time log to frontend via Socket.IO
     const io = req.app.get("io");
     if (io) {
-      io.to(`job:${jobId}`).emit("job:log", { 
-        jobId, 
+      io.to(`job:${jobId}`).emit("job:log", {
+        jobId,
         line,
         timestamp: new Date().toISOString()
       });
@@ -223,7 +224,7 @@ WorkerRouter.post("/heartbeat", async (req, res) => {
   }
 });
 
-// ✅ FIXED: POST /accept-job with Socket.io broadcast
+// ✅ FIXED: POST /accept-job with Socket.io broadcast and payment integration
 WorkerRouter.post("/accept-job", async (req, res) => {
   try {
     const { jobId, deviceId } = req.body;
@@ -238,22 +239,53 @@ WorkerRouter.post("/accept-job", async (req, res) => {
     // Check if job is still available
     if (job.status !== "pending" && job.status !== "queued") {
       console.log(`❌ Job ${jobId} already taken. Status: ${job.status}`);
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: "Job already taken",
-        currentStatus: job.status 
+        currentStatus: job.status
       });
     }
 
-    // Update job status
+    // ✅ PAYMENT: Get worker and their pricing
+    const worker = await Worker.findOne({ deviceId });
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found. Please register first." });
+    }
+
+    const workerRate = worker.pricing.hourlyRate;
+    const minimumCharge = worker.pricing.minimumCharge;
+
+    // ✅ PAYMENT: Reserve funds from user's wallet
+    const estimatedCost = job.pricing?.estimatedCost || calculateEstimatedCost(workerRate, 1, minimumCharge);
+    const reserveResult = await reserveFunds(job.userId, estimatedCost, jobId);
+
+    if (!reserveResult.success) {
+      return res.status(400).json({
+        message: "Failed to reserve funds",
+        error: reserveResult.error
+      });
+    }
+
+    // Update job status and pricing
     job.status = "assigned";
     job.assignedWorkerId = deviceId;
+    job.pricing = {
+      ...job.pricing,
+      workerRate: workerRate,
+      estimatedCost: estimatedCost,
+      startTime: new Date(),
+    };
+    job.paymentStatus = "reserved";
     await job.save();
 
-    console.log(`✅ Job ${jobId} assigned to worker ${deviceId}`);
+    // ✅ PAYMENT: Update worker's pending earnings
+    worker.pendingEarnings += estimatedCost;
+    await worker.save();
+
+    console.log(`✅ Job ${jobId} assigned to worker ${deviceId} | Reserved: ₹${estimatedCost}`);
 
     // ✅ EMIT SOCKET EVENT to notify frontend
     const io = req.app.get("io");
-    
+
     // Emit to all connected clients
     io.emit("job_status_changed", {
       jobId: job._id,
@@ -266,18 +298,21 @@ WorkerRouter.post("/accept-job", async (req, res) => {
     io.to(`job:${jobId}`).emit("job_accepted", {
       jobId: job._id,
       workerId: deviceId,
-      status: "assigned"
+      status: "assigned",
+      pricing: job.pricing,
     });
 
     console.log(`📡 Socket events emitted for job ${jobId}`);
 
-    res.json({ 
-      message: "Job accepted", 
+    res.json({
+      message: "Job accepted",
       job: {
         _id: job._id,
         title: job.title,
         status: job.status,
-        assignedWorkerId: job.assignedWorkerId
+        assignedWorkerId: job.assignedWorkerId,
+        pricing: job.pricing,
+        paymentStatus: job.paymentStatus,
       }
     });
   } catch (err) {
@@ -316,10 +351,10 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
     // Allow PENDING/QUEUED jobs (anyone can view to accept) 
     // OR ASSIGNED/COMPLETED to this specific worker
     if (deviceId) {
-      if ((job.status === 'assigned' || job.status === 'completed') && 
-          job.assignedWorkerId !== deviceId) {
-        return res.status(403).json({ 
-          message: "Unauthorized - job not assigned to this worker" 
+      if ((job.status === 'assigned' || job.status === 'completed') &&
+        job.assignedWorkerId !== deviceId) {
+        return res.status(403).json({
+          message: "Unauthorized - job not assigned to this worker"
         });
       }
     }
@@ -443,6 +478,106 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
     });
   } catch (err) {
     console.error("Error fetching job details:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ✅ PUT /pricing - Worker updates their pricing
+WorkerRouter.put("/pricing", authMiddleware, async (req, res) => {
+  try {
+    const { hourlyRate, minimumCharge } = req.body;
+
+    if (hourlyRate !== undefined && (hourlyRate < 0 || hourlyRate > 1000)) {
+      return res.status(400).json({ message: "Invalid hourly rate (must be between 0 and 1000)" });
+    }
+
+    if (minimumCharge !== undefined && (minimumCharge < 0 || minimumCharge > 100)) {
+      return res.status(400).json({ message: "Invalid minimum charge (must be between 0 and 100)" });
+    }
+
+    const worker = await Worker.findOne({ userId: req.user.userId });
+
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found. Please register first." });
+    }
+
+    // Update pricing
+    if (hourlyRate !== undefined) worker.pricing.hourlyRate = hourlyRate;
+    if (minimumCharge !== undefined) worker.pricing.minimumCharge = minimumCharge;
+
+    await worker.save();
+
+    res.json({
+      message: "Pricing updated successfully",
+      pricing: worker.pricing,
+    });
+  } catch (err) {
+    console.error("Update pricing error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ✅ GET /pricing - Get worker's current pricing
+WorkerRouter.get("/pricing", authMiddleware, async (req, res) => {
+  try {
+    const worker = await Worker.findOne({ userId: req.user.userId });
+
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found" });
+    }
+
+    res.json({
+      pricing: worker.pricing,
+      totalEarnings: worker.totalEarnings,
+      pendingEarnings: worker.pendingEarnings,
+    });
+  } catch (err) {
+    console.error("Get pricing error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ✅ GET /earnings - Get worker's earnings summary
+WorkerRouter.get("/earnings", authMiddleware, async (req, res) => {
+  try {
+    const worker = await Worker.findOne({ userId: req.user.userId });
+
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found" });
+    }
+
+    // Get completed jobs
+    const completedJobs = await Job.find({
+      assignedWorkerId: worker.deviceId,
+      status: "completed",
+    }).select("title pricing createdAt");
+
+    // Get in-progress jobs
+    const inProgressJobs = await Job.find({
+      assignedWorkerId: worker.deviceId,
+      status: { $in: ["assigned", "processing"] },
+    }).select("title pricing createdAt");
+
+    res.json({
+      totalEarnings: worker.totalEarnings,
+      pendingEarnings: worker.pendingEarnings,
+      totalJobsCompleted: worker.totalJobsCompleted,
+      pricing: worker.pricing,
+      completedJobs: completedJobs.map(job => ({
+        id: job._id,
+        title: job.title,
+        earnings: job.pricing?.actualCost || 0,
+        completedAt: job.createdAt,
+      })),
+      inProgressJobs: inProgressJobs.map(job => ({
+        id: job._id,
+        title: job.title,
+        estimatedEarnings: job.pricing?.estimatedCost || 0,
+        startedAt: job.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Get earnings error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });

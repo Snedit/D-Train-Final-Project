@@ -8,11 +8,18 @@ const billingSchema = new mongoose.Schema(
 
     amount: { type: Number, required: true },
 
+    // Pricing details
+    workerRate: { type: Number, required: true }, // Rate at time of job
+    durationSeconds: Number, // Execution duration
+
     status: {
       type: String,
       enum: ["pending", "paid", "failed"],
       default: "pending",
     },
+
+    // Reference to transaction
+    transactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
 
     invoiceUrl: String,
   },

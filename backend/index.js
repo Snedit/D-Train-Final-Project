@@ -8,6 +8,8 @@ import { Server } from "socket.io";
 import UserRouter from "./routes/UserRoutes.js";
 import WorkerRouter from "./routes/WorkerRoutes.js";
 import JobRouter from "./routes/JobRoutes.js";
+import PaymentRouter from "./routes/PaymentRoutes.js";
+import morgan from "morgan";
 
 dotenv.config();
 
@@ -21,6 +23,8 @@ app.use(cors({
 }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
+
+app.use(morgan("dev"));
 
 /* ---------- http server ---------- */
 const server = http.createServer(app);
@@ -70,10 +74,10 @@ io.on("connection", (socket) => {
 // ✅ Global socket event emitter helper
 export const emitJobUpdate = (io, jobId, eventType, data) => {
   console.log(`📡 Emitting ${eventType} for job ${jobId}`);
-  
+
   // Emit to specific job room
   io.to(`job:${jobId}`).emit(eventType, data);
-  
+
   // Also emit globally for dashboards
   io.emit(eventType, data);
 };
@@ -94,6 +98,7 @@ mongoose
 app.use("/api/user", UserRouter);
 app.use("/api/worker", WorkerRouter);
 app.use("/api/jobs", JobRouter);
+app.use("/api/payment", PaymentRouter);
 
 /* ---------- health check ---------- */
 app.get("/", (req, res) => {
@@ -107,16 +112,16 @@ app.get("/", (req, res) => {
 
 /* ---------- 404 handler ---------- */
 app.use((req, res) => {
-  res.status(404).json({ 
+  res.status(404).json({
     message: "Route not found",
-    path: req.path 
+    path: req.path
   });
 });
 
 /* ---------- error handler ---------- */
 app.use((err, req, res, next) => {
   console.error("❌ Server error:", err);
-  res.status(500).json({ 
+  res.status(500).json({
     message: "Internal server error",
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });

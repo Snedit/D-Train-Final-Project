@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus, Trash2, Wallet } from 'lucide-react';
 import { Job, Worker } from '../types';
 import { Socket } from 'socket.io-client';
 import ProfileDropdown from './ProfileDropdown';
@@ -11,26 +11,29 @@ interface DashboardProps {
   onViewRunning: () => void;
   onViewPending: () => void;
   onViewWorkers: () => void;
+  onViewWallet: () => void;
   onSignOut: () => void;
   socket: Socket | null;
   jobs: Job[];
   workers: Worker[];
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ 
-  onJobSelect, 
-  onNewJob, 
-  onViewRunning, 
-  onViewPending, 
-  onViewWorkers, 
+const Dashboard: React.FC<DashboardProps> = ({
+  onJobSelect,
+  onNewJob,
+  onViewRunning,
+  onViewPending,
+  onViewWorkers,
+  onViewWallet,
   onSignOut,
-  socket, 
-  jobs, 
-  workers 
+  socket,
+  jobs,
+  workers
 }) => {
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState({ name: '', email: '' });
   const [localJobs, setLocalJobs] = useState<Job[]>(jobs);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const statusIcons = {
     pending: Clock,
@@ -78,11 +81,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       // Listen for job status changes
       socket.on('job_status_changed', (data) => {
         console.log('📡 Job status changed:', data);
-        
+
         // Update local jobs state
-        setLocalJobs(prevJobs => 
-          prevJobs.map(job => 
-            job._id === data.jobId 
+        setLocalJobs(prevJobs =>
+          prevJobs.map(job =>
+            job._id === data.jobId
               ? { ...job, status: data.status, assignedWorkerId: data.assignedWorkerId }
               : job
           )
@@ -92,10 +95,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       // Listen for job accepted events
       socket.on('job_accepted', (data) => {
         console.log('📡 Job accepted:', data);
-        
-        setLocalJobs(prevJobs => 
-          prevJobs.map(job => 
-            job._id === data.jobId 
+
+        setLocalJobs(prevJobs =>
+          prevJobs.map(job =>
+            job._id === data.jobId
               ? { ...job, status: data.status, assignedWorkerId: data.workerId }
               : job
           )
@@ -105,10 +108,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       // Legacy support for old event name
       socket.on('job_status', (data) => {
         console.log('📡 Job status updated (legacy):', data);
-        
-        setLocalJobs(prevJobs => 
-          prevJobs.map(job => 
-            job._id === data.jobId 
+
+        setLocalJobs(prevJobs =>
+          prevJobs.map(job =>
+            job._id === data.jobId
               ? { ...job, status: data.status }
               : job
           )
@@ -141,6 +144,27 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     };
   }, [socket]);
+
+  // Fetch wallet balance
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
+      try {
+        const token = localStorage.getItem('dtrain_token');
+        const response = await fetch('http://localhost:5000/api/payment/wallet/balance', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setWalletBalance(data.balance);
+        }
+      } catch (error) {
+        console.error('Error fetching wallet balance:', error);
+      }
+    };
+
+    fetchWalletBalance();
+  }, []);
 
   if (loading) {
     return (
@@ -201,9 +225,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img 
-                    src="/logo.png" 
-                    alt="DTrain Logo" 
+                  <img
+                    src="/logo.png"
+                    alt="DTrain Logo"
                     className="w-8 h-8 object-contain"
                   />
                 </div>
@@ -223,7 +247,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <span className="hidden sm:inline">New Job</span>
                 </motion.button>
 
-                <ProfileDropdown 
+                <ProfileDropdown
                   onSignOut={onSignOut}
                   userName={userInfo.name}
                   userEmail={userInfo.email}
@@ -241,8 +265,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Stats Grid - Use localJobs instead of jobs */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-5 mb-8">
-              <motion.div 
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-8">
+              <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
                 className="rounded-[18px] border-[3px] border-slate-900 bg-blue-400 p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)] cursor-pointer"
@@ -258,7 +282,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
                 onClick={onViewRunning}
@@ -280,7 +304,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
                 onClick={onViewPending}
@@ -302,7 +326,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              <motion.div 
+              <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
                 onClick={onViewWorkers}
@@ -316,6 +340,26 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">{workers.length}</p>
                       <p className="text-xs font-semibold text-slate-900">Active Workers</p>
+                    </div>
+                  </div>
+                  <ArrowRight className="w-5 h-5 text-slate-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </div>
+              </motion.div>
+
+              <motion.div
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onViewWallet}
+                className="rounded-[18px] border-[3px] border-slate-900 bg-[#A8E6CF] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)] cursor-pointer group"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
+                      <Wallet className="w-5 h-5 text-slate-900" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-extrabold text-slate-900">₹{walletBalance.toFixed(2)}</p>
+                      <p className="text-xs font-semibold text-slate-900">Your Wallet</p>
                     </div>
                   </div>
                   <ArrowRight className="w-5 h-5 text-slate-900 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -354,6 +398,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Created</th>
                         <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Entry Point</th>
                         <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Action</th>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Delete</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -371,7 +416,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <td className="px-5 py-4">
                               <p className="text-sm font-extrabold text-slate-900">{job.title || job.name}</p>
-                              <p className="text-xs text-slate-600 font-medium">#{index+1}</p>
+                              <p className="text-xs text-slate-600 font-medium">#{index + 1}</p>
                             </td>
                             <td className="px-5 py-4">
                               <div className={`inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${statusStyle}`}>
@@ -393,6 +438,43 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 className="px-4 py-2 rounded-[10px] border-[2px] border-slate-900 bg-white text-slate-900 text-xs font-bold shadow-[3px_3px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
                               >
                                 View Details
+                              </motion.button>
+                            </td>
+                            <td className="px-5 py-4">
+                              <motion.button
+                                whileHover={{ y: -1 }}
+                                whileTap={{ y: 0 }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm('Are you sure you want to delete this job?')) {
+                                    try {
+                                      const token = localStorage.getItem('dtrain_token');
+                                      const response = await fetch(`http://localhost:5000/api/jobs/${job._id}`, {
+                                        method: 'DELETE',
+                                        headers: {
+                                          Authorization: `Bearer ${token}`,
+                                        },
+                                      });
+
+                                      if (response.ok) {
+                                        // Remove job from local state
+                                        setLocalJobs(prev => prev.filter(j => j._id !== job._id));
+                                        console.log(`✅ Job ${job._id} deleted successfully`);
+                                      } else {
+                                        const errorData = await response.json();
+                                        console.error('Delete failed:', errorData);
+                                        alert(`Failed to delete job: ${errorData.message || 'Unknown error'}`);
+                                      }
+                                    } catch (error) {
+                                      console.error('Error deleting job:', error);
+                                      alert('Failed to delete job. Please try again.');
+                                    }
+                                  }
+                                }}
+                                className="p-2 rounded-[10px] border-[2px] border-slate-900 bg-red-100 text-red-600 hover:bg-red-200 shadow-[3px_3px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+                                title="Delete job"
+                              >
+                                <Trash2 className="w-4 h-4" />
                               </motion.button>
                             </td>
                           </motion.tr>
