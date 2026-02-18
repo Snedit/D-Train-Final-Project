@@ -235,3 +235,53 @@ export const getRealTimeCost = (workerRate, startTime, minimumCharge = 0.05) => 
         elapsedSeconds,
     };
 };
+
+/**
+ * Credit worker's wallet on job completion
+ * @param {string} workerId - Worker ObjectId (not deviceId)
+ * @param {number} amount - Amount to credit
+ * @param {string} jobId - Job ID
+ * @returns {Promise<object>} { success, transaction, newBalance, error }
+ */
+export const creditWorkerWallet = async (workerId, amount, jobId) => {
+    try {
+        const worker = await Worker.findById(workerId);
+
+        if (!worker) {
+            return { success: false, error: "Worker not found" };
+        }
+
+        // Add to wallet balance
+        worker.walletBalance += amount;
+
+        // Update earnings tracking
+        worker.totalEarnings += amount;
+        if (worker.pendingEarnings >= amount) {
+            worker.pendingEarnings -= amount;
+        } else {
+            worker.pendingEarnings = 0;
+        }
+
+        await worker.save();
+
+        // Create transaction record
+        const transaction = await Transaction.create({
+            userId: worker.userId,
+            workerId: worker._id,
+            type: "worker_payout",
+            amount,
+            status: "completed",
+            jobId,
+            description: `Payment for completed job - ₹${amount.toFixed(2)}`,
+        });
+
+        return {
+            success: true,
+            transaction,
+            newBalance: worker.walletBalance,
+        };
+    } catch (error) {
+        console.error("Credit worker wallet error:", error);
+        return { success: false, error: error.message };
+    }
+};

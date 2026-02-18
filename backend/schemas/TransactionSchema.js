@@ -3,32 +3,35 @@ import mongoose from "mongoose";
 const transactionSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    
+
     type: {
       type: String,
-      enum: ["topup", "reservation", "charge", "refund", "withdrawal"],
+      enum: ["topup", "reservation", "charge", "refund", "withdrawal", "worker_payout"],
       required: true,
     },
-    
+
     amount: { type: Number, required: true },
-    
+
     status: {
       type: String,
       enum: ["pending", "completed", "failed", "cancelled"],
       default: "pending",
     },
-    
+
     // Related job (if applicable)
     jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job" },
-    
+
+    // Related worker (for worker_payout transactions)
+    workerId: { type: mongoose.Schema.Types.ObjectId, ref: "Worker" },
+
     // Razorpay payment details
     razorpayOrderId: String,
     razorpayPaymentId: String,
     razorpaySignature: String,
-    
+
     // Description for transaction history
     description: String,
-    
+
     // Metadata
     metadata: {
       type: Object,

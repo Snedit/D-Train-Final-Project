@@ -9,6 +9,8 @@ import UserRouter from "./routes/UserRoutes.js";
 import WorkerRouter from "./routes/WorkerRoutes.js";
 import JobRouter from "./routes/JobRoutes.js";
 import PaymentRouter from "./routes/PaymentRoutes.js";
+import Job from "./schemas/JobSchema.js";
+import { getRealTimeCost } from "./utils/paymentHelpers.js";
 import morgan from "morgan";
 
 dotenv.config();
@@ -126,6 +128,50 @@ app.use((err, req, res, next) => {
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
 });
+
+/* ---------- Real-time Cost Tracking ---------- */
+const startCostTracking = (io) => {
+  console.log("💰 Starting real-time cost tracking...");
+
+  setInterval(async () => {
+    try {
+      // Find all active jobs (processing or assigned)
+      const activeJobs = await Job.find({
+        status: { $in: ["assigned", "processing"] },
+        "pricing.workerRate": { $exists: true },
+        "pricing.startTime": { $exists: true }
+      });
+
+      if (activeJobs.length > 0) {
+        // console.log(`Processing costs for ${activeJobs.length} active jobs...`);
+
+        activeJobs.forEach(job => {
+          if (!job.pricing.startTime) return;
+
+          const { currentCost, elapsedSeconds } = getRealTimeCost(
+            job.pricing.workerRate,
+            job.pricing.startTime,
+            0.05 // Minimum charge default
+          );
+
+          // Emit update to job room
+          io.to(`job:${job._id}`).emit("job:cost_update", {
+            jobId: job._id,
+            currentCost,
+            elapsedSeconds,
+            workerRate: job.pricing.workerRate,
+            timestamp: new Date().toISOString()
+          });
+        });
+      }
+    } catch (err) {
+      console.error("❌ Cost tracking error:", err.message);
+    }
+  }, 1000); // Run every second
+};
+
+// Start tracking
+startCostTracking(io);
 
 /* ---------- start ---------- */
 server.listen(port, () => {

@@ -39,6 +39,7 @@ const workerSchema = new mongoose.Schema(
     // Earnings tracking
     totalEarnings: { type: Number, default: 0 },
     pendingEarnings: { type: Number, default: 0 }, // From in-progress jobs
+    walletBalance: { type: Number, default: 0 }, // Available balance for withdrawal
   },
   { timestamps: true }
 );

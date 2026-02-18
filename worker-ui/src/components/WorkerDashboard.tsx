@@ -1,20 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Socket } from 'socket.io-client';
-import { 
-  Cpu,  
-  Activity, 
-  CheckCircle, 
-  Clock, 
+import {
+  Cpu,
+  Activity,
+  CheckCircle,
+  Clock,
   FileText,
   LogOut,
   Zap,
   TrendingUp,
   Server,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  Wallet,
+  Settings
 } from 'lucide-react';
-import type { Worker } from '../types';
+import type { Worker, Pricing, Wallet as WalletType, Transaction } from '../types';
+import PricingSettings from './PricingSettings';
+import WalletCard from './WalletCard';
 
 interface WorkerDashboardProps {
   worker: Worker | null;
@@ -23,7 +27,7 @@ interface WorkerDashboardProps {
   onAcceptJob: (jobId: string) => void;
   onSignOut: () => void;
   onRegisterWorker: () => void;
-  socket: Socket | null; // ✅ Added socket prop
+  socket: Socket | null;
 }
 
 interface PendingJob {
@@ -40,12 +44,12 @@ interface WorkerStats {
   currentStatus: 'idle' | 'working' | 'busy' | 'offline';
 }
 
-const WorkerDashboard: React.FC<WorkerDashboardProps> = ({ 
-  worker,  
+const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
+  worker,
   onViewJobDetails,
   onSignOut,
   onRegisterWorker,
-  socket // ✅ Receive socket
+  socket
 }) => {
   const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
   const [loading, setLoading] = useState(true);
@@ -56,31 +60,35 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     currentStatus: 'idle',
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [showPricingSettings, setShowPricingSettings] = useState(false);
+  const [walletData, setWalletData] = useState<WalletType>({
+    balance: 0,
+    totalEarnings: 0,
+    pendingEarnings: 0,
+  });
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [pricing, setPricing] = useState<Pricing>({
+    hourlyRate: 0.10,
+    minimumCharge: 0.05,
+    currency: 'INR',
+  });
 
-  // ✅ Listen for Socket.io events
+  // Listen for Socket.io events
   useEffect(() => {
     if (!socket) return;
 
     console.log('🔌 WorkerDashboard: Setting up socket listeners');
 
-    // Listen for job_accepted event (job was taken by another worker)
     const handleJobAccepted = (data: any) => {
       console.log('📡 WorkerDashboard: Job accepted by another worker:', data);
-      
-      // Remove the accepted job from our list
       setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
     };
 
-    // Listen for job_status_changed
     const handleJobStatusChanged = (data: any) => {
       console.log('📡 WorkerDashboard: Job status changed:', data);
-      
-      // If job became available (status changed to pending/queued), refetch
       if (data.status === 'pending' || data.status === 'queued') {
         fetchPendingJobs();
-      }
-      // If job was assigned/completed, remove from list
-      else if (data.status === 'assigned' || data.status === 'completed') {
+      } else if (data.status === 'assigned' || data.status === 'completed') {
         setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
       }
     };
@@ -88,7 +96,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     socket.on('job_accepted', handleJobAccepted);
     socket.on('job_status_changed', handleJobStatusChanged);
 
-    // ✅ Also listen for custom window event (from App.tsx)
     const handleWindowJobAccepted = (event: any) => {
       const data = event.detail;
       console.log('📡 WorkerDashboard: Window event - job accepted:', data);
@@ -107,15 +114,15 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   useEffect(() => {
     if (worker) {
       console.log("✅ Worker loaded:", worker);
-      console.log("📱 Device ID:", worker.deviceId);
       fetchPendingJobs();
       fetchWorkerStats();
-      
-      // ✅ Reduced interval since Socket.io handles real-time updates
+      fetchWalletAndPricing();
+
       const interval = setInterval(() => {
         fetchPendingJobs();
         fetchWorkerStats();
-      }, 30000); // 30 seconds instead of 10
+        fetchWalletAndPricing();
+      }, 30000);
 
       return () => clearInterval(interval);
     } else {
@@ -126,40 +133,28 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   const fetchPendingJobs = async () => {
     try {
       if (!worker?.deviceId) {
-        console.log("❌ No deviceId found. Worker:", worker);
         setPendingJobs([]);
         setLoading(false);
         setError('Worker device ID missing. Please re-register.');
         return;
       }
 
-      console.log("🔍 Fetching jobs for deviceId:", worker.deviceId);
-
       const response = await fetch(
         `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
         {
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: { 'Content-Type': 'application/json' },
         }
       );
 
-      console.log("📡 Jobs API status:", response.status);
-
       if (response.ok) {
         const data = await response.json();
-        console.log("📦 Jobs data:", data);
-        
         const availableJobs = data.jobs || data.availableJobs || [];
-        
-        console.log("✅ Available jobs:", availableJobs.length);
         setPendingJobs(availableJobs);
         setError('');
       } else {
         const errorText = await response.text();
         console.error('❌ Jobs fetch failed:', response.status, errorText);
         setPendingJobs([]);
-        
         if (response.status === 404) {
           setError('Worker not registered. Please register first.');
         } else {
@@ -196,24 +191,24 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
           'Content-Type': 'application/json',
         },
       });
-      
+
       if (jobsResponse.ok) {
         const jobsData = await jobsResponse.json();
-        
+
         const completedJobs = jobsData.jobs.filter(
-          (job: any) => 
-            job.assignedWorkerId === worker.deviceId && 
+          (job: any) =>
+            job.assignedWorkerId === worker.deviceId &&
             job.status === 'completed'
         );
-        
+
         const totalEarned = completedJobs.length * 5.0;
-        
+
         const hasActiveJob = jobsData.jobs.some(
-          (job: any) => 
-            job.assignedWorkerId === worker.deviceId && 
+          (job: any) =>
+            job.assignedWorkerId === worker.deviceId &&
             (job.status === 'running' || job.status === 'assigned')
         );
-        
+
         setStats({
           totalCompleted: completedJobs.length,
           totalEarned: totalEarned,
@@ -225,10 +220,69 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     }
   };
 
+  const fetchWalletAndPricing = async () => {
+    try {
+      const token = localStorage.getItem("dtrain_worker_token");
+      if (!token) return;
+
+      const pricingRes = await fetch('http://localhost:5000/api/worker/pricing', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (pricingRes.ok) {
+        const data = await pricingRes.json();
+        if (data.pricing) setPricing(data.pricing);
+      }
+
+      const walletRes = await fetch('http://localhost:5000/api/worker/wallet', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (walletRes.ok) {
+        const data = await walletRes.json();
+        setWalletData({
+          balance: data.walletBalance || 0,
+          totalEarnings: data.totalEarnings || 0,
+          pendingEarnings: data.pendingEarnings || 0,
+        });
+        if (data.transactions) setTransactions(data.transactions);
+      }
+    } catch (error) {
+      console.error('Wallet fetch failed:', error);
+    }
+  };
+
+  const handleUpdatePricing = async (rate: number, minCharge: number) => {
+    const token = localStorage.getItem("dtrain_worker_token");
+    if (!token) throw new Error("Not authenticated");
+
+    const res = await fetch('http://localhost:5000/api/worker/pricing', {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({
+        hourlyRate: rate,
+        minimumCharge: minCharge
+      })
+    });
+
+    if (!res.ok) {
+      const data = await res.json();
+      throw new Error(data.message || "Failed to update pricing");
+    }
+
+    const data = await res.json();
+    setPricing(data.pricing);
+    fetchPendingJobs();
+  };
+
   const handleRefresh = () => {
     setIsRefreshing(true);
     fetchPendingJobs();
     fetchWorkerStats();
+    fetchWalletAndPricing();
   };
 
   if (loading) {
@@ -278,9 +332,9 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img 
-                    src="logo.png" 
-                    alt="DTrain Logo" 
+                  <img
+                    src="logo.png"
+                    alt="DTrain Logo"
                     className="w-8 h-8 object-contain"
                   />
                 </div>
@@ -290,6 +344,16 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
+                <motion.button
+                  whileHover={{ y: -2 }}
+                  whileTap={{ y: 0 }}
+                  onClick={() => setShowPricingSettings(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-[#FEF3C7] text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span className="hidden sm:inline">Pricing</span>
+                </motion.button>
+
                 <motion.button
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
@@ -374,6 +438,60 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
             {worker && (
               <>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                  {/* Status Card */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                        <Activity className="w-5 h-5 text-slate-900" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-extrabold text-slate-900 capitalize">
+                          {stats.currentStatus}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-900">Current Status</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Completed Jobs Card */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                        <CheckCircle className="w-5 h-5 text-slate-900" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-extrabold text-slate-900">{stats.totalCompleted}</p>
+                        <p className="text-xs font-semibold text-slate-900">Jobs Completed</p>
+                      </div>
+                    </div>
+                  </motion.div>
+
+                  {/* Total Earned (Stats) Card */}
+                  <motion.div
+                    whileHover={{ y: -2 }}
+                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                        <TrendingUp className="w-5 h-5 text-slate-900" />
+                      </div>
+                      <div>
+                        <p className="text-2xl font-extrabold text-slate-900">
+                          ₹{stats.totalEarned.toFixed(2)}
+                        </p>
+                        <p className="text-xs font-semibold text-slate-900">Session Earnings</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                </div>
+
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] p-6 mb-8">
                   <h2 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
                     <Cpu className="w-5 h-5" />
@@ -405,57 +523,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                       </p>
                     </div>
                   </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  <motion.div 
-                    whileHover={{ y: -2 }}
-                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
-                        <Activity className="w-5 h-5 text-slate-900" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-extrabold text-slate-900 capitalize">
-                          {stats.currentStatus}
-                        </p>
-                        <p className="text-xs font-semibold text-slate-900">Current Status</p>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div 
-                    whileHover={{ y: -2 }}
-                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
-                        <CheckCircle className="w-5 h-5 text-slate-900" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-extrabold text-slate-900">{stats.totalCompleted}</p>
-                        <p className="text-xs font-semibold text-slate-900">Jobs Completed</p>
-                      </div>
-                    </div>
-                  </motion.div>
-
-                  <motion.div 
-                    whileHover={{ y: -2 }}
-                    className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
-                        <TrendingUp className="w-5 h-5 text-slate-900" />
-                      </div>
-                      <div>
-                        <p className="text-2xl font-extrabold text-slate-900">
-                          ${stats.totalEarned.toFixed(2)}
-                        </p>
-                        <p className="text-xs font-semibold text-slate-900">Total Earned</p>
-                      </div>
-                    </div>
-                  </motion.div>
                 </div>
 
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
@@ -540,6 +607,52 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
           </div>
         </div>
       </div>
+
+      <PricingSettings
+        isOpen={showPricingSettings}
+        onClose={() => setShowPricingSettings(false)}
+        currentRate={pricing.hourlyRate}
+        currentMinCharge={pricing.minimumCharge}
+        onUpdate={handleUpdatePricing}
+      />
+
+      {/* Floating Wallet Button */}
+      {worker && (
+        <div className="fixed bottom-6 right-6 z-50">
+          <motion.button
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.9 }}
+            onClick={() => setWalletData({ ...walletData, showModal: true } as any)}
+            className="w-16 h-16 rounded-full bg-[#FFD447] border-[4px] border-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] flex items-center justify-center transition-all hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
+          >
+            <Wallet className="w-8 h-8 text-slate-900" />
+          </motion.button>
+        </div>
+      )}
+
+      {/* Wallet Modal */}
+      {(walletData as any).showModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="relative w-full max-w-2xl"
+          >
+            <button
+              onClick={() => setWalletData({ ...walletData, showModal: false } as any)}
+              className="absolute -top-4 -right-4 z-10 w-10 h-10 rounded-full bg-[#fb7185] border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)] hover:scale-110 transition-transform"
+            >
+              <span className="text-xl font-black text-white">×</span>
+            </button>
+            <WalletCard
+              balance={walletData.balance}
+              totalEarnings={walletData.totalEarnings}
+              pendingEarnings={walletData.pendingEarnings}
+              transactions={transactions}
+            />
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 };

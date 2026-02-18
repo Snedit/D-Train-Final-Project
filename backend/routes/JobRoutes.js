@@ -126,6 +126,7 @@ JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res
     res.status(201).json({
       message: "Request submitted",
       jobId: job._id,
+      success: true,
       estimatedCost: estimatedCost,
       currency: "INR",
     });

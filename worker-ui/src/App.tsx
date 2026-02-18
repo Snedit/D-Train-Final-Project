@@ -36,7 +36,7 @@ function App() {
   // ✅ Initialize Socket.io connection
   useEffect(() => {
     console.log('🔌 Initializing Worker Socket.IO connection...');
-    
+
     const newSocket = io("http://localhost:5000", {
       transports: ["websocket", "polling"],
       reconnection: true,
@@ -61,7 +61,7 @@ function App() {
     // ✅ CRITICAL: Listen for job status changes
     newSocket.on('job_status_changed', (data) => {
       console.log('📡 Worker received job status change:', data);
-      
+
       // If we're viewing this job in JobDetail, it will handle the update
       // If we're in dashboard, WorkerDashboard will refetch
     });
@@ -69,7 +69,7 @@ function App() {
     // ✅ CRITICAL: Listen for job accepted events
     newSocket.on('job_accepted', (data) => {
       console.log('📡 Worker received job accepted:', data);
-      
+
       // This tells us a job was taken - dashboard should refresh
       // Trigger a custom event that WorkerDashboard can listen to
       window.dispatchEvent(new CustomEvent('job_accepted', { detail: data }));
@@ -268,12 +268,12 @@ function App() {
         hasGetDeviceInfo: isElectron,
         userAgent: navigator.userAgent.includes('Electron') ? 'Electron' : 'Browser'
       });
-      
+
       if (isElectron) {
         console.log("⚡ Using Electron device info...");
         const electronInfo = await (window as any).worker.getDeviceInfo();
         console.log("📥 Electron info received:", electronInfo);
-        
+
         deviceInfo = {
           os: electronInfo.os || "Unknown OS",
           cpu: electronInfo.cpu || `${navigator.hardwareConcurrency || 4} cores`,
@@ -282,7 +282,7 @@ function App() {
         };
       } else {
         console.log("🌐 Using browser fallback device info...");
-        
+
         deviceInfo = {
           os: navigator.platform || "Unknown OS",
           cpu: `${navigator.hardwareConcurrency || 4} cores`,
@@ -389,13 +389,13 @@ function App() {
 
   const handleJobStart = (jobId: string) => {
     setCurrentJobId(jobId);
-    
+
     // ✅ Join job room for real-time updates
     if (socket && jobId) {
       socket.emit('join_job', { jobId });
       console.log(`🚪 Worker joined room for job: ${jobId}`);
     }
-    
+
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("runningJob");
@@ -409,7 +409,7 @@ function App() {
       socket.emit('leave_job', { jobId: currentJobId });
       console.log(`🚪 Worker left room for job: ${currentJobId}`);
     }
-    
+
     setCompletedJob(job);
     setIsLoading(true);
     setTimeout(() => {
@@ -425,7 +425,7 @@ function App() {
       socket.emit('leave_job', { jobId });
       console.log(`🚪 Worker left room for job: ${jobId}`);
     }
-    
+
     setCurrentJobId(null);
     setCompletedJob(null);
     setIsLoading(true);
@@ -438,13 +438,13 @@ function App() {
   const handleViewJobDetails = (jobId: string) => {
     setCurrentJobId(jobId);
     setCompletedJob(null);
-    
+
     // ✅ Join job room
     if (socket && jobId) {
       socket.emit('join_job', { jobId });
       console.log(`🚪 Worker joined room for job: ${jobId}`);
     }
-    
+
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("jobDetail");
@@ -668,6 +668,7 @@ function App() {
                 workerId={worker.deviceId}
                 onJobComplete={handleJobComplete}
                 onBack={handleBackToDashboard}
+                socket={socket}
               />
             </motion.div>
           )}
@@ -690,7 +691,7 @@ function App() {
                   jobId={currentJobId!}
                   workerId={worker?.deviceId || ""}
                   onBack={handleBackToDashboard}
-                  onAcceptJob={handleJobStart} 
+                  onAcceptJob={handleJobStart}
                 />
               )}
             </motion.div>

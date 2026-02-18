@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { 
-  Play, 
-  StopCircle, 
-  ArrowLeft, 
+import { Socket } from 'socket.io-client';
+import {
+  Play,
+  StopCircle,
+  ArrowLeft,
   Terminal,
   Search,
   CheckCircle,
@@ -19,7 +20,9 @@ import {
   XCircle,
   AlertTriangle,
   Smartphone,
-  Bot
+  Bot,
+  DollarSign,
+  Clock
 } from 'lucide-react';
 import type { Job } from '../types';
 
@@ -28,6 +31,7 @@ interface RunningJobsProps {
   workerId: string;
   onJobComplete?: (job: Job) => void;
   onBack: () => void;
+  socket: Socket | null;
 }
 
 // Map icon tags to actual Lucide components
@@ -59,17 +63,17 @@ const iconMap: Record<string, React.ReactNode> = {
 const parseLogLine = (line: string): React.ReactNode => {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
-  
+
   // Find all icon tags in the line
   const regex = /\[(SEARCH|OK|INFO|DOWNLOAD|EXTRACT|DOCKER|RUN|START|OUTPUT|FILE|CLOUD|UPLOAD|LINK|CLEAN|SUCCESS|ERROR|WARN|DEVICE|WORKER|PACKAGE|CLIPBOARD)\]/g;
   let match;
-  
+
   while ((match = regex.exec(line)) !== null) {
     // Add text before the icon
     if (match.index > lastIndex) {
       parts.push(line.substring(lastIndex, match.index));
     }
-    
+
     // Add the icon
     const iconKey = match[0];
     parts.push(
@@ -77,23 +81,25 @@ const parseLogLine = (line: string): React.ReactNode => {
         {iconMap[iconKey]}
       </span>
     );
-    
+
     lastIndex = match.index + match[0].length;
   }
-  
+
   // Add remaining text
   if (lastIndex < line.length) {
     parts.push(line.substring(lastIndex));
   }
-  
+
   return parts.length > 0 ? parts : line;
 };
 
-const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplete, onBack }) => {
+const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplete, onBack, socket }) => {
   const [logs, setLogs] = useState<string[]>(['> dtrain-worker ready\n> waiting for job...']);
   const [isRunning, setIsRunning] = useState(false);
   const [isCompleted, setIsCompleted] = useState(false);
   const [job, setJob] = useState<any>(null);
+  const [currentCost, setCurrentCost] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
   const logsRef = useRef<HTMLDivElement>(null);
   const logListenerRef = useRef<((data: string) => void) | null>(null);
 
@@ -101,10 +107,28 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     logsRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, []);
 
+  // Listen for real-time cost updates
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCostUpdate = (data: any) => {
+      if (data.jobId === jobId) {
+        setCurrentCost(data.currentCost);
+        setElapsedTime(data.elapsedSeconds);
+      }
+    };
+
+    socket.on('job:cost_update', handleCostUpdate);
+
+    return () => {
+      socket.off('job:cost_update', handleCostUpdate);
+    };
+  }, [socket, jobId]);
+
   useEffect(() => {
     scrollToBottom();
     console.log('[SEARCH] Fetching job details for:', jobId);
-    
+
     fetch(`http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${workerId}`, {
       headers: { 'Content-Type': 'application/json' }
     })
@@ -117,6 +141,12 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
         const jobData = data.job || data;
         setJob(jobData);
         setLogs(prev => [...prev, `\n[INFO] Job: ${jobData.title || 'Untitled'}\n`]);
+
+        // Initial cost/time if available
+        if (jobData.pricing) {
+          setCurrentCost(jobData.pricing.actualCost || jobData.pricing.estimatedCost || 0);
+          if (jobData.pricing.durationSeconds) setElapsedTime(jobData.pricing.durationSeconds);
+        }
       })
       .catch(err => {
         console.error('[ERROR] Job fetch failed:', err);
@@ -134,38 +164,38 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
 
   const handleStart = async () => {
     if (isRunning || isCompleted) return;
-    
+
     console.log('[START] START JOB CLICKED - worker exists?', !!(window as any).worker);
-    
+
     if (!(window as any).worker) {
       setLogs(prev => [...prev, '\n[ERROR] Worker runtime not available (run in Electron)']);
       console.error('[ERROR] window.worker not found - must run in Electron');
       return;
     }
-    
+
     setIsRunning(true);
     setLogs(prev => [...prev, `\n> Starting job ${jobId.slice(-8)}...\n`]);
-    
+
     const logListener = (data: string) => {
       console.log('[INFO] Log received:', data.trim());
       setLogs(prev => [...prev, data.replace(/\n$/, '')]);
       scrollToBottom();
     };
-    
+
     logListenerRef.current = logListener;
-    
+
     if ((window as any).worker.onLog) {
       console.log('[LINK] Setting up log listener');
       (window as any).worker.onLog(logListener);
     }
-    
+
     try {
       console.log('[CLOUD] Calling Electron: runTestJob(', jobId, ', workerId:', workerId, ')');
       const result = await (window as any).worker.runTestJob(jobId, workerId);
       console.log('[DOWNLOAD] Electron result:', result);
-      
+
       setIsCompleted(true);
-      
+
       if (result.success && onJobComplete && job) {
         console.log('[OK] Calling onJobComplete');
         onJobComplete({ ...job, status: 'completed' });
@@ -184,12 +214,18 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     setLogs(prev => [...prev, '\n> [WARN] Press Ctrl+C in Docker terminal or restart app to stop']);
   };
 
+  const formatDuration = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-5xl mx-auto">
         <div className="relative">
           {/* Grid background card */}
-          <div 
+          <div
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
               backgroundImage: `
@@ -201,28 +237,28 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
           />
 
           {/* Memphis shapes */}
-          <motion.div 
+          <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
-            animate={{ 
+            animate={{
               rotate: [0, 15, -15, 0],
               scale: [1, 1.1, 1]
             }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 4, 
-              ease: "easeInOut" 
+            transition={{
+              repeat: Infinity,
+              duration: 4,
+              ease: "easeInOut"
             }}
           >
             <Play className="w-8 h-8 text-slate-900" />
           </motion.div>
 
-          <motion.div 
+          <motion.div
             className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#FFD447]"
             animate={{ y: [0, -6, 0] }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 5, 
-              ease: "easeInOut" 
+            transition={{
+              repeat: Infinity,
+              duration: 5,
+              ease: "easeInOut"
             }}
           />
 
@@ -250,14 +286,39 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
               </motion.button>
             </nav>
 
-            {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
-                Running Job
-              </h1>
-              <p className="text-sm text-slate-700 font-medium font-mono">
-                worker@{workerId.slice(-8)} · job-{jobId.slice(-8)}
-              </p>
+            {/* Header & Stats */}
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-8">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
+                  Running Job
+                </h1>
+                <p className="text-sm text-slate-700 font-medium font-mono">
+                  worker@{workerId.slice(-8)} · job-{jobId.slice(-8)}
+                </p>
+              </div>
+
+              {/* Live Stats */}
+              <div className="flex items-center gap-4">
+                <div className="px-5 py-3 rounded-[14px] bg-[#FEF3C7] border-[3px] border-slate-900 flex items-center gap-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <div className="w-10 h-10 rounded-full bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                    <DollarSign className="w-5 h-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Current Cost</p>
+                    <p className="text-xl font-black text-slate-900">₹{currentCost.toFixed(4)}</p>
+                  </div>
+                </div>
+
+                <div className="px-5 py-3 rounded-[14px] bg-[#DCFCE7] border-[3px] border-slate-900 flex items-center gap-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <div className="w-10 h-10 rounded-full bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                    <Clock className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-slate-500 uppercase">Duration</p>
+                    <p className="text-xl font-black text-slate-900">{formatDuration(elapsedTime)}</p>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Terminal Section */}
@@ -277,17 +338,16 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
                     <p className="text-xs text-slate-700">Real-time execution logs</p>
                   </div>
                 </div>
-                <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${
-                  isCompleted 
-                    ? 'bg-[#4ADE80] text-slate-900' 
-                    : isRunning 
-                    ? 'bg-[#7CF2D0] text-slate-900' 
-                    : 'bg-[#FFE66D] text-slate-900'
-                }`}>
+                <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${isCompleted
+                    ? 'bg-[#4ADE80] text-slate-900'
+                    : isRunning
+                      ? 'bg-[#7CF2D0] text-slate-900'
+                      : 'bg-[#FFE66D] text-slate-900'
+                  }`}>
                   {isCompleted ? '✓ COMPLETED' : isRunning ? '▶ RUNNING' : '○ READY'}
                 </div>
               </div>
-              
+
               <div className="h-96 p-4 bg-slate-900 font-mono text-xs overflow-y-auto">
                 {logs.map((log, i) => (
                   <div key={i} className="text-[#7CF2D0] whitespace-pre-wrap mb-1 flex items-start">

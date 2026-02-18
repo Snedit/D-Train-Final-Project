@@ -5,7 +5,7 @@ import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
 import { supabase } from "../utils/supabaseClient.js";
 import AdmZip from "adm-zip";
-import { calculateEstimatedCost, reserveFunds } from "../utils/paymentHelpers.js";
+import { calculateEstimatedCost, reserveFunds, calculateActualCost, chargeFunds, creditWorkerWallet } from "../utils/paymentHelpers.js";
 
 const WorkerRouter = Router();
 
@@ -143,6 +143,7 @@ WorkerRouter.post("/metrics", async (req, res) => {
 });
 
 // POST /complete - Worker uploads final model
+// POST /complete - Worker uploads final model
 WorkerRouter.post("/complete", async (req, res) => {
   try {
     const { jobId, modelUrl, logsUrl } = req.body;
@@ -150,16 +151,57 @@ WorkerRouter.post("/complete", async (req, res) => {
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
+    // ✅ Calculate final cost
+    const startTime = job.pricing.startTime || job.createdAt;
+    const endTime = new Date();
+    const workerRate = job.pricing.workerRate || 0.10;
+
+    // Calculate actual cost
+    const { cost: actualCost, durationSeconds } = calculateActualCost(
+      workerRate,
+      startTime,
+      endTime,
+      0.05 // Minimum charge
+    );
+
+    console.log(`💰 Job ${jobId} completed. Cost: ₹${actualCost} (${durationSeconds}s)`);
+
+    // ✅ Process Payment
+    // 1. Charge user (already reserved, but finalizing record)
+    await chargeFunds(job.userId, actualCost, jobId, null); // passing null for workerId as we do explicit credit next
+
+    // 2. Credit worker wallet
+    if (job.assignedWorkerId) {
+      const worker = await Worker.findOne({ deviceId: job.assignedWorkerId });
+      if (worker) {
+        await creditWorkerWallet(worker._id, actualCost, jobId);
+        console.log(`💸 Credited ₹${actualCost} to worker ${worker.deviceId}`);
+      }
+    }
+
+    // Update job status and pricing
     job.status = "completed";
     job.modelUrl = modelUrl;
     job.logsUrl = logsUrl;
-    job.completedAt = Date.now();
+    job.completedAt = endTime;
+    job.pricing.actualCost = actualCost;
+    job.pricing.endTime = endTime;
+    job.pricing.durationSeconds = durationSeconds;
+    job.paymentStatus = "charged";
+
     await job.save();
 
-    res.json({ message: "Job marked completed", job });
+    res.json({
+      message: "Job marked completed and payment processed",
+      job,
+      payment: {
+        cost: actualCost,
+        duration: durationSeconds
+      }
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Job completion error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -561,6 +603,7 @@ WorkerRouter.get("/earnings", authMiddleware, async (req, res) => {
     res.json({
       totalEarnings: worker.totalEarnings,
       pendingEarnings: worker.pendingEarnings,
+      walletBalance: worker.walletBalance,
       totalJobsCompleted: worker.totalJobsCompleted,
       pricing: worker.pricing,
       completedJobs: completedJobs.map(job => ({
@@ -578,6 +621,44 @@ WorkerRouter.get("/earnings", authMiddleware, async (req, res) => {
     });
   } catch (err) {
     console.error("Get earnings error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ✅ GET /wallet - Get worker's wallet balance and transactions
+WorkerRouter.get("/wallet", authMiddleware, async (req, res) => {
+  try {
+    const worker = await Worker.findOne({ userId: req.user.userId });
+
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found" });
+    }
+
+    // Get worker's transactions
+    const Transaction = (await import("../schemas/TransactionSchema.js")).default;
+    const transactions = await Transaction.find({
+      workerId: worker._id,
+    })
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .populate("jobId", "title");
+
+    res.json({
+      walletBalance: worker.walletBalance,
+      totalEarnings: worker.totalEarnings,
+      pendingEarnings: worker.pendingEarnings,
+      transactions: transactions.map(tx => ({
+        id: tx._id,
+        type: tx.type,
+        amount: tx.amount,
+        status: tx.status,
+        description: tx.description,
+        jobTitle: tx.jobId?.title || "N/A",
+        createdAt: tx.createdAt,
+      })),
+    });
+  } catch (err) {
+    console.error("Get wallet error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });

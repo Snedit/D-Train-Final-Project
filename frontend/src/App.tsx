@@ -162,7 +162,11 @@ function App() {
 
   const fetchWorkers = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/workers");
+      const response = await fetch("http://localhost:5000/api/worker", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("dtrain_token")}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -259,7 +263,7 @@ function App() {
 
       const data = await response.json();
 
-      if (response.ok) {
+      if (data.success) {
         await fetchJobs();
         setIsLoading(true);
         setTimeout(() => {
