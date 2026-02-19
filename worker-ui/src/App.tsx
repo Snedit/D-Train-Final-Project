@@ -11,6 +11,10 @@ import JobDetail from "./components/JobDetail";
 import Documentation from "./components/Documentation";
 import type { Worker as WorkerType, Job } from "./types";
 
+const API_BASE = "http://localhost:5000";
+const TOKEN_KEY = "dtrain_worker_token";
+const WORKER_KEY = "dtrain_worker";
+
 function App() {
   const [currentView, setCurrentView] = useState<
     | "hero"
@@ -30,89 +34,157 @@ function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [socket, setSocket] = useState<Socket | null>(null);
 
-  const TOKEN_KEY = "dtrain_worker_token";
-  const WORKER_KEY = "dtrain_worker";
-
   // ✅ Initialize Socket.io connection
   useEffect(() => {
-    console.log('🔌 Initializing Worker Socket.IO connection...');
+    console.log("🔌 Initializing Worker Socket.IO connection...");
 
-    const newSocket = io("http://localhost:5000", {
+    const newSocket = io(API_BASE, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
     });
 
-    // Connection handlers
-    newSocket.on('connect', () => {
-      console.log('✅ Worker Socket connected:', newSocket.id);
+    newSocket.on("connect", () => {
+      console.log("✅ Worker Socket connected:", newSocket.id);
+
+      // ✅ On every (re)connect: register the worker socket with the server
+      // AND immediately send a heartbeat so server marks us online right away
+      const savedWorker = localStorage.getItem(WORKER_KEY);
+      if (savedWorker) {
+        try {
+          const w: WorkerType = JSON.parse(savedWorker);
+          if (w?.deviceId) {
+            // Tell server which worker owns this socket
+            newSocket.emit("register_worker", { deviceId: w.deviceId });
+            console.log("📋 Registered worker socket on connect:", w.deviceId);
+
+            // Immediately send a heartbeat so server flips status to online instantly
+            fetch(`${API_BASE}/api/worker/heartbeat`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ deviceId: w.deviceId }),
+            }).catch((err) => console.error("❌ Reconnect heartbeat failed:", err));
+          }
+        } catch {
+          // ignore JSON parse errors from corrupted storage
+        }
+      }
     });
 
-    newSocket.on('disconnect', (reason) => {
-      console.log('⚠️ Worker Socket disconnected:', reason);
+    newSocket.on("disconnect", (reason) => {
+      console.log("⚠️ Worker Socket disconnected:", reason);
     });
 
-    newSocket.on('connect_error', (error) => {
-      console.error('❌ Worker Socket connection error:', error);
+    newSocket.on("connect_error", (error) => {
+      console.error("❌ Worker Socket connection error:", error);
     });
 
-    // ✅ CRITICAL: Listen for job status changes
-    newSocket.on('job_status_changed', (data) => {
-      console.log('📡 Worker received job status change:', data);
-
-      // If we're viewing this job in JobDetail, it will handle the update
-      // If we're in dashboard, WorkerDashboard will refetch
+    newSocket.on("job_status_changed", (data) => {
+      console.log("📡 Worker received job status change:", data);
     });
 
-    // ✅ CRITICAL: Listen for job accepted events
-    newSocket.on('job_accepted', (data) => {
-      console.log('📡 Worker received job accepted:', data);
+    newSocket.on("job_accepted", (data) => {
+      console.log("📡 Worker received job accepted:", data);
+      window.dispatchEvent(new CustomEvent("job_accepted", { detail: data }));
+    });
 
-      // This tells us a job was taken - dashboard should refresh
-      // Trigger a custom event that WorkerDashboard can listen to
-      window.dispatchEvent(new CustomEvent('job_accepted', { detail: data }));
+    // ✅ Server marks this worker offline — update local state immediately
+    newSocket.on("worker_status_changed", (data) => {
+      console.log("📡 Worker status changed:", data);
+      setWorker((prev) => {
+        if (!prev) return prev;
+        if (prev._id === data.workerId || prev.deviceId === data.deviceId) {
+          console.log(`📴 This worker marked ${data.status} by server`);
+          return { ...prev, currentStatus: data.status, status: data.status };
+        }
+        return prev;
+      });
     });
 
     setSocket(newSocket);
 
     return () => {
-      console.log('🧹 Cleaning up Worker Socket.IO connection');
-      newSocket.off('connect');
-      newSocket.off('disconnect');
-      newSocket.off('connect_error');
-      newSocket.off('job_status_changed');
-      newSocket.off('job_accepted');
+      console.log("🧹 Cleaning up Worker Socket.IO connection");
+      newSocket.off("connect");
+      newSocket.off("disconnect");
+      newSocket.off("connect_error");
+      newSocket.off("job_status_changed");
+      newSocket.off("job_accepted");
+      newSocket.off("worker_status_changed");
       newSocket.close();
     };
   }, []);
 
-  // Check if user is already logged in on mount
+  // ✅ Re-register socket with server whenever worker state changes
+  // (covers the case where worker logs in after the socket was already open)
+  useEffect(() => {
+    if (socket && worker?.deviceId && socket.connected) {
+      socket.emit("register_worker", { deviceId: worker.deviceId });
+      console.log("📋 Re-registered worker socket after worker state update:", worker.deviceId);
+    }
+  }, [worker?.deviceId, socket]);
+
+  // ✅ Periodic heartbeat — keeps worker marked online every 25s.
+  // Server marks offline after 60s without a heartbeat, so 25s is a safe interval.
+  // Also fires immediately on mount so status is correct right away.
+  useEffect(() => {
+    if (!worker?.deviceId) return;
+
+    console.log("💓 Starting heartbeat for worker:", worker.deviceId);
+
+    const sendHeartbeat = async () => {
+      try {
+        await fetch(`${API_BASE}/api/worker/heartbeat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deviceId: worker.deviceId }),
+        });
+        console.log("💓 Heartbeat sent for:", worker.deviceId);
+      } catch (err) {
+        console.error("❌ Heartbeat failed:", err);
+      }
+    };
+
+    // Fire immediately so status is online the moment the worker mounts
+    sendHeartbeat();
+
+    const heartbeatInterval = setInterval(sendHeartbeat, 25000);
+
+    return () => {
+      console.log("🛑 Stopping heartbeat for worker:", worker.deviceId);
+      clearInterval(heartbeatInterval);
+    };
+  }, [worker?.deviceId]);
+
+  // ✅ Check if user is already logged in on mount
   useEffect(() => {
     const savedToken = localStorage.getItem(TOKEN_KEY);
     const savedWorker = localStorage.getItem(WORKER_KEY);
 
     if (savedToken && savedWorker) {
-      setIsAuthenticated(true);
-      setWorker(JSON.parse(savedWorker));
-      setCurrentView("dashboard");
+      try {
+        const parsedWorker: WorkerType = JSON.parse(savedWorker);
+        setIsAuthenticated(true);
+        setWorker(parsedWorker);
+        setCurrentView("dashboard");
+      } catch {
+        // corrupted storage — clear and start fresh
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(WORKER_KEY);
+      }
     }
   }, []);
 
   const checkExistingWorker = async (
-    token: string
+    token: string,
   ): Promise<WorkerType | null> => {
     try {
-      const response = await fetch(
-        "http://localhost:5000/api/worker/my-worker",
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE}/api/worker/my-worker`, {
+        method: "GET",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -120,12 +192,15 @@ function App() {
           const workerObj: WorkerType = {
             _id: data.worker._id,
             deviceId: data.worker.deviceId,
+            currentStatus: data.worker.currentStatus || "online",
+            status: data.worker.currentStatus || "online",
             os: data.worker.systemInfo?.os || "Unknown",
             cpu: data.worker.systemInfo?.cpu || "Unknown",
             ram: data.worker.systemInfo?.ram || "Unknown",
             gpu: data.worker.systemInfo?.gpu || "N/A",
-            status: data.worker.currentStatus || "online",
-            lastHeartbeat: new Date(data.worker.lastHeartbeatAt).getTime(),
+            lastHeartbeatAt: data.worker.lastHeartbeatAt
+              ? new Date(data.worker.lastHeartbeatAt).getTime()
+              : undefined,
             createdAt: data.worker.createdAt,
           };
           return workerObj;
@@ -141,11 +216,7 @@ function App() {
   const handleGetStarted = () => {
     setIsLoading(true);
     setTimeout(() => {
-      if (isAuthenticated) {
-        setCurrentView("dashboard");
-      } else {
-        setCurrentView("signin");
-      }
+      setCurrentView(isAuthenticated ? "dashboard" : "signin");
       setIsLoading(false);
     }, 800);
   };
@@ -168,17 +239,14 @@ function App() {
 
   const handleSignIn = async (email: string, password: string) => {
     try {
-      const loginRes = await fetch("http://localhost:5000/api/user/login", {
+      const loginRes = await fetch(`${API_BASE}/api/user/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
       const loginData = await loginRes.json();
-
-      if (!loginRes.ok) {
-        throw new Error(loginData.message || "Login failed");
-      }
+      if (!loginRes.ok) throw new Error(loginData.message || "Login failed");
 
       localStorage.setItem(TOKEN_KEY, loginData.token);
       setIsAuthenticated(true);
@@ -204,25 +272,20 @@ function App() {
   const handleSignUp = async (
     name: string,
     email: string,
-    password: string
+    password: string,
   ) => {
     try {
       setIsLoading(true);
 
-      const registerRes = await fetch(
-        "http://localhost:5000/api/user/register",
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password }),
-        }
-      );
+      const registerRes = await fetch(`${API_BASE}/api/user/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, password }),
+      });
 
       const registerData = await registerRes.json();
-
-      if (!registerRes.ok) {
+      if (!registerRes.ok)
         throw new Error(registerData.message || "Registration failed");
-      }
 
       if (registerData.token) {
         localStorage.setItem(TOKEN_KEY, registerData.token);
@@ -250,30 +313,25 @@ function App() {
   const handleWorkerRegister = async () => {
     try {
       const token = localStorage.getItem(TOKEN_KEY);
+      if (!token) throw new Error("Please sign in first");
 
-      if (!token) {
-        throw new Error("Please sign in first");
-      }
+      let deviceInfo: { os: string; cpu: string; ram: string; gpu: string };
 
-      let deviceInfo: {
-        os: string;
-        cpu: string;
-        ram: string;
-        gpu: string;
-      };
+      const isElectron =
+        (window as any).worker &&
+        typeof (window as any).worker.getDeviceInfo === "function";
 
-      const isElectron = (window as any).worker && typeof (window as any).worker.getDeviceInfo === 'function';
       console.log("🔍 Environment check:", {
         hasWorkerAPI: !!(window as any).worker,
         hasGetDeviceInfo: isElectron,
-        userAgent: navigator.userAgent.includes('Electron') ? 'Electron' : 'Browser'
+        userAgent: navigator.userAgent.includes("Electron")
+          ? "Electron"
+          : "Browser",
       });
 
       if (isElectron) {
         console.log("⚡ Using Electron device info...");
         const electronInfo = await (window as any).worker.getDeviceInfo();
-        console.log("📥 Electron info received:", electronInfo);
-
         deviceInfo = {
           os: electronInfo.os || "Unknown OS",
           cpu: electronInfo.cpu || `${navigator.hardwareConcurrency || 4} cores`,
@@ -282,7 +340,6 @@ function App() {
         };
       } else {
         console.log("🌐 Using browser fallback device info...");
-
         deviceInfo = {
           os: navigator.platform || "Unknown OS",
           cpu: `${navigator.hardwareConcurrency || 4} cores`,
@@ -291,59 +348,48 @@ function App() {
         };
       }
 
-      const deviceId = `device-${Date.now()}-${Math.random()
-        .toString(36)
-        .substr(2, 9)}`;
+      const deviceId = `device-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
-      console.log("📤 Sending device info to backend:", {
-        deviceId,
-        ...deviceInfo,
+      const registerRes = await fetch(`${API_BASE}/api/worker/register`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          deviceId,
+          os: deviceInfo.os,
+          cpu: deviceInfo.cpu,
+          ram: deviceInfo.ram,
+          gpu: deviceInfo.gpu,
+        }),
       });
 
-      const registerRes = await fetch(
-        "http://localhost:5000/api/worker/register",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            deviceId,
-            os: deviceInfo.os,
-            cpu: deviceInfo.cpu,
-            ram: deviceInfo.ram,
-            gpu: deviceInfo.gpu,
-          }),
-        }
-      );
-
       const workerData = await registerRes.json();
-
-      if (!registerRes.ok) {
+      if (!registerRes.ok)
         throw new Error(workerData.message || "Worker registration failed");
-      }
-
-      console.log("Worker registered successfully:", workerData);
 
       const workerObj: WorkerType = {
         _id: workerData.worker._id,
         deviceId: workerData.worker.deviceId,
+        currentStatus: workerData.worker.currentStatus || "online",
+        status: workerData.worker.currentStatus || "online",
         os: deviceInfo.os,
         cpu: deviceInfo.cpu,
         ram: deviceInfo.ram,
         gpu: deviceInfo.gpu,
-        status: workerData.worker.currentStatus || "online",
-        lastHeartbeat: Date.now(),
+        lastHeartbeatAt: Date.now(),
         createdAt: workerData.worker.createdAt || new Date().toISOString(),
       };
 
       setWorker(workerObj);
       localStorage.setItem(WORKER_KEY, JSON.stringify(workerObj));
 
-      // ✅ Store deviceId in Electron if available
-      if ((window as any).worker && typeof (window as any).worker.setDeviceId === 'function') {
-        console.log('💾 Storing deviceId in Electron:', workerData.worker.deviceId);
+      if (
+        (window as any).worker &&
+        typeof (window as any).worker.setDeviceId === "function"
+      ) {
+        console.log("💾 Storing deviceId in Electron:", workerData.worker.deviceId);
         await (window as any).worker.setDeviceId(workerData.worker.deviceId);
       }
 
@@ -363,7 +409,6 @@ function App() {
     setWorker(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(WORKER_KEY);
-
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("hero");
@@ -389,13 +434,10 @@ function App() {
 
   const handleJobStart = (jobId: string) => {
     setCurrentJobId(jobId);
-
-    // ✅ Join job room for real-time updates
     if (socket && jobId) {
-      socket.emit('join_job', { jobId });
+      socket.emit("join_job", { jobId });
       console.log(`🚪 Worker joined room for job: ${jobId}`);
     }
-
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("runningJob");
@@ -404,12 +446,10 @@ function App() {
   };
 
   const handleJobComplete = (job: Job) => {
-    // ✅ Leave job room
     if (socket && currentJobId) {
-      socket.emit('leave_job', { jobId: currentJobId });
+      socket.emit("leave_job", { jobId: currentJobId });
       console.log(`🚪 Worker left room for job: ${currentJobId}`);
     }
-
     setCompletedJob(job);
     setIsLoading(true);
     setTimeout(() => {
@@ -419,13 +459,11 @@ function App() {
   };
 
   const handleBackToDashboard = () => {
-    // ✅ Leave job room if we're viewing one
     if (socket && (currentJobId || completedJob?._id)) {
       const jobId = currentJobId || completedJob?._id;
-      socket.emit('leave_job', { jobId });
+      socket.emit("leave_job", { jobId });
       console.log(`🚪 Worker left room for job: ${jobId}`);
     }
-
     setCurrentJobId(null);
     setCompletedJob(null);
     setIsLoading(true);
@@ -438,13 +476,10 @@ function App() {
   const handleViewJobDetails = (jobId: string) => {
     setCurrentJobId(jobId);
     setCompletedJob(null);
-
-    // ✅ Join job room
     if (socket && jobId) {
-      socket.emit('join_job', { jobId });
+      socket.emit("join_job", { jobId });
       console.log(`🚪 Worker joined room for job: ${jobId}`);
     }
-
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("jobDetail");
@@ -511,41 +546,21 @@ function App() {
                 <span className="text-lg font-extrabold text-slate-900 mr-2">
                   Loading DTrain Worker
                 </span>
-                <motion.span
-                  animate={{ scale: [1, 1.3, 1] }}
-                  transition={{
-                    duration: 0.6,
-                    repeat: Infinity,
-                    repeatDelay: 0.2,
-                  }}
-                  className="text-xl"
-                >
-                  .
-                </motion.span>
-                <motion.span
-                  animate={{ scale: [1, 1.3, 1] }}
-                  transition={{
-                    duration: 0.6,
-                    repeat: Infinity,
-                    repeatDelay: 0.2,
-                    delay: 0.2,
-                  }}
-                  className="text-xl"
-                >
-                  .
-                </motion.span>
-                <motion.span
-                  animate={{ scale: [1, 1.3, 1] }}
-                  transition={{
-                    duration: 0.6,
-                    repeat: Infinity,
-                    repeatDelay: 0.2,
-                    delay: 0.4,
-                  }}
-                  className="text-xl"
-                >
-                  .
-                </motion.span>
+                {[0, 0.2, 0.4].map((delay, i) => (
+                  <motion.span
+                    key={i}
+                    animate={{ scale: [1, 1.3, 1] }}
+                    transition={{
+                      duration: 0.6,
+                      repeat: Infinity,
+                      repeatDelay: 0.2,
+                      delay,
+                    }}
+                    className="text-xl"
+                  >
+                    .
+                  </motion.span>
+                ))}
               </motion.div>
             </div>
           </motion.div>

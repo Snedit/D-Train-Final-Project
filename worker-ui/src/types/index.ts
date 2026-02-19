@@ -28,11 +28,14 @@ export interface Worker {
   ram: string;
   gpu: string;
   status: string;
-  lastHeartbeat: number;
+  currentStatus: string;        // ✅ Added — used by App.tsx and socket events
+  lastHeartbeatAt?: number;     // ✅ Renamed from lastHeartbeat to match backend + App.tsx
   createdAt: string;
   pricing?: Pricing;
   walletBalance?: number;
   totalEarnings?: number;
+  pendingEarnings?: number;     // ✅ Added — returned by /earnings and /wallet endpoints
+  totalJobsCompleted?: number;  // ✅ Added — returned by /earnings endpoint
 }
 
 export interface Job {

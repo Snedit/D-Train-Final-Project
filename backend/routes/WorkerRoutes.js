@@ -9,19 +9,20 @@ import { calculateEstimatedCost, reserveFunds, calculateActualCost, chargeFunds,
 
 const WorkerRouter = Router();
 
-// ✅ HELPER: Optional authentication middleware
-const optionalAuth = (req, res, next) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-
-  if (token) {
-    return authMiddleware(req, res, next);
-  }
-
-  req.user = null;
-  next();
+// ✅ HELPER: Emit worker online status change if worker was previously offline
+// Call this anywhere a worker proves it's alive (heartbeat, register, available-jobs poll)
+const emitWorkerOnline = (io, worker) => {
+  if (!io) return;
+  io.emit("worker_status_changed", {
+    workerId: worker._id,
+    deviceId: worker.deviceId,
+    status: "online",
+    timestamp: new Date().toISOString()
+  });
+  console.log(`📡 Emitted worker online: ${worker.deviceId}`);
 };
 
-// GET / - Fetch all workers (admin endpoint - keep auth)
+// GET / - Fetch all workers (admin endpoint)
 WorkerRouter.get("/", authMiddleware, async (req, res) => {
   try {
     const workers = await Worker.find();
@@ -32,7 +33,7 @@ WorkerRouter.get("/", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ GET /available-jobs - Remove authMiddleware for workers
+// ✅ GET /available-jobs - Worker polls for jobs (also acts as a lightweight heartbeat)
 WorkerRouter.get("/available-jobs", async (req, res) => {
   try {
     const { deviceId } = req.query;
@@ -47,9 +48,17 @@ WorkerRouter.get("/available-jobs", async (req, res) => {
         });
       }
 
+      const wasOffline = worker.currentStatus === "offline";
+
       worker.lastHeartbeatAt = Date.now();
       worker.currentStatus = "online";
       await worker.save();
+
+      // ✅ If worker was offline, emit online event so user UI updates instantly
+      if (wasOffline) {
+        const io = req.app.get("io");
+        emitWorkerOnline(io, worker);
+      }
     }
 
     const availableJobs = await Job.find({
@@ -80,7 +89,7 @@ WorkerRouter.get("/available-jobs", async (req, res) => {
   }
 });
 
-// POST /register - Worker registration with authentication
+// ✅ POST /register - Worker registration
 WorkerRouter.post("/register", authMiddleware, async (req, res) => {
   try {
     const { deviceId, os, cpu, ram, gpu } = req.body;
@@ -91,6 +100,10 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
     if (!deviceId) {
       return res.status(400).json({ message: "deviceId required" });
     }
+
+    // Check if worker existed and was offline before upserting
+    const existingWorker = await Worker.findOne({ deviceId });
+    const wasOffline = existingWorker?.currentStatus === "offline";
 
     const worker = await Worker.findOneAndUpdate(
       { deviceId },
@@ -110,6 +123,11 @@ WorkerRouter.post("/register", authMiddleware, async (req, res) => {
     );
 
     console.log("Worker created/updated:", worker);
+
+    // ✅ Emit online event so user UI updates instantly on registration
+    const io = req.app.get("io");
+    emitWorkerOnline(io, worker);
+
     res.status(201).json({
       message: "Worker registered successfully",
       worker,
@@ -143,7 +161,6 @@ WorkerRouter.post("/metrics", async (req, res) => {
 });
 
 // POST /complete - Worker uploads final model
-// POST /complete - Worker uploads final model
 WorkerRouter.post("/complete", async (req, res) => {
   try {
     const { jobId, modelUrl, logsUrl } = req.body;
@@ -151,26 +168,21 @@ WorkerRouter.post("/complete", async (req, res) => {
     const job = await Job.findById(jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
 
-    // ✅ Calculate final cost
     const startTime = job.pricing.startTime || job.createdAt;
     const endTime = new Date();
     const workerRate = job.pricing.workerRate || 0.10;
 
-    // Calculate actual cost
     const { cost: actualCost, durationSeconds } = calculateActualCost(
       workerRate,
       startTime,
       endTime,
-      0.05 // Minimum charge
+      0.05
     );
 
     console.log(`💰 Job ${jobId} completed. Cost: ₹${actualCost} (${durationSeconds}s)`);
 
-    // ✅ Process Payment
-    // 1. Charge user (already reserved, but finalizing record)
-    await chargeFunds(job.userId, actualCost, jobId, null); // passing null for workerId as we do explicit credit next
+    await chargeFunds(job.userId, actualCost, jobId, null);
 
-    // 2. Credit worker wallet
     if (job.assignedWorkerId) {
       const worker = await Worker.findOne({ deviceId: job.assignedWorkerId });
       if (worker) {
@@ -179,7 +191,6 @@ WorkerRouter.post("/complete", async (req, res) => {
       }
     }
 
-    // Update job status and pricing
     job.status = "completed";
     job.modelUrl = modelUrl;
     job.logsUrl = logsUrl;
@@ -194,10 +205,7 @@ WorkerRouter.post("/complete", async (req, res) => {
     res.json({
       message: "Job marked completed and payment processed",
       job,
-      payment: {
-        cost: actualCost,
-        duration: durationSeconds
-      }
+      payment: { cost: actualCost, duration: durationSeconds }
     });
   } catch (err) {
     console.error("Job completion error:", err);
@@ -205,7 +213,7 @@ WorkerRouter.post("/complete", async (req, res) => {
   }
 });
 
-// ✅ UPDATED: POST /push-log - Stream logs with Socket.IO
+// ✅ POST /push-log - Stream logs with Socket.IO
 WorkerRouter.post("/push-log", async (req, res) => {
   try {
     const { jobId, deviceId, line } = req.body;
@@ -216,7 +224,6 @@ WorkerRouter.post("/push-log", async (req, res) => {
       });
     }
 
-    // ✅ Save log to database
     const job = await Job.findByIdAndUpdate(
       jobId,
       { $push: { logs: line } },
@@ -227,7 +234,6 @@ WorkerRouter.post("/push-log", async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // ✅ Emit real-time log to frontend via Socket.IO
     const io = req.app.get("io");
     if (io) {
       io.to(`job:${jobId}`).emit("job:log", {
@@ -245,7 +251,7 @@ WorkerRouter.post("/push-log", async (req, res) => {
   }
 });
 
-// POST /heartbeat - Worker heartbeat
+// ✅ POST /heartbeat - Worker heartbeat — emits online event if worker was offline
 WorkerRouter.post("/heartbeat", async (req, res) => {
   try {
     const { deviceId } = req.body;
@@ -254,10 +260,25 @@ WorkerRouter.post("/heartbeat", async (req, res) => {
       return res.status(400).json({ message: "deviceId missing" });
     }
 
-    await Worker.findOneAndUpdate(
-      { deviceId },
-      { lastHeartbeatAt: Date.now(), currentStatus: "online" }
-    );
+    // Find current status before updating so we know if this is a transition
+    const worker = await Worker.findOne({ deviceId });
+    if (!worker) {
+      return res.status(404).json({ message: "Worker not found" });
+    }
+
+    const wasOffline = worker.currentStatus === "offline";
+
+    worker.lastHeartbeatAt = Date.now();
+    worker.currentStatus = "online";
+    await worker.save();
+
+    // ✅ If worker was offline, emit online event so user UI updates instantly
+    // This is the key fix: reconnecting worker sends a heartbeat, which triggers
+    // an immediate socket broadcast so the user dashboard refreshes without polling
+    if (wasOffline) {
+      const io = req.app.get("io");
+      emitWorkerOnline(io, worker);
+    }
 
     res.json({ message: "Heartbeat received" });
   } catch (err) {
@@ -266,7 +287,7 @@ WorkerRouter.post("/heartbeat", async (req, res) => {
   }
 });
 
-// ✅ FIXED: POST /accept-job with Socket.io broadcast and payment integration
+// ✅ POST /accept-job - Worker accepts a job
 WorkerRouter.post("/accept-job", async (req, res) => {
   try {
     const { jobId, deviceId } = req.body;
@@ -278,7 +299,6 @@ WorkerRouter.post("/accept-job", async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // Check if job is still available
     if (job.status !== "pending" && job.status !== "queued") {
       console.log(`❌ Job ${jobId} already taken. Status: ${job.status}`);
       return res.status(400).json({
@@ -287,7 +307,6 @@ WorkerRouter.post("/accept-job", async (req, res) => {
       });
     }
 
-    // ✅ PAYMENT: Get worker and their pricing
     const worker = await Worker.findOne({ deviceId });
     if (!worker) {
       return res.status(404).json({ message: "Worker not found. Please register first." });
@@ -296,7 +315,6 @@ WorkerRouter.post("/accept-job", async (req, res) => {
     const workerRate = worker.pricing.hourlyRate;
     const minimumCharge = worker.pricing.minimumCharge;
 
-    // ✅ PAYMENT: Reserve funds from user's wallet
     const estimatedCost = job.pricing?.estimatedCost || calculateEstimatedCost(workerRate, 1, minimumCharge);
     const reserveResult = await reserveFunds(job.userId, estimatedCost, jobId);
 
@@ -307,7 +325,6 @@ WorkerRouter.post("/accept-job", async (req, res) => {
       });
     }
 
-    // Update job status and pricing
     job.status = "assigned";
     job.assignedWorkerId = deviceId;
     job.pricing = {
@@ -319,16 +336,13 @@ WorkerRouter.post("/accept-job", async (req, res) => {
     job.paymentStatus = "reserved";
     await job.save();
 
-    // ✅ PAYMENT: Update worker's pending earnings
     worker.pendingEarnings += estimatedCost;
     await worker.save();
 
     console.log(`✅ Job ${jobId} assigned to worker ${deviceId} | Reserved: ₹${estimatedCost}`);
 
-    // ✅ EMIT SOCKET EVENT to notify frontend
     const io = req.app.get("io");
 
-    // Emit to all connected clients
     io.emit("job_status_changed", {
       jobId: job._id,
       status: "assigned",
@@ -336,7 +350,6 @@ WorkerRouter.post("/accept-job", async (req, res) => {
       timestamp: new Date().toISOString()
     });
 
-    // Also emit to specific job room (if frontend joins rooms)
     io.to(`job:${jobId}`).emit("job_accepted", {
       jobId: job._id,
       workerId: deviceId,
@@ -379,7 +392,7 @@ WorkerRouter.get("/my-worker", authMiddleware, async (req, res) => {
   }
 });
 
-// ✅ GET /job/:jobId/details - Complete updated route
+// ✅ GET /job/:jobId/details
 WorkerRouter.get("/job/:jobId/details", async (req, res) => {
   try {
     const { jobId } = req.params;
@@ -390,8 +403,6 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
       return res.status(404).json({ message: "Job not found" });
     }
 
-    // Allow PENDING/QUEUED jobs (anyone can view to accept) 
-    // OR ASSIGNED/COMPLETED to this specific worker
     if (deviceId) {
       if ((job.status === 'assigned' || job.status === 'completed') &&
         job.assignedWorkerId !== deviceId) {
@@ -401,7 +412,6 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
       }
     }
 
-    // Extract file path from the zipFileUrl
     let zipMetadata = null;
     let zipFilesList = [];
     let filesExtractedFromZip = false;
@@ -416,10 +426,7 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
 
         const { data: fileData, error: fileError } = await supabase.storage
           .from("jobs")
-          .list("jobs", {
-            limit: 100,
-            offset: 0,
-          });
+          .list("jobs", { limit: 100, offset: 0 });
 
         if (!fileError && fileData) {
           const fileInfo = fileData.find((f) => f.name === fileName);
@@ -441,7 +448,6 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
           if (!downloadError && zipData) {
             const arrayBuffer = await zipData.arrayBuffer();
             const buffer = Buffer.from(arrayBuffer);
-
             const zip = new AdmZip(buffer);
             const entries = zip.getEntries();
 
@@ -473,7 +479,7 @@ WorkerRouter.get("/job/:jobId/details", async (req, res) => {
                 return {
                   name: fileName,
                   type: fileType,
-                  required: required,
+                  required,
                   size: entry.header.size,
                 };
               });
@@ -538,21 +544,16 @@ WorkerRouter.put("/pricing", authMiddleware, async (req, res) => {
     }
 
     const worker = await Worker.findOne({ userId: req.user.userId });
-
     if (!worker) {
       return res.status(404).json({ message: "Worker not found. Please register first." });
     }
 
-    // Update pricing
     if (hourlyRate !== undefined) worker.pricing.hourlyRate = hourlyRate;
     if (minimumCharge !== undefined) worker.pricing.minimumCharge = minimumCharge;
 
     await worker.save();
 
-    res.json({
-      message: "Pricing updated successfully",
-      pricing: worker.pricing,
-    });
+    res.json({ message: "Pricing updated successfully", pricing: worker.pricing });
   } catch (err) {
     console.error("Update pricing error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
@@ -563,7 +564,6 @@ WorkerRouter.put("/pricing", authMiddleware, async (req, res) => {
 WorkerRouter.get("/pricing", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
-
     if (!worker) {
       return res.status(404).json({ message: "Worker not found" });
     }
@@ -583,18 +583,15 @@ WorkerRouter.get("/pricing", authMiddleware, async (req, res) => {
 WorkerRouter.get("/earnings", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
-
     if (!worker) {
       return res.status(404).json({ message: "Worker not found" });
     }
 
-    // Get completed jobs
     const completedJobs = await Job.find({
       assignedWorkerId: worker.deviceId,
       status: "completed",
     }).select("title pricing createdAt");
 
-    // Get in-progress jobs
     const inProgressJobs = await Job.find({
       assignedWorkerId: worker.deviceId,
       status: { $in: ["assigned", "processing"] },
@@ -629,16 +626,12 @@ WorkerRouter.get("/earnings", authMiddleware, async (req, res) => {
 WorkerRouter.get("/wallet", authMiddleware, async (req, res) => {
   try {
     const worker = await Worker.findOne({ userId: req.user.userId });
-
     if (!worker) {
       return res.status(404).json({ message: "Worker not found" });
     }
 
-    // Get worker's transactions
     const Transaction = (await import("../schemas/TransactionSchema.js")).default;
-    const transactions = await Transaction.find({
-      workerId: worker._id,
-    })
+    const transactions = await Transaction.find({ workerId: worker._id })
       .sort({ createdAt: -1 })
       .limit(50)
       .populate("jobId", "title");

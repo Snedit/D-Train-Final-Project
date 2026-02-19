@@ -1,5 +1,11 @@
 import { useState, useEffect } from "react";
-import { Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { motion, AnimatePresence, Variants } from "framer-motion";
 import HeroSection from "./components/HeroSection";
 import Dashboard from "./components/Dashboard";
@@ -15,9 +21,11 @@ import Wallet from "./components/Wallet";
 import { Job, Worker } from "./types";
 import { io, Socket } from "socket.io-client";
 
+const API_BASE = "http://localhost:5000";
+
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const token = localStorage.getItem('dtrain_token');
+  const token = localStorage.getItem("dtrain_token");
   if (!token) {
     return <Navigate to="/signin" replace />;
   }
@@ -32,16 +40,18 @@ function JobDetailWrapper({
 }: {
   jobs: Job[];
   onBack: () => void;
-  socket: Socket | null; // FIX 1: Added socket prop
+  socket: Socket | null;
 }) {
   const { jobId } = useParams<{ jobId: string }>();
-  const job = jobs.find(j => j._id === jobId);
+  const job = jobs.find((j) => j._id === jobId);
 
   if (!job) {
     return (
       <div className="min-h-screen bg-[#FFEFE1] flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-extrabold text-slate-900 mb-4">Job not found</h2>
+          <h2 className="text-2xl font-extrabold text-slate-900 mb-4">
+            Job not found
+          </h2>
           <button
             onClick={onBack}
             className="px-6 py-3 rounded-[14px] border-[3px] border-slate-900 bg-blue-400 text-white font-bold shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
@@ -53,7 +63,6 @@ function JobDetailWrapper({
     );
   }
 
-  // FIX 1: Pass socket to JobDetail
   return <JobDetail job={job} onBack={onBack} socket={socket} />;
 }
 
@@ -67,18 +76,17 @@ function App() {
 
   useEffect(() => {
     const savedUser = localStorage.getItem("dtrain_user");
-
     if (savedUser) {
       setIsAuthenticated(true);
     }
 
     console.log("🔌 Initializing Socket.IO connection...");
-    const newSocket = io("http://localhost:5000", {
+    const newSocket = io(API_BASE, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
-      reconnectionAttempts: 5,
+      reconnectionAttempts: 10,
     });
 
     newSocket.on("connect", () => {
@@ -93,14 +101,15 @@ function App() {
       console.error("🔴 Socket.IO connection error:", error);
     });
 
+    // ✅ Job status updates
     newSocket.on("job_status_changed", (data) => {
       console.log("📡 Job status changed:", data);
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id === data.jobId
             ? { ...job, status: data.status, assignedWorkerId: data.assignedWorkerId }
-            : job
-        )
+            : job,
+        ),
       );
     });
 
@@ -110,8 +119,8 @@ function App() {
         prevJobs.map((job) =>
           job._id === data.jobId
             ? { ...job, status: "assigned", assignedWorkerId: data.workerId }
-            : job
-        )
+            : job,
+        ),
       );
     });
 
@@ -119,15 +128,55 @@ function App() {
       console.log("📡 Job status update:", data);
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
-          job._id === data.jobId ? { ...job, status: data.status } : job
-        )
+          job._id === data.jobId ? { ...job, status: data.status } : job,
+        ),
       );
+    });
+
+    // ✅ Worker status changes — handles BOTH online and offline transitions instantly
+    // This fires when:
+    //   - Worker disconnects (server disconnect handler → status: "offline")
+    //   - Worker reconnects and sends heartbeat (heartbeat route → status: "online")
+    //   - Worker registers fresh (register route → status: "online")
+    //   - Heartbeat checker marks stale worker offline (status: "offline")
+    newSocket.on("worker_status_changed", (data) => {
+      console.log("📡 Worker status changed:", data);
+
+      setWorkers((prevWorkers) => {
+        const existingWorker = prevWorkers.find(
+          (w) => w._id === data.workerId || w.deviceId === data.deviceId
+        );
+
+        if (existingWorker) {
+          // ✅ Update existing worker's status in place
+          return prevWorkers.map((w) =>
+            w._id === data.workerId || w.deviceId === data.deviceId
+              ? { ...w, currentStatus: data.status, status: data.status }
+              : w,
+          );
+        } else if (data.status === "online") {
+          // ✅ New worker came online that we don't have in state yet — fetch full list
+          // This covers the case where a brand new worker registers for the first time
+          console.log("🆕 New worker came online, refreshing worker list...");
+          fetchWorkers();
+          return prevWorkers;
+        }
+
+        return prevWorkers;
+      });
     });
 
     setSocket(newSocket);
 
     return () => {
       console.log("🧹 Cleaning up Socket.IO connection");
+      newSocket.off("connect");
+      newSocket.off("disconnect");
+      newSocket.off("connect_error");
+      newSocket.off("job_status_changed");
+      newSocket.off("job_accepted");
+      newSocket.off("job_status");
+      newSocket.off("worker_status_changed");
       newSocket.disconnect();
     };
   }, []);
@@ -142,12 +191,9 @@ function App() {
   const fetchJobs = async () => {
     try {
       const token = localStorage.getItem("dtrain_token");
-      const response = await fetch("http://localhost:5000/api/jobs", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+      const response = await fetch(`${API_BASE}/api/jobs`, {
+        headers: { Authorization: `Bearer ${token}` },
       });
-
       if (response.ok) {
         const data = await response.json();
         setJobs(data.jobs);
@@ -160,12 +206,11 @@ function App() {
 
   const fetchWorkers = async () => {
     try {
-      const response = await fetch("http://localhost:5000/api/worker", {
+      const response = await fetch(`${API_BASE}/api/worker`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("dtrain_token")}`,
         },
       });
-
       if (response.ok) {
         const data = await response.json();
         setWorkers(data.workers);
@@ -176,22 +221,17 @@ function App() {
     }
   };
 
-  // FIX 2: Return type matches what SignIn expects
   const handleSignIn = async (
     email: string,
-    password: string
+    password: string,
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch("http://localhost:5000/api/user/login", {
+      const response = await fetch(`${API_BASE}/api/user/login`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
         localStorage.setItem("dtrain_token", data.token);
         localStorage.setItem("dtrain_user", JSON.stringify(data.user));
@@ -211,23 +251,18 @@ function App() {
     }
   };
 
-  // FIX 3: Return type matches what SignUp expects
   const handleSignUp = async (
     name: string,
     email: string,
-    password: string
+    password: string,
   ): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch("http://localhost:5000/api/user/register", {
+      const response = await fetch(`${API_BASE}/api/user/register`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name, email, password }),
       });
-
       const data = await response.json();
-
       if (response.ok) {
         localStorage.setItem("dtrain_token", data.token);
         localStorage.setItem("dtrain_user", JSON.stringify(data.user));
@@ -256,22 +291,17 @@ function App() {
     navigate("/");
   };
 
-  // FIX 4: Return type matches what JobSubmission expects
   const handleJobSubmit = async (
-    formData: FormData
+    formData: FormData,
   ): Promise<{ success: boolean; jobId?: string; message?: string }> => {
     try {
       const token = localStorage.getItem("dtrain_token");
-      const response = await fetch("http://localhost:5000/api/jobs/create", {
+      const response = await fetch(`${API_BASE}/api/jobs/create`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-
       const data = await response.json();
-
       if (data.success) {
         await fetchJobs();
         setIsLoading(true);
@@ -361,22 +391,24 @@ function App() {
     }, 800);
   };
 
+  // ✅ Filtered job arrays — single source of truth
+  const pendingJobs = jobs.filter(
+    (j) => j.status === "pending" || j.status === "queued",
+  );
+
+  const runningJobs = jobs.filter(
+    (j) =>
+      j.status === "running" ||
+      j.status === "assigned" ||
+      j.status === "processing",
+  );
+
   const pageVariants: Variants = {
-    initial: {
-      opacity: 0,
-      y: 20,
-    },
-    animate: {
-      opacity: 1,
-      y: 0,
-    },
-    exit: {
-      opacity: 0,
-      y: -20,
-    },
+    initial: { opacity: 0, y: 20 },
+    animate: { opacity: 1, y: 0 },
+    exit: { opacity: 0, y: -20 },
   };
 
-  // FIX 5: Use "as const" so TypeScript narrows the ease type correctly
   const pageTransition = {
     duration: 0.5,
     ease: "easeInOut" as const,
@@ -411,7 +443,6 @@ function App() {
                   exit="exit"
                   transition={pageTransition}
                 >
-                  {/* FIX 6: Pass onViewDocs — ensure HeroSectionProps includes this prop */}
                   <HeroSection
                     onGetStarted={handleGetStarted}
                     onViewDocs={handleViewDocumentation}
@@ -526,7 +557,6 @@ function App() {
                     exit="exit"
                     transition={pageTransition}
                   >
-                    {/* FIX 4: onSubmit prop name — ensure JobSubmissionProps uses "onSubmit" */}
                     <JobSubmission
                       onSubmit={handleJobSubmit}
                       onBack={handleBackToDashboard}
@@ -550,7 +580,6 @@ function App() {
                     exit="exit"
                     transition={pageTransition}
                   >
-                    {/* FIX 1: Pass socket to JobDetailWrapper */}
                     <JobDetailWrapper
                       jobs={jobs}
                       onBack={handleBackToDashboard}
@@ -576,7 +605,7 @@ function App() {
                     transition={pageTransition}
                   >
                     <RunningJobs
-                      jobs={jobs}
+                      jobs={runningJobs}
                       onJobSelect={handleJobSelect}
                       onBack={handleBackToDashboard}
                     />
@@ -600,7 +629,7 @@ function App() {
                     transition={pageTransition}
                   >
                     <PendingJobs
-                      jobs={jobs}
+                      jobs={pendingJobs}
                       onJobSelect={handleJobSelect}
                       onBack={handleBackToDashboard}
                     />
@@ -654,7 +683,7 @@ function App() {
             }
           />
 
-          {/* Fallback - redirect to home */}
+          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AnimatePresence>

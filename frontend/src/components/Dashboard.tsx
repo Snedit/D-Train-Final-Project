@@ -74,15 +74,11 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     }
 
-    // ✅ Set up socket listeners for real-time updates
     if (socket) {
       console.log('🔌 Setting up socket listeners in Dashboard');
 
-      // Listen for job status changes
       socket.on('job_status_changed', (data) => {
         console.log('📡 Job status changed:', data);
-
-        // Update local jobs state
         setLocalJobs(prevJobs =>
           prevJobs.map(job =>
             job._id === data.jobId
@@ -92,10 +88,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         );
       });
 
-      // Listen for job accepted events
       socket.on('job_accepted', (data) => {
         console.log('📡 Job accepted:', data);
-
         setLocalJobs(prevJobs =>
           prevJobs.map(job =>
             job._id === data.jobId
@@ -105,10 +99,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         );
       });
 
-      // Legacy support for old event name
       socket.on('job_status', (data) => {
         console.log('📡 Job status updated (legacy):', data);
-
         setLocalJobs(prevJobs =>
           prevJobs.map(job =>
             job._id === data.jobId
@@ -118,18 +110,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         );
       });
 
-      // Connection status
-      socket.on('connect', () => {
-        console.log('✅ Socket connected in Dashboard');
-      });
-
-      socket.on('disconnect', () => {
-        console.log('⚠️ Socket disconnected in Dashboard');
-      });
-
-      socket.on('connect_error', (error) => {
-        console.error('❌ Socket connection error:', error);
-      });
+      socket.on('connect', () => console.log('✅ Socket connected in Dashboard'));
+      socket.on('disconnect', () => console.log('⚠️ Socket disconnected in Dashboard'));
+      socket.on('connect_error', (error) => console.error('❌ Socket connection error:', error));
     }
 
     return () => {
@@ -153,7 +136,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         const response = await fetch('http://localhost:5000/api/payment/wallet/balance', {
           headers: { Authorization: `Bearer ${token}` }
         });
-
         if (response.ok) {
           const data = await response.json();
           setWalletBalance(data.balance);
@@ -162,9 +144,15 @@ const Dashboard: React.FC<DashboardProps> = ({
         console.error('Error fetching wallet balance:', error);
       }
     };
-
     fetchWalletBalance();
   }, []);
+
+  // ✅ Active workers = only online/busy/idle, not offline
+  const activeWorkersCount = workers.filter(w =>
+    w.currentStatus === 'online' ||
+    w.currentStatus === 'busy' ||
+    w.currentStatus === 'idle'
+  ).length;
 
   if (loading) {
     return (
@@ -264,8 +252,9 @@ const Dashboard: React.FC<DashboardProps> = ({
               </p>
             </div>
 
-            {/* Stats Grid - Use localJobs instead of jobs */}
+            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-8">
+              {/* Total Jobs */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -282,6 +271,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
+              {/* Running Jobs */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -295,7 +285,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {localJobs.filter(j => j.status === 'running' || j.status === 'assigned').length}
+                        {localJobs.filter(j =>
+                          j.status === 'running' ||
+                          j.status === 'assigned' ||
+                          j.status === 'processing'
+                        ).length}
                       </p>
                       <p className="text-xs font-semibold text-slate-900">Running</p>
                     </div>
@@ -304,6 +298,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
+              {/* Pending Jobs */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -317,7 +312,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {localJobs.filter(j => j.status === 'pending' || j.status === 'queued').length}
+                        {localJobs.filter(j =>
+                          j.status === 'pending' ||
+                          j.status === 'queued'
+                        ).length}
                       </p>
                       <p className="text-xs font-semibold text-slate-900">Pending</p>
                     </div>
@@ -326,6 +324,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
+              {/* ✅ FIX: Active Workers — only count online/busy/idle */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -338,7 +337,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Users className="w-5 h-5 text-slate-900" />
                     </div>
                     <div>
-                      <p className="text-2xl font-extrabold text-slate-900">{workers.length}</p>
+                      <p className="text-2xl font-extrabold text-slate-900">
+                        {activeWorkersCount}
+                      </p>
                       <p className="text-xs font-semibold text-slate-900">Active Workers</p>
                     </div>
                   </div>
@@ -346,6 +347,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
+              {/* Wallet */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -367,7 +369,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </motion.div>
             </div>
 
-            {/* Jobs Table - Use localJobs */}
+            {/* Jobs Table */}
             <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
               <div className="p-5 border-b-[3px] border-slate-900 bg-[#F5F3FF]">
                 <h2 className="text-lg font-extrabold text-slate-900">Recent Jobs</h2>
@@ -451,13 +453,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       const token = localStorage.getItem('dtrain_token');
                                       const response = await fetch(`http://localhost:5000/api/jobs/${job._id}`, {
                                         method: 'DELETE',
-                                        headers: {
-                                          Authorization: `Bearer ${token}`,
-                                        },
+                                        headers: { Authorization: `Bearer ${token}` },
                                       });
 
                                       if (response.ok) {
-                                        // Remove job from local state
                                         setLocalJobs(prev => prev.filter(j => j._id !== job._id));
                                         console.log(`✅ Job ${job._id} deleted successfully`);
                                       } else {
