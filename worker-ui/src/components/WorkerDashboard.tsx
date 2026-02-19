@@ -61,6 +61,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showPricingSettings, setShowPricingSettings] = useState(false);
+  const [showWalletModal, setShowWalletModal] = useState(false);
   const [walletData, setWalletData] = useState<WalletType>({
     balance: 0,
     totalEarnings: 0,
@@ -177,11 +178,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     try {
       const token = localStorage.getItem("dtrain_worker_token");
       if (!token) {
-        setStats({
-          totalCompleted: 0,
-          totalEarned: 0,
-          currentStatus: 'idle',
-        });
+        setStats({ totalCompleted: 0, totalEarned: 0, currentStatus: 'idle' });
         return;
       }
 
@@ -315,6 +312,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
             }}
           />
 
+          {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
@@ -322,6 +320,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
           >
             <Server className="w-8 h-8 text-slate-900" />
           </motion.div>
+
           <motion.div
             className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#FFD447]"
             animate={{ y: [0, -6, 0] }}
@@ -329,6 +328,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
           />
 
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
+            {/* Nav */}
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
@@ -344,6 +344,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
+                {/* Pricing */}
                 <motion.button
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
@@ -354,6 +355,20 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   <span className="hidden sm:inline">Pricing</span>
                 </motion.button>
 
+                {/* Wallet — dedicated nav button */}
+                {worker && (
+                  <motion.button
+                    whileHover={{ y: -2 }}
+                    whileTap={{ y: 0 }}
+                    onClick={() => setShowWalletModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-[#FFD447] text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5"
+                  >
+                    <Wallet className="w-4 h-4" />
+                    <span className="hidden sm:inline">Wallet</span>
+                  </motion.button>
+                )}
+
+                {/* Refresh */}
                 <motion.button
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
@@ -365,6 +380,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   <span className="hidden sm:inline">Refresh</span>
                 </motion.button>
 
+                {/* Sign Out */}
                 <motion.button
                   whileHover={{ y: -2 }}
                   whileTap={{ y: 0 }}
@@ -438,8 +454,8 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
             {worker && (
               <>
+                {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  {/* Status Card */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -457,7 +473,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Completed Jobs Card */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -473,7 +488,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Total Earned (Stats) Card */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -492,6 +506,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   </motion.div>
                 </div>
 
+                {/* System Info */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] p-6 mb-8">
                   <h2 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
                     <Cpu className="w-5 h-5" />
@@ -525,6 +540,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   </div>
                 </div>
 
+                {/* Available Jobs */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
                   <div className="p-5 border-b-[3px] border-slate-900 bg-[#DBEAFE]">
                     <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
@@ -608,6 +624,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         </div>
       </div>
 
+      {/* Pricing Settings Modal */}
       <PricingSettings
         isOpen={showPricingSettings}
         onClose={() => setShowPricingSettings(false)}
@@ -616,39 +633,20 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         onUpdate={handleUpdatePricing}
       />
 
-      {/* Floating Wallet Button */}
-      {worker && (
-        <div className="fixed bottom-6 right-6 z-50">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
-            onClick={() => setWalletData({ ...walletData, showModal: true } as any)}
-            className="w-16 h-16 rounded-full bg-[#FFD447] border-[4px] border-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] flex items-center justify-center transition-all hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
-          >
-            <Wallet className="w-8 h-8 text-slate-900" />
-          </motion.button>
-        </div>
-      )}
-
       {/* Wallet Modal */}
-      {(walletData as any).showModal && (
+      {showWalletModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="relative w-full max-w-2xl"
+            className="relative w-full max-w-lg"
           >
-            <button
-              onClick={() => setWalletData({ ...walletData, showModal: false } as any)}
-              className="absolute -top-4 -right-4 z-10 w-10 h-10 rounded-full bg-[#fb7185] border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)] hover:scale-110 transition-transform"
-            >
-              <span className="text-xl font-black text-white">×</span>
-            </button>
             <WalletCard
               balance={walletData.balance}
               totalEarnings={walletData.totalEarnings}
               pendingEarnings={walletData.pendingEarnings}
               transactions={transactions}
+              onClose={() => setShowWalletModal(false)}
             />
           </motion.div>
         </div>

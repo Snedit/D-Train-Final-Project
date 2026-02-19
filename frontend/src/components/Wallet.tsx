@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet as WalletIcon, ArrowLeft, CreditCard, History, TrendingUp } from 'lucide-react';
+import { Wallet as WalletIcon, CreditCard, History, TrendingUp } from 'lucide-react';
 
 interface Transaction {
   id: string;
@@ -81,8 +81,6 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
     try {
       const token = localStorage.getItem('dtrain_token');
 
-      // Step 1: Create Razorpay order
-      // Send plain rupee amount — backend handles conversion to paise for Razorpay
       const orderRes = await fetch(`${API_BASE}/wallet/topup`, {
         method: 'POST',
         headers: {
@@ -94,21 +92,18 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
 
       const orderData = await orderRes.json();
 
-      // Backend returns "orderId", not "id"
       if (!orderData.orderId) {
         throw new Error(orderData.message || 'Order creation failed');
       }
 
-      // Step 2: Open Razorpay checkout
       const options = {
         key: RAZORPAY_KEY_ID,
-        amount: orderData.amount,       // paise value returned by backend/Razorpay
+        amount: orderData.amount,
         currency: orderData.currency,
-        order_id: orderData.orderId,    // ✅ matches backend response field
+        order_id: orderData.orderId,
         name: 'DTrain Wallet',
         description: `Recharge ₹${rechargeAmount}`,
         handler: async (response: any) => {
-          // Step 3: Verify payment — correct endpoint is /razorpay/verify
           const verifyRes = await fetch(`${API_BASE}/razorpay/verify`, {
             method: 'POST',
             headers: {
@@ -186,23 +181,15 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-6xl mx-auto">
-        {/* Back Button */}
-        <motion.button
-          whileHover={{ x: -4 }}
-          whileTap={{ x: 0 }}
-          onClick={onBack}
-          className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 font-bold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] mb-6"
-        >
-          <ArrowLeft className="w-5 h-5" /> Back to Dashboard
-        </motion.button>
-
-        {/* Outer Brutalist Frame */}
         <div className="relative">
           {/* Grid Background */}
           <div
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
-              backgroundImage: 'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
+              backgroundImage: `
+                linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)
+              `,
               backgroundSize: '26px 26px'
             }}
           />
@@ -223,7 +210,7 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
           />
 
           <motion.div
-            className="absolute top-12 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#A8E6CF] flex items-center justify-center"
+            className="absolute top-1/3 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#A8E6CF] flex items-center justify-center"
             animate={{ rotate: [6, -6, 6] }}
             transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
           >
@@ -232,6 +219,28 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
 
           {/* Main Content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
+
+            {/* Top Nav — exact same as JobDetail */}
+            <nav className="flex items-center justify-between mb-8">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
+                </div>
+                <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
+                  DTrain
+                </span>
+              </div>
+
+              <motion.button
+                whileHover={{ y: -2 }}
+                whileTap={{ y: 0 }}
+                onClick={onBack}
+                className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
+              >
+                Back to Dashboard
+              </motion.button>
+            </nav>
+
             {/* Balance & Recharge Grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {/* Balance Card */}

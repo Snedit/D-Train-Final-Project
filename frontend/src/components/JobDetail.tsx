@@ -65,17 +65,14 @@ const parseLogLine = (line: string): React.ReactNode => {
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
   
-  // Find all icon tags in the line
   const regex = /\[(SEARCH|OK|INFO|DOWNLOAD|EXTRACT|DOCKER|RUN|START|OUTPUT|FILE|CLOUD|UPLOAD|LINK|CLEAN|SUCCESS|ERROR|WARN|DEVICE|WORKER|PACKAGE|CLIPBOARD)\]/g;
   let match;
   
   while ((match = regex.exec(line)) !== null) {
-    // Add text before the icon
     if (match.index > lastIndex) {
       parts.push(line.substring(lastIndex, match.index));
     }
     
-    // Add the icon
     const iconKey = match[0];
     parts.push(
       <span key={match.index} className="inline-flex items-center">
@@ -86,7 +83,6 @@ const parseLogLine = (line: string): React.ReactNode => {
     lastIndex = match.index + match[0].length;
   }
   
-  // Add remaining text
   if (lastIndex < line.length) {
     parts.push(line.substring(lastIndex));
   }
@@ -98,10 +94,11 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
   const [metrics, setMetrics] = useState<MetricData[]>([]);
   const [jobStatus, setJobStatus] = useState(job.status);
+  const [modelUrl, setModelUrl] = useState<string | undefined>(job.modelUrl);
   const [isLoadingLogs, setIsLoadingLogs] = useState(true);
   const terminalRef = useRef<HTMLDivElement>(null);
 
-  // ✅ Fetch initial logs from database
+  // Fetch initial logs from database
   useEffect(() => {
     const fetchLogs = async () => {
       try {
@@ -120,11 +117,8 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
         if (response.ok) {
           const data = await response.json();
           console.log('[INFO] Logs fetched from DB:', data.logs?.length || 0);
-          
-          // Set initial logs from database
           setTerminalOutput(data.logs || []);
           
-          // Update status if changed
           if (data.status) {
             setJobStatus(data.status);
           }
@@ -140,38 +134,56 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     fetchLogs();
   }, [job._id]);
 
-  // ✅ Socket connection and real-time log streaming
+  // Also fetch modelUrl if job is already completed
+  useEffect(() => {
+    const fetchResults = async () => {
+      if (job.status === 'completed' && !modelUrl) {
+        try {
+          const token = localStorage.getItem('dtrain_token');
+          const response = await fetch(
+            `http://localhost:5000/api/jobs/${job._id}/results`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (response.ok) {
+            const data = await response.json();
+            if (data.modelUrl) setModelUrl(data.modelUrl);
+          }
+        } catch (error) {
+          console.error('Error fetching results:', error);
+        }
+      }
+    };
+    fetchResults();
+  }, [job._id, job.status]);
+
+  // Socket connection and real-time log streaming
   useEffect(() => {
     if (!socket) return;
 
-    // Join job room for real-time updates
     socket.emit('join_job', { jobId: job._id });
     console.log(`[INFO] Joined room for job: ${job._id}`);
 
-    // ✅ Listen for real-time logs
     const handleJobLog = (data: any) => {
       console.log('[INFO] Real-time log received:', data);
-      
       if (data.jobId === job._id) {
         setTerminalOutput(prev => [...prev, data.line]);
       }
     };
 
-    // ✅ Listen for job status changes
     const handleJobStatus = (data: any) => {
       console.log('[INFO] Job status updated:', data);
-      
       if (data.jobId === job._id) {
         setJobStatus(data.status);
       }
     };
 
-    // ✅ Listen for job completion
     const handleJobCompleted = (data: any) => {
       console.log('[INFO] Job completed:', data);
-      
       if (data.jobId === job._id) {
         setJobStatus('completed');
+        setModelUrl(data.modelUrl);
         setTerminalOutput(prev => [
           ...prev,
           '\n[SUCCESS] JOB COMPLETED SUCCESSFULLY!',
@@ -180,10 +192,8 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       }
     };
 
-    // ✅ Listen for job failure
     const handleJobFailed = (data: any) => {
       console.log('[ERROR] Job failed:', data);
-      
       if (data.jobId === job._id) {
         setJobStatus('failed');
         setTerminalOutput(prev => [
@@ -271,11 +281,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
               rotate: [0, 15, -15, 0],
               scale: [1, 1.1, 1]
             }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 4, 
-              ease: "easeInOut" 
-            }}
+            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
           >
             <Activity className="w-8 h-8 text-slate-900" />
           </motion.div>
@@ -283,21 +289,13 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
           <motion.div 
             className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#FFD447]"
             animate={{ y: [0, -6, 0] }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 5, 
-              ease: "easeInOut" 
-            }}
+            transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
           />
 
           <motion.div 
             className="absolute top-1/3 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
             animate={{ rotate: [6, -6, 6] }}
-            transition={{ 
-              repeat: Infinity, 
-              duration: 6, 
-              ease: "easeInOut" 
-            }}
+            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
           >
             <Terminal className="w-8 h-8 text-slate-900" />
           </motion.div>
@@ -327,7 +325,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
 
             {/* Header */}
             <div className="mb-8">
-              <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-start justify-between flex-wrap gap-4">
                 <div>
                   <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
                     {job.title}
@@ -336,16 +334,48 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                   <p className="text-xs text-slate-600 font-mono">Job ID: {job._id}</p>
                 </div>
                 
+                {/* Status badge only */}
                 <div className={`inline-flex items-center px-4 py-2 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${
                   statusColors[jobStatus as keyof typeof statusColors] || 'bg-slate-300 text-slate-900'
                 }`}>
                   {(jobStatus === 'running' || jobStatus === 'assigned') && <Activity className="w-3 h-3 mr-1.5" />}
                   {jobStatus === 'pending' && <Clock className="w-3 h-3 mr-1.5" />}
                   {jobStatus === 'completed' && <CheckCircle className="w-3 h-3 mr-1.5" />}
+                  {jobStatus === 'failed' && <XCircle className="w-3 h-3 mr-1.5" />}
                   {jobStatus.charAt(0).toUpperCase() + jobStatus.slice(1)}
                 </div>
               </div>
             </div>
+
+            {/* Completion banner — no download button here */}
+            {jobStatus === 'completed' && modelUrl && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 flex items-center gap-4 px-6 py-4 rounded-[18px] border-[3px] border-slate-900 bg-[#4ADE80] shadow-[5px_5px_0_0_rgba(15,23,42,1)]"
+              >
+                <PartyPopper className="w-5 h-5 text-slate-900 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-extrabold text-slate-900">Job completed successfully!</p>
+                  <p className="text-xs text-slate-800 font-medium mt-0.5">Your trained model is ready to download.</p>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Failed banner */}
+            {jobStatus === 'failed' && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 flex items-center gap-4 px-6 py-4 rounded-[18px] border-[3px] border-slate-900 bg-[#FEE2E2] shadow-[5px_5px_0_0_rgba(15,23,42,1)]"
+              >
+                <XCircle className="w-5 h-5 text-red-700 flex-shrink-0" />
+                <div>
+                  <p className="text-sm font-extrabold text-slate-900">Job failed</p>
+                  <p className="text-xs text-slate-800 font-medium mt-0.5">Check the terminal output below for error details.</p>
+                </div>
+              </motion.div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
               {/* Terminal Section */}
@@ -389,9 +419,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                       ))
                     )}
                     {(jobStatus === 'running' || jobStatus === 'assigned') && (
-                      <div className="text-[#7CF2D0] animate-pulse inline-block">
-                        ▋
-                      </div>
+                      <div className="text-[#7CF2D0] animate-pulse inline-block">▋</div>
                     )}
                   </div>
                 </div>
@@ -433,6 +461,36 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                     )}
                   </div>
                 </div>
+
+                {/* Download card — shown in sidebar too when completed */}
+                {jobStatus === 'completed' && modelUrl && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="rounded-[20px] border-[3px] border-slate-900 bg-[#7CF2D0] p-5 shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center">
+                        <Download className="w-5 h-5 text-slate-900" />
+                      </div>
+                      <h3 className="text-base font-extrabold text-slate-900">Model Output</h3>
+                    </div>
+                    <p className="text-xs text-slate-800 font-medium mb-4">
+                      Your trained model is packaged as a ZIP archive and ready to download.
+                    </p>
+                    <motion.a
+                      href={modelUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      whileHover={{ y: -2 }}
+                      whileTap={{ y: 0 }}
+                      className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-[12px] border-[3px] border-slate-900 bg-slate-900 text-white text-sm font-extrabold shadow-[3px_3px_0_0_rgba(15,23,42,0.4)] hover:shadow-[5px_5px_0_0_rgba(15,23,42,0.4)] transition-all"
+                    >
+                      <Download className="w-4 h-4" />
+                      Download Model ZIP
+                    </motion.a>
+                  </motion.div>
+                )}
               </div>
             </div>
 
@@ -456,14 +514,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                 </div>
                 <ResponsiveContainer width="100%" height={100}>
                   <AreaChart data={metrics.slice(-10)}>
-                    <Area 
-                      type="monotone" 
-                      dataKey="cpu" 
-                      stroke="#0f172a" 
-                      fill="#3B82F6" 
-                      fillOpacity={0.3}
-                      strokeWidth={3}
-                    />
+                    <Area type="monotone" dataKey="cpu" stroke="#0f172a" fill="#3B82F6" fillOpacity={0.3} strokeWidth={3} />
                     <XAxis dataKey="timestamp" hide />
                     <YAxis hide />
                   </AreaChart>
@@ -488,14 +539,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                 </div>
                 <ResponsiveContainer width="100%" height={100}>
                   <AreaChart data={metrics.slice(-10)}>
-                    <Area 
-                      type="monotone" 
-                      dataKey="memory" 
-                      stroke="#0f172a" 
-                      fill="#10B981" 
-                      fillOpacity={0.3}
-                      strokeWidth={3}
-                    />
+                    <Area type="monotone" dataKey="memory" stroke="#0f172a" fill="#10B981" fillOpacity={0.3} strokeWidth={3} />
                     <XAxis dataKey="timestamp" hide />
                     <YAxis hide />
                   </AreaChart>
@@ -523,14 +567,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
                 </div>
                 <ResponsiveContainer width="100%" height={100}>
                   <AreaChart data={metrics.slice(-10)}>
-                    <Area 
-                      type="monotone" 
-                      dataKey="gpu" 
-                      stroke="#0f172a" 
-                      fill="#A855F7" 
-                      fillOpacity={0.3}
-                      strokeWidth={3}
-                    />
+                    <Area type="monotone" dataKey="gpu" stroke="#0f172a" fill="#A855F7" fillOpacity={0.3} strokeWidth={3} />
                     <XAxis dataKey="timestamp" hide />
                     <YAxis hide />
                   </AreaChart>
@@ -546,12 +583,10 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
           0%, 100% { transform: translateY(0) rotate(-8deg); }
           50% { transform: translateY(-6px) rotate(-8deg); }
         }
-        
         @keyframes wiggle {
           0%, 100% { transform: rotate(6deg); }
           50% { transform: rotate(2deg); }
         }
-        
         @keyframes pulse {
           0%, 100% { transform: scale(1); }
           50% { transform: scale(1.1); }
