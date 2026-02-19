@@ -12,8 +12,8 @@ import mermaid from 'mermaid';
 // 🔧 CONFIGURATION - CHANGE THIS TO YOUR REPO
 // ============================================
 const CONFIG = {
-  GITHUB_USERNAME: 'debjitmitra000',
-  REPO_NAME: 'joblance',
+  GITHUB_USERNAME: 'snedit',
+  REPO_NAME: 'D-Train-Final-Project',
   BRANCH: 'main',
   README_PATH: 'README.md',
   PROJECT_TITLE: 'DTrain Documentation',
