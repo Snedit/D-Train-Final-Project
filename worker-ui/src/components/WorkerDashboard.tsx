@@ -142,9 +142,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
       const response = await fetch(
         `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
-        {
-          headers: { 'Content-Type': 'application/json' },
-        }
+        { headers: { 'Content-Type': 'application/json' } }
       );
 
       if (response.ok) {
@@ -172,6 +170,9 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     }
   };
 
+  // ✅ FIXED: fetchWorkerStats now uses the /earnings endpoint which has
+  // real totalJobsCompleted and totalEarnings from the Worker schema,
+  // instead of counting jobs manually with a hardcoded ₹5 per job.
   const fetchWorkerStats = async () => {
     if (!worker?.deviceId) return;
 
@@ -182,33 +183,25 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         return;
       }
 
-      const jobsResponse = await fetch('http://localhost:5000/api/jobs', {
+      // ✅ Use the dedicated /earnings endpoint — it returns totalJobsCompleted
+      // and totalEarnings directly from the Worker document
+      const earningsRes = await fetch('http://localhost:5000/api/worker/earnings', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (jobsResponse.ok) {
-        const jobsData = await jobsResponse.json();
+      if (earningsRes.ok) {
+        const earningsData = await earningsRes.json();
 
-        const completedJobs = jobsData.jobs.filter(
-          (job: any) =>
-            job.assignedWorkerId === worker.deviceId &&
-            job.status === 'completed'
-        );
-
-        const totalEarned = completedJobs.length * 5.0;
-
-        const hasActiveJob = jobsData.jobs.some(
-          (job: any) =>
-            job.assignedWorkerId === worker.deviceId &&
-            (job.status === 'running' || job.status === 'assigned')
-        );
+        // ✅ Check if this worker has any currently active jobs
+        // so we can show "working" vs "idle" status
+        const hasActiveJob = earningsData.inProgressJobs?.length > 0;
 
         setStats({
-          totalCompleted: completedJobs.length,
-          totalEarned: totalEarned,
+          totalCompleted: earningsData.totalJobsCompleted ?? 0,
+          totalEarned: earningsData.totalEarnings ?? 0,
           currentStatus: hasActiveJob ? 'working' : 'idle',
         });
       }
@@ -259,10 +252,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({
-        hourlyRate: rate,
-        minimumCharge: minCharge
-      })
+      body: JSON.stringify({ hourlyRate: rate, minimumCharge: minCharge })
     });
 
     if (!res.ok) {
@@ -355,7 +345,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   <span className="hidden sm:inline">Pricing</span>
                 </motion.button>
 
-                {/* Wallet — dedicated nav button */}
+                {/* Wallet */}
                 {worker && (
                   <motion.button
                     whileHover={{ y: -2 }}
@@ -456,6 +446,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               <>
                 {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
+                  {/* Current Status */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -473,6 +464,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
+                  {/* Jobs Completed — ✅ now reads from worker.totalJobsCompleted via /earnings */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -482,12 +474,15 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                         <CheckCircle className="w-5 h-5 text-slate-900" />
                       </div>
                       <div>
-                        <p className="text-2xl font-extrabold text-slate-900">{stats.totalCompleted}</p>
+                        <p className="text-2xl font-extrabold text-slate-900">
+                          {stats.totalCompleted}
+                        </p>
                         <p className="text-xs font-semibold text-slate-900">Jobs Completed</p>
                       </div>
                     </div>
                   </motion.div>
 
+                  {/* Total Earnings — ✅ renamed from "Session Earnings", uses real totalEarnings */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -500,7 +495,8 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                         <p className="text-2xl font-extrabold text-slate-900">
                           ₹{stats.totalEarned.toFixed(2)}
                         </p>
-                        <p className="text-xs font-semibold text-slate-900">Session Earnings</p>
+                        {/* ✅ Renamed from "Session Earnings" to "Total Earnings" */}
+                        <p className="text-xs font-semibold text-slate-900">Total Earnings</p>
                       </div>
                     </div>
                   </motion.div>
