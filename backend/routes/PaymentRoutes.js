@@ -32,7 +32,6 @@ PaymentRouter.get("/wallet/balance", authMiddleware, async (req, res) => {
 /**
  * POST /wallet/fake-topup
  * Add fake balance for testing (DEVELOPMENT ONLY)
- * Use this until Razorpay is configured
  */
 PaymentRouter.post("/wallet/fake-topup", authMiddleware, async (req, res) => {
     try {
@@ -52,11 +51,9 @@ PaymentRouter.post("/wallet/fake-topup", authMiddleware, async (req, res) => {
             return res.status(404).json({ message: "User not found" });
         }
 
-        // Add to wallet
         user.walletBalance += amount;
         await user.save();
 
-        // Create transaction record
         const transaction = await Transaction.create({
             userId: req.user.userId,
             type: "topup",
@@ -99,12 +96,10 @@ PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Invalid amount" });
         }
 
-        // Minimum top-up amount: ₹10
         if (amount < 10) {
             return res.status(400).json({ message: "Minimum top-up amount is ₹10" });
         }
 
-        // Create Razorpay order
         const receipt = `TUP_${Date.now()}`;
         const result = await createOrder(amount, receipt, {
             userId: req.user.userId,
@@ -118,7 +113,8 @@ PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
             });
         }
 
-        // Create pending transaction
+        // Create ONE pending transaction here — it will be updated (not duplicated)
+        // by addFundsToWallet when payment is verified
         await Transaction.create({
             userId: req.user.userId,
             type: "topup",
@@ -153,7 +149,6 @@ PaymentRouter.post("/razorpay/verify", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Missing payment details" });
         }
 
-        // Verify signature
         const isValid = verifyPaymentSignature(
             razorpay_order_id,
             razorpay_payment_id,
@@ -164,20 +159,21 @@ PaymentRouter.post("/razorpay/verify", authMiddleware, async (req, res) => {
             return res.status(400).json({ message: "Invalid payment signature" });
         }
 
-        // Find pending transaction
-        const transaction = await Transaction.findOne({
+        // Find the pending transaction to get amount and userId
+        const pendingTransaction = await Transaction.findOne({
             razorpayOrderId: razorpay_order_id,
             status: "pending",
         });
 
-        if (!transaction) {
+        if (!pendingTransaction) {
             return res.status(404).json({ message: "Transaction not found" });
         }
 
-        // Add funds to wallet
+        // addFundsToWallet will update the existing pending transaction to
+        // "completed" — no duplicate is created
         const result = await addFundsToWallet(
-            transaction.userId,
-            transaction.amount,
+            pendingTransaction.userId,
+            pendingTransaction.amount,
             razorpay_order_id,
             razorpay_payment_id
         );
@@ -189,19 +185,17 @@ PaymentRouter.post("/razorpay/verify", authMiddleware, async (req, res) => {
             });
         }
 
-        // Update transaction status
-        transaction.status = "completed";
-        transaction.razorpayPaymentId = razorpay_payment_id;
-        transaction.razorpaySignature = razorpay_signature;
-        await transaction.save();
+        // Save the signature onto the now-completed transaction
+        result.transaction.razorpaySignature = razorpay_signature;
+        await result.transaction.save();
 
         res.json({
             message: "Payment verified successfully",
             newBalance: result.newBalance,
             transaction: {
-                id: transaction._id,
-                amount: transaction.amount,
-                status: transaction.status,
+                id: result.transaction._id,
+                amount: result.transaction.amount,
+                status: result.transaction.status,
             },
         });
     } catch (error) {
@@ -252,7 +246,6 @@ PaymentRouter.post("/razorpay/webhook", async (req, res) => {
         const signature = req.headers["x-razorpay-signature"];
         const body = JSON.stringify(req.body);
 
-        // Verify webhook signature
         const isValid = verifyWebhookSignature(body, signature);
 
         if (!isValid) {
@@ -265,19 +258,18 @@ PaymentRouter.post("/razorpay/webhook", async (req, res) => {
 
         console.log(`📥 Webhook received: ${event}`);
 
-        // Handle payment success
         if (event === "payment.captured") {
             const orderId = payload.order_id;
             const paymentId = payload.id;
 
-            // Find transaction
             const transaction = await Transaction.findOne({
                 razorpayOrderId: orderId,
                 status: "pending",
             });
 
             if (transaction) {
-                // Add funds to wallet
+                // addFundsToWallet updates the existing pending transaction —
+                // no duplicate even if webhook and verify both fire
                 const result = await addFundsToWallet(
                     transaction.userId,
                     transaction.amount,
@@ -286,16 +278,11 @@ PaymentRouter.post("/razorpay/webhook", async (req, res) => {
                 );
 
                 if (result.success) {
-                    transaction.status = "completed";
-                    transaction.razorpayPaymentId = paymentId;
-                    await transaction.save();
-
-                    console.log(`✅ Wallet topped up: ₹${transaction.amount} for user ${transaction.userId}`);
+                    console.log(`✅ Wallet topped up via webhook: ₹${transaction.amount} for user ${transaction.userId}`);
                 }
             }
         }
 
-        // Handle payment failure
         if (event === "payment.failed") {
             const orderId = payload.order_id;
 
@@ -307,7 +294,6 @@ PaymentRouter.post("/razorpay/webhook", async (req, res) => {
             if (transaction) {
                 transaction.status = "failed";
                 await transaction.save();
-
                 console.log(`❌ Payment failed for order ${orderId}`);
             }
         }

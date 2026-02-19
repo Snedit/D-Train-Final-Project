@@ -4,14 +4,12 @@ import { useDropzone } from 'react-dropzone';
 import { Upload, CheckCircle, AlertCircle, Send, FileCode, Package, Terminal, Lightbulb } from 'lucide-react';
 
 interface JobSubmissionProps {
-  onJobSubmitted: () => void;
-  onBackToDashboard: () => void;
+  // FIX: renamed from onJobSubmitted/onBackToDashboard to match App.tsx
+  onSubmit: (formData: FormData) => Promise<{ success: boolean; jobId?: string; message?: string }>;
+  onBack: () => void;
 }
 
-const JobSubmission: React.FC<JobSubmissionProps> = ({
-  onJobSubmitted,
-  onBackToDashboard,
-}) => {
+const JobSubmission: React.FC<JobSubmissionProps> = ({ onSubmit, onBack }) => {
   const [jobTitle, setjobTitle] = useState('');
   const [jobDescription, setJobDescription] = useState('');
   const [mainEntry, setMainEntry] = useState('main.py');
@@ -32,9 +30,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
-    accept: {
-      'application/zip': ['.zip'],
-    },
+    accept: { 'application/zip': ['.zip'] },
     multiple: false,
   });
 
@@ -48,37 +44,19 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
     setIsSubmitting(true);
     setError('');
 
-    try {
-      const formData = new FormData();
-      formData.append('title', jobTitle.trim());
-      formData.append('description', jobDescription.trim());
-      formData.append('mainFileName', mainEntry);
-      // formData.append('requirements_file', requirementsFile);
-      formData.append('file', selectedFile);
-      const token = localStorage.getItem('dtrain_token');
+    const formData = new FormData();
+    formData.append('title', jobTitle.trim());
+    formData.append('description', jobDescription.trim());
+    formData.append('mainFileName', mainEntry);
+    formData.append('file', selectedFile);
 
-      const response = await fetch('http://localhost:5000/api/jobs/create', {
-        method: 'POST',
-        body: formData,
-        headers: {
-          "Authorization" : `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit job');
-      }
-
-      setTimeout(() => {
-        onJobSubmitted();
-      }, 1500);
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to submit job'
-      );
+    // FIX: delegate to App.tsx's onSubmit handler instead of fetching directly
+    const result = await onSubmit(formData);
+    if (!result.success) {
+      setError(result.message || 'Failed to submit job');
       setIsSubmitting(false);
     }
+    // On success, App.tsx handles navigation
   };
 
   return (
@@ -120,30 +98,25 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
 
         {/* Main card content */}
         <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
-          {/* Top nav - matching hero section */}
+          {/* Top nav */}
           <nav
             className="flex items-center justify-between mb-8"
-            style={{
-              animation: 'slideDown 0.6s ease-out',
-            }}
+            style={{ animation: 'slideDown 0.6s ease-out' }}
           >
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img 
-                  src="/logo.png" 
-                  alt="DTrain Logo" 
-                  className="w-8 h-8 object-contain"
-                />
+                <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
               </div>
               <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
                 DTrain
               </span>
             </div>
 
+            {/* FIX: was onBackToDashboard, now onBack */}
             <motion.button
               whileHover={{ y: -2 }}
               whileTap={{ y: 0 }}
-              onClick={onBackToDashboard}
+              onClick={onBack}
               className="px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
             >
               Back to Dashboard
@@ -181,8 +154,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                 {/* Job title */}
                 <div>
                   <label className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#FFE66D] text-[11px] font-semibold text-slate-900 mb-2">
-                    Job Title
-                    <span className="ml-1 text-red-600">*</span>
+                    Job Title <span className="ml-1 text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -193,11 +165,11 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                     required
                   />
                 </div>
+
                 {/* Job description */}
                 <div>
                   <label className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#91ff6d] text-[11px] font-semibold text-slate-900 mb-2">
-                    Job Description
-                    <span className="ml-1 text-red-600">*</span>
+                    Job Description <span className="ml-1 text-red-600">*</span>
                   </label>
                   <input
                     type="text"
@@ -212,10 +184,8 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                 {/* File upload */}
                 <div>
                   <label className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#7BC8FF] text-[11px] font-semibold text-slate-900 mb-2">
-                    Training code bundle (.zip)
-                    <span className="ml-1 text-red-600">*</span>
+                    Training code bundle (.zip) <span className="ml-1 text-red-600">*</span>
                   </label>
-
                   <div
                     {...getRootProps()}
                     className={`mt-2 rounded-[16px] border-[3px] border-dashed p-6 md:p-8 text-center cursor-pointer transition-all ${
@@ -233,9 +203,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                           <div className="w-12 h-12 rounded-[12px] bg-[#22C55E] border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                             <CheckCircle className="w-7 h-7 text-white" />
                           </div>
-                          <p className="text-sm font-extrabold text-slate-900 mt-2">
-                            {selectedFile.name}
-                          </p>
+                          <p className="text-sm font-extrabold text-slate-900 mt-2">{selectedFile.name}</p>
                           <p className="text-[11px] font-medium text-slate-700">
                             {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • zip archive
                           </p>
@@ -246,9 +214,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                             <Upload className="w-7 h-7 text-slate-900" />
                           </div>
                           <p className="text-sm font-extrabold text-slate-900 mt-2">
-                            {isDragActive
-                              ? 'Drop your zip file here'
-                              : 'Drag & drop your zip file here'}
+                            {isDragActive ? 'Drop your zip file here' : 'Drag & drop your zip file here'}
                           </p>
                           <p className="text-[11px] font-medium text-slate-700">
                             or click to browse from your machine
@@ -306,16 +272,8 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                 <motion.button
                   type="submit"
                   disabled={!selectedFile || !jobTitle.trim() || isSubmitting}
-                  whileHover={
-                    !isSubmitting && selectedFile && jobTitle.trim()
-                      ? { y: -2 }
-                      : {}
-                  }
-                  whileTap={
-                    !isSubmitting && selectedFile && jobTitle.trim()
-                      ? { y: 0 }
-                      : {}
-                  }
+                  whileHover={!isSubmitting && selectedFile && jobTitle.trim() ? { y: -2 } : {}}
+                  whileTap={!isSubmitting && selectedFile && jobTitle.trim() ? { y: 0 } : {}}
                   className={`w-full inline-flex items-center justify-center px-6 py-4 rounded-[18px] border-[3px] border-slate-900 text-sm md:text-base font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all ${
                     !selectedFile || !jobTitle.trim() || isSubmitting
                       ? 'bg-slate-300 text-slate-500 cursor-not-allowed'
@@ -326,11 +284,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                     <>
                       <motion.div
                         animate={{ rotate: 360 }}
-                        transition={{
-                          duration: 1,
-                          repeat: Infinity,
-                          ease: 'linear',
-                        }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                         className="w-5 h-5 border-[3px] border-slate-900 border-t-transparent rounded-full mr-3"
                       />
                       Submitting job…
@@ -347,43 +301,24 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
 
             {/* Right: guidelines / info */}
             <div className="flex flex-col gap-4">
-              {/* Preparation guidelines card */}
               <div className="rounded-[20px] border-[3px] border-slate-900 bg-[#7CF2D0] p-5 shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
                     <FileCode className="w-5 h-5 text-slate-900" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm font-extrabold text-slate-900 mb-3">
-                      Preparation guidelines
-                    </h3>
+                    <h3 className="text-sm font-extrabold text-slate-900 mb-3">Preparation guidelines</h3>
                     <ul className="space-y-2 text-[11px] font-medium text-slate-800">
-                      <li className="flex items-start">
-                        <span className="mr-2 text-slate-900">•</span>
-                        <span className="text-slate-900">Ensure your zip file contains all Python source code</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2 text-slate-900">•</span>
-                        <span className="text-slate-900">Include a <code className="px-1 py-0.5 rounded bg-slate-200 border border-slate-900 text-[10px] text-slate-900">requirements.txt</code> file with all dependencies</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2 text-slate-900">•</span>
-                        <span className="text-slate-900">Specify the correct main entry point file (default: main.py)</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2 text-slate-900">•</span>
-                        <span className="text-slate-900">Your code will run in an isolated Docker environment</span>
-                      </li>
-                      <li className="flex items-start">
-                        <span className="mr-2 text-slate-900">•</span>
-                        <span className="text-slate-900">Avoid hardcoded absolute paths in your code</span>
-                      </li>
+                      <li className="flex items-start"><span className="mr-2">•</span><span>Ensure your zip file contains all Python source code</span></li>
+                      <li className="flex items-start"><span className="mr-2">•</span><span>Include a <code className="px-1 py-0.5 rounded bg-slate-200 border border-slate-900 text-[10px]">requirements.txt</code> with all dependencies</span></li>
+                      <li className="flex items-start"><span className="mr-2">•</span><span>Specify the correct main entry point file (default: main.py)</span></li>
+                      <li className="flex items-start"><span className="mr-2">•</span><span>Your code will run in an isolated Docker environment</span></li>
+                      <li className="flex items-start"><span className="mr-2">•</span><span>Avoid hardcoded absolute paths in your code</span></li>
                     </ul>
                   </div>
                 </div>
               </div>
 
-              {/* Pro tip card */}
               <div className="rounded-[20px] border-[3px] border-slate-900 bg-[#FFB4D3] p-5 shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
@@ -392,9 +327,8 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
                   <div className="flex-1">
                     <div className="text-sm font-extrabold text-slate-900 mb-2">Pro tip</div>
                     <p className="text-[11px] font-medium text-slate-900 mb-3">
-                      Start with a tiny dataset slice and fewer epochs. Once the
-                      job shape looks right, bump the scale and let the network
-                      flex.
+                      Start with a tiny dataset slice and fewer epochs. Once the job shape looks right,
+                      bump the scale and let the network flex.
                     </p>
                     <div className="inline-flex items-center px-3 py-1.5 rounded-[12px] border-[2px] border-slate-900 bg-white text-[10px] font-semibold text-slate-900 shadow-[3px_3px_0_0_rgba(15,23,42,1)]">
                       <span className="w-4 h-4 rounded-full bg-[#22C55E] border-[2px] border-slate-900 mr-2 flex-shrink-0" />
@@ -409,31 +343,7 @@ const JobSubmission: React.FC<JobSubmissionProps> = ({
       </div>
 
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0) rotate(-8deg); }
-          50% { transform: translateY(-6px) rotate(-8deg); }
-        }
-        
-        @keyframes wiggle {
-          0%, 100% { transform: rotate(6deg); }
-          50% { transform: rotate(2deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-25px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-25px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );

@@ -1,25 +1,15 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
-import {
-  Mail,
-  Lock,
-  User,
-  ArrowRight,
-  UserPlus,
-  ArrowLeft,
-} from "lucide-react";
+import { Mail, Lock, User, ArrowRight, UserPlus, ArrowLeft } from "lucide-react";
 
 interface SignUpProps {
-  onSignUp: (name: string, email: string, password: string) => Promise<void>;
+  // FIX: was Promise<void>, now returns the result object App.tsx provides
+  onSignUp: (name: string, email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   onSwitchToSignIn: () => void;
-  onBack?: () => void; // Optional back handler
+  onBack?: () => void;
 }
 
-const SignUp: React.FC<SignUpProps> = ({
-  onSignUp,
-  onSwitchToSignIn,
-  onBack,
-}) => {
+const SignUp: React.FC<SignUpProps> = ({ onSignUp, onSwitchToSignIn, onBack }) => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -35,12 +25,10 @@ const SignUp: React.FC<SignUpProps> = ({
       setError("Please fill in all fields");
       return;
     }
-
     if (password !== confirmPassword) {
       setError("Passwords do not match");
       return;
     }
-
     if (password.length < 6) {
       setError("Password must be at least 6 characters");
       return;
@@ -48,13 +36,13 @@ const SignUp: React.FC<SignUpProps> = ({
 
     setIsLoading(true);
 
-    try {
-      await onSignUp(name, email, password);
-      // Success - App.tsx will handle navigation
-    } catch (err: any) {
-      setError(err.message || "Registration failed. Please try again.");
+    // FIX: use the returned result to show errors instead of relying on thrown exceptions
+    const result = await onSignUp(name, email, password);
+    if (!result.success) {
+      setError(result.message || "Registration failed. Please try again.");
       setIsLoading(false);
     }
+    // On success, App.tsx handles navigation — no need to do anything here
   };
 
   return (
@@ -89,17 +77,10 @@ const SignUp: React.FC<SignUpProps> = ({
             <nav className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img
-                    src="/logo.png"
-                    alt="DTrain Logo"
-                    className="w-8 h-8 object-contain"
-                  />
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
-                <span className="text-2xl font-extrabold text-slate-900">
-                  DTrain
-                </span>
+                <span className="text-2xl font-extrabold text-slate-900">DTrain</span>
               </div>
-
               <motion.button
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -117,15 +98,9 @@ const SignUp: React.FC<SignUpProps> = ({
             <div className="flex justify-center mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img
-                    src="/logo.png"
-                    alt="DTrain Logo"
-                    className="w-8 h-8 object-contain"
-                  />
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
-                <span className="text-3xl font-extrabold text-slate-900">
-                  DTrain
-                </span>
+                <span className="text-3xl font-extrabold text-slate-900">DTrain</span>
               </div>
             </div>
           )}
@@ -135,12 +110,8 @@ const SignUp: React.FC<SignUpProps> = ({
             <div className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#7CF2D0] text-[11px] font-semibold text-slate-900 shadow-[3px_3px_0_0_rgba(15,23,42,1)] mb-3">
               Get Started
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
-              Create Account
-            </h1>
-            <p className="text-sm text-slate-700 font-medium">
-              Join the decentralized ML training network
-            </p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">Create Account</h1>
+            <p className="text-sm text-slate-700 font-medium">Join the decentralized ML training network</p>
           </div>
 
           {/* Form */}
@@ -248,11 +219,7 @@ const SignUp: React.FC<SignUpProps> = ({
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     className="w-5 h-5 border-[3px] border-slate-900 border-t-transparent rounded-full mr-2"
                   />
                   Creating Account...
@@ -275,9 +242,7 @@ const SignUp: React.FC<SignUpProps> = ({
 
           {/* Sign In Link */}
           <div className="text-center">
-            <p className="text-sm text-slate-700 font-medium mb-3">
-              Already have an account?
-            </p>
+            <p className="text-sm text-slate-700 font-medium mb-3">Already have an account?</p>
             <motion.button
               whileHover={{ y: -2 }}
               whileTap={{ y: 0 }}

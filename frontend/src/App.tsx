@@ -27,10 +27,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 // Job Detail Wrapper to extract jobId from URL
 function JobDetailWrapper({
   jobs,
-  onBack
+  onBack,
+  socket,
 }: {
   jobs: Job[];
   onBack: () => void;
+  socket: Socket | null; // FIX 1: Added socket prop
 }) {
   const { jobId } = useParams<{ jobId: string }>();
   const job = jobs.find(j => j._id === jobId);
@@ -51,7 +53,8 @@ function JobDetailWrapper({
     );
   }
 
-  return <JobDetail job={job} onBack={onBack} />;
+  // FIX 1: Pass socket to JobDetail
+  return <JobDetail job={job} onBack={onBack} socket={socket} />;
 }
 
 function App() {
@@ -69,7 +72,6 @@ function App() {
       setIsAuthenticated(true);
     }
 
-    // ✅ Initialize Socket.IO with proper configuration
     console.log("🔌 Initializing Socket.IO connection...");
     const newSocket = io("http://localhost:5000", {
       transports: ["websocket", "polling"],
@@ -91,7 +93,6 @@ function App() {
       console.error("🔴 Socket.IO connection error:", error);
     });
 
-    // ✅ Listen for job status changes
     newSocket.on("job_status_changed", (data) => {
       console.log("📡 Job status changed:", data);
       setJobs((prevJobs) =>
@@ -103,7 +104,6 @@ function App() {
       );
     });
 
-    // ✅ Listen for job acceptance
     newSocket.on("job_accepted", (data) => {
       console.log("📡 Job accepted by worker:", data);
       setJobs((prevJobs) =>
@@ -115,7 +115,6 @@ function App() {
       );
     });
 
-    // ✅ Listen for job status updates
     newSocket.on("job_status", (data) => {
       console.log("📡 Job status update:", data);
       setJobs((prevJobs) =>
@@ -133,7 +132,6 @@ function App() {
     };
   }, []);
 
-  // Fetch jobs when authenticated
   useEffect(() => {
     if (isAuthenticated) {
       fetchJobs();
@@ -178,8 +176,11 @@ function App() {
     }
   };
 
-  // Navigation handlers
-  const handleSignIn = async (email: string, password: string) => {
+  // FIX 2: Return type matches what SignIn expects
+  const handleSignIn = async (
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
       const response = await fetch("http://localhost:5000/api/user/login", {
         method: "POST",
@@ -210,9 +211,14 @@ function App() {
     }
   };
 
-  const handleSignUp = async (name: string, email: string, password: string) => {
+  // FIX 3: Return type matches what SignUp expects
+  const handleSignUp = async (
+    name: string,
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; message?: string }> => {
     try {
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
+      const response = await fetch("http://localhost:5000/api/user/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -250,7 +256,10 @@ function App() {
     navigate("/");
   };
 
-  const handleJobSubmit = async (formData: FormData) => {
+  // FIX 4: Return type matches what JobSubmission expects
+  const handleJobSubmit = async (
+    formData: FormData
+  ): Promise<{ success: boolean; jobId?: string; message?: string }> => {
     try {
       const token = localStorage.getItem("dtrain_token");
       const response = await fetch("http://localhost:5000/api/jobs/create", {
@@ -367,9 +376,10 @@ function App() {
     },
   };
 
+  // FIX 5: Use "as const" so TypeScript narrows the ease type correctly
   const pageTransition = {
     duration: 0.5,
-    ease: "easeInOut",
+    ease: "easeInOut" as const,
   };
 
   return (
@@ -401,6 +411,7 @@ function App() {
                   exit="exit"
                   transition={pageTransition}
                 >
+                  {/* FIX 6: Pass onViewDocs — ensure HeroSectionProps includes this prop */}
                   <HeroSection
                     onGetStarted={handleGetStarted}
                     onViewDocs={handleViewDocumentation}
@@ -515,6 +526,7 @@ function App() {
                     exit="exit"
                     transition={pageTransition}
                   >
+                    {/* FIX 4: onSubmit prop name — ensure JobSubmissionProps uses "onSubmit" */}
                     <JobSubmission
                       onSubmit={handleJobSubmit}
                       onBack={handleBackToDashboard}
@@ -538,9 +550,11 @@ function App() {
                     exit="exit"
                     transition={pageTransition}
                   >
+                    {/* FIX 1: Pass socket to JobDetailWrapper */}
                     <JobDetailWrapper
                       jobs={jobs}
                       onBack={handleBackToDashboard}
+                      socket={socket}
                     />
                   </motion.div>
                 ) : null}

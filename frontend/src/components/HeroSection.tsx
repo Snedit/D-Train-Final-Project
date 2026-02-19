@@ -3,10 +3,10 @@ import { Zap, Shield, Globe, Database, Code } from 'lucide-react';
 
 interface HeroSectionProps {
   onGetStarted: () => void;
-  onDocumentation: () => void;
+  onViewDocs: () => void; // FIX: was onDocumentation
 }
 
-const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation }) => {
+const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) => {
   const features = [
     {
       icon: Globe,
@@ -45,31 +45,23 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
         {/* Memphis / playful shapes */}
         <div
           className="absolute -top-6 -left-6 w-28 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#7BC8FF]"
-          style={{
-            animation: 'float 5s ease-in-out infinite',
-          }}
+          style={{ animation: 'float 5s ease-in-out infinite' }}
         />
         <div
           className="absolute -bottom-10 left-10 w-24 h-24 rounded-3xl border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
-          style={{
-            animation: 'wiggle 6s ease-in-out infinite',
-          }}
+          style={{ animation: 'wiggle 6s ease-in-out infinite' }}
         >
           <Code className="w-8 h-8 text-slate-900" />
         </div>
         <div
           className="absolute -top-8 right-4 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFD447] flex items-center justify-center"
-          style={{
-            animation: 'pulse 4s ease-in-out infinite',
-          }}
+          style={{ animation: 'pulse 4s ease-in-out infinite' }}
         >
           <Database className="w-7 h-7 text-slate-900" />
         </div>
         <div
           className="absolute bottom-4 -right-10 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#7CF2D0]"
-          style={{
-            animation: 'slideHorizontal 5s ease-in-out infinite',
-          }}
+          style={{ animation: 'slideHorizontal 5s ease-in-out infinite' }}
         />
 
         {/* Main content card */}
@@ -77,25 +69,20 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
           {/* Top nav */}
           <nav
             className="flex items-center justify-between mb-10"
-            style={{
-              animation: 'slideDown 0.6s ease-out',
-            }}
+            style={{ animation: 'slideDown 0.6s ease-out' }}
           >
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img 
-                  src="/logo.png" 
-                  alt="DTrain Logo" 
-                  className="w-8 h-8 object-contain"
-                />
+                <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
               </div>
               <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
                 DTrain
               </span>
             </div>
 
+            {/* FIX: was onDocumentation, now onViewDocs */}
             <button
-              onClick={onDocumentation}
+              onClick={onViewDocs}
               className="px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
             >
               Documentation
@@ -109,9 +96,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
               <div>
                 <h1
                   className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.3] pb-2"
-                  style={{
-                    animation: 'slideUp 0.7s ease-out 0.2s both',
-                  }}
+                  style={{ animation: 'slideUp 0.7s ease-out 0.2s both' }}
                 >
                   <span className="bg-slate-900 bg-clip-text text-transparent">
                     Decentralized
@@ -124,21 +109,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
 
                 <p
                   className="mt-4 text-sm md:text-base text-slate-700 max-w-xl"
-                  style={{
-                    animation: 'slideUp 0.7s ease-out 0.35s both',
-                  }}
+                  style={{ animation: 'slideUp 0.7s ease-out 0.35s both' }}
                 >
-                  Train your machine learning models using distributed computing power. 
-                  Upload your Python code, let workers around the world handle the heavy lifting, 
+                  Train your machine learning models using distributed computing power.
+                  Upload your Python code, let workers around the world handle the heavy lifting,
                   and monitor everything in real-time.
                 </p>
               </div>
 
               <div
                 className="flex flex-col sm:flex-row items-start sm:items-center gap-4"
-                style={{
-                  animation: 'slideUp 0.6s ease-out 0.45s both',
-                }}
+                style={{ animation: 'slideUp 0.6s ease-out 0.45s both' }}
               >
                 <button
                   onClick={onGetStarted}
@@ -152,13 +133,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
             {/* Right: fake UI card */}
             <div
               className="relative"
-              style={{
-                animation: 'slideLeft 0.7s ease-out 0.25s both',
-              }}
+              style={{ animation: 'slideLeft 0.7s ease-out 0.25s both' }}
             >
-              {/* Back shadow card */}
               <div className="absolute -top-4 -left-4 w-full h-full rounded-[22px] border-[3px] border-slate-900 bg-[#7BC8FF] opacity-90" />
-              {/* Main UI card */}
               <div className="relative rounded-[22px] border-[3px] border-slate-900 bg-white p-4 md:p-5 shadow-[8px_8px_0_0_rgba(15,23,42,1)]">
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
@@ -171,7 +148,6 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
                   </span>
                 </div>
 
-                {/* Fake terminal + metrics */}
                 <div className="grid grid-cols-1 gap-4">
                   <div className="rounded-[14px] border-[2px] border-slate-900 bg-slate-900 text-[11px] font-mono p-3 h-28 overflow-hidden">
                     <p className="text-[#E0E7FF]">$ python train.py --epochs 40 --lr 3e-4</p>
@@ -221,29 +197,21 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
           {/* Features Grid */}
           <div
             className="grid md:grid-cols-3 gap-5 mb-10"
-            style={{
-              animation: 'slideUp 0.7s ease-out 0.5s both',
-            }}
+            style={{ animation: 'slideUp 0.7s ease-out 0.5s both' }}
           >
             {features.map((feature, index) => (
               <div
                 key={feature.title}
                 className={`relative rounded-[18px] border-[3px] border-slate-900 ${feature.color} p-4 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-1 hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]`}
-                style={{
-                  animation: `fadeIn 0.6s ease-out ${0.6 + index * 0.15}s both`,
-                }}
+                style={{ animation: `fadeIn 0.6s ease-out ${0.6 + index * 0.15}s both` }}
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
                     <feature.icon className="w-5 h-5 text-slate-900" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 mb-1">
-                      {feature.title}
-                    </h3>
-                    <p className="text-xs text-slate-900 font-medium leading-snug">
-                      {feature.description}
-                    </p>
+                    <h3 className="text-sm font-extrabold text-slate-900 mb-1">{feature.title}</h3>
+                    <p className="text-xs text-slate-900 font-medium leading-snug">{feature.description}</p>
                   </div>
                 </div>
               </div>
@@ -253,96 +221,33 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onDocumentation
           {/* Stats */}
           <div
             className="grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-6 border-t-[2px] border-dashed border-slate-900"
-            style={{
-              animation: 'slideUp 0.8s ease-out 0.65s both',
-            }}
+            style={{ animation: 'slideUp 0.8s ease-out 0.65s both' }}
           >
-            <div className="text-center">
-              <div className="rounded-[16px] border-[3px] border-slate-900 bg-white px-4 py-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                <div className="text-3xl font-extrabold text-blue-500 mb-2">24/7</div>
-                <div className="text-sm text-slate-700">Available Workers</div>
+            {[
+              { value: '24/7', label: 'Available Workers' },
+              { value: '∞', label: 'Scalability' },
+              { value: '100%', label: 'Open Source' },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center">
+                <div className="rounded-[16px] border-[3px] border-slate-900 bg-white px-4 py-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
+                  <div className="text-3xl font-extrabold text-blue-500 mb-2">{stat.value}</div>
+                  <div className="text-sm text-slate-700">{stat.label}</div>
+                </div>
               </div>
-            </div>
-            <div className="text-center">
-              <div className="rounded-[16px] border-[3px] border-slate-900 bg-white px-4 py-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                <div className="text-3xl font-extrabold text-blue-500 mb-2">∞</div>
-                <div className="text-sm text-slate-700">Scalability</div>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="rounded-[16px] border-[3px] border-slate-900 bg-white px-4 py-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                <div className="text-3xl font-extrabold text-blue-500 mb-2">100%</div>
-                <div className="text-sm text-slate-700">Open Source</div>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </div>
 
       <style>{`
-        @keyframes float {
-          0%, 100% { transform: translateY(0) rotate(-8deg); }
-          50% { transform: translateY(-6px) rotate(-8deg); }
-        }
-        
-        @keyframes wiggle {
-          0%, 100% { transform: rotate(6deg); }
-          50% { transform: rotate(2deg); }
-        }
-        
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); }
-          50% { transform: scale(1.1); }
-        }
-        
-        @keyframes slideHorizontal {
-          0%, 100% { transform: translateX(0) rotate(10deg); }
-          50% { transform: translateX(8px) rotate(10deg); }
-        }
-        
-        @keyframes slideDown {
-          from {
-            opacity: 0;
-            transform: translateY(-25px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes slideUp {
-          from {
-            opacity: 0;
-            transform: translateY(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-        
-        @keyframes slideLeft {
-          from {
-            opacity: 0;
-            transform: translateX(30px);
-          }
-          to {
-            opacity: 1;
-            transform: translateX(0);
-          }
-        }
-        
-        @keyframes fadeIn {
-          from {
-            opacity: 0;
-            transform: translateY(20px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
+        @keyframes float { 0%, 100% { transform: translateY(0) rotate(-8deg); } 50% { transform: translateY(-6px) rotate(-8deg); } }
+        @keyframes wiggle { 0%, 100% { transform: rotate(6deg); } 50% { transform: rotate(2deg); } }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        @keyframes slideHorizontal { 0%, 100% { transform: translateX(0) rotate(10deg); } 50% { transform: translateX(8px) rotate(10deg); } }
+        @keyframes slideDown { from { opacity: 0; transform: translateY(-25px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes slideLeft { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
       `}</style>
     </div>
   );

@@ -3,16 +3,13 @@ import { motion } from "framer-motion";
 import { Mail, Lock, ArrowRight, LogIn, ArrowLeft } from "lucide-react";
 
 interface SignInProps {
-  onSignIn: (email: string, password: string) => Promise<void>;
+  // FIX: was Promise<void>, now returns the result object App.tsx provides
+  onSignIn: (email: string, password: string) => Promise<{ success: boolean; message?: string }>;
   onSwitchToSignUp: () => void;
-  onBack?: () => void; // Optional back handler
+  onBack?: () => void;
 }
 
-const SignIn: React.FC<SignInProps> = ({
-  onSignIn,
-  onSwitchToSignUp,
-  onBack,
-}) => {
+const SignIn: React.FC<SignInProps> = ({ onSignIn, onSwitchToSignUp, onBack }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -29,13 +26,13 @@ const SignIn: React.FC<SignInProps> = ({
 
     setIsLoading(true);
 
-    try {
-      await onSignIn(email, password);
-      // Success - App.tsx will handle navigation
-    } catch (err: any) {
-      setError(err.message || "Sign in failed. Please try again.");
+    // FIX: use the returned result to show errors instead of relying on thrown exceptions
+    const result = await onSignIn(email, password);
+    if (!result.success) {
+      setError(result.message || "Sign in failed. Please try again.");
       setIsLoading(false);
     }
+    // On success, App.tsx handles navigation — no need to do anything here
   };
 
   return (
@@ -70,17 +67,10 @@ const SignIn: React.FC<SignInProps> = ({
             <nav className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img
-                    src="/logo.png"
-                    alt="DTrain Logo"
-                    className="w-8 h-8 object-contain"
-                  />
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
-                <span className="text-2xl font-extrabold text-slate-900">
-                  DTrain
-                </span>
+                <span className="text-2xl font-extrabold text-slate-900">DTrain</span>
               </div>
-
               <motion.button
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
@@ -98,15 +88,9 @@ const SignIn: React.FC<SignInProps> = ({
             <div className="flex justify-center mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                  <img
-                    src="/logo.png"
-                    alt="DTrain Logo"
-                    className="w-8 h-8 object-contain"
-                  />
+                  <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
-                <span className="text-3xl font-extrabold text-slate-900">
-                  DTrain
-                </span>
+                <span className="text-3xl font-extrabold text-slate-900">DTrain</span>
               </div>
             </div>
           )}
@@ -116,12 +100,8 @@ const SignIn: React.FC<SignInProps> = ({
             <div className="inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#E4ECFF] text-[11px] font-semibold text-slate-900 shadow-[3px_3px_0_0_rgba(15,23,42,1)] mb-3">
               Welcome Back
             </div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">
-              Sign In
-            </h1>
-            <p className="text-sm text-slate-700 font-medium">
-              Continue your ML training journey
-            </p>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 mb-2">Sign In</h1>
+            <p className="text-sm text-slate-700 font-medium">Continue your ML training journey</p>
           </div>
 
           {/* Form */}
@@ -191,11 +171,7 @@ const SignIn: React.FC<SignInProps> = ({
                 <>
                   <motion.div
                     animate={{ rotate: 360 }}
-                    transition={{
-                      duration: 1,
-                      repeat: Infinity,
-                      ease: "linear",
-                    }}
+                    transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
                     className="w-5 h-5 border-[3px] border-slate-900 border-t-transparent rounded-full mr-2"
                   />
                   Signing In...
@@ -218,9 +194,7 @@ const SignIn: React.FC<SignInProps> = ({
 
           {/* Sign Up Link */}
           <div className="text-center">
-            <p className="text-sm text-slate-700 font-medium mb-3">
-              Don't have an account?
-            </p>
+            <p className="text-sm text-slate-700 font-medium mb-3">Don't have an account?</p>
             <motion.button
               whileHover={{ y: -2 }}
               whileTap={{ y: 0 }}
