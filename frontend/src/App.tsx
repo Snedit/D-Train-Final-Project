@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import {
   Routes,
   Route,
@@ -74,6 +74,40 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+  // ✅ Stable fetchWorkers reference so it can be called from socket handler
+  const fetchWorkers = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_BASE}/api/worker`, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("dtrain_token")}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setWorkers(data.workers);
+        console.log("✅ Workers fetched:", data.workers.length);
+      }
+    } catch (error) {
+      console.error("Error fetching workers:", error);
+    }
+  }, []);
+
+  const fetchJobs = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("dtrain_token");
+      const response = await fetch(`${API_BASE}/api/jobs`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setJobs(data.jobs);
+        console.log("✅ Jobs fetched:", data.jobs.length);
+      }
+    } catch (error) {
+      console.error("Error fetching jobs:", error);
+    }
+  }, []);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("dtrain_user");
     if (savedUser) {
@@ -101,9 +135,11 @@ function App() {
       console.error("🔴 Socket.IO connection error:", error);
     });
 
-    // ✅ Job status updates
+    // ✅ SINGLE SOURCE OF TRUTH: All job status socket events handled ONLY here in App.tsx
+    // Dashboard.tsx reads from the `jobs` prop — no duplicate listeners there.
+
     newSocket.on("job_status_changed", (data) => {
-      console.log("📡 Job status changed:", data);
+      console.log("📡 job_status_changed →", data);
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id === data.jobId
@@ -114,7 +150,7 @@ function App() {
     });
 
     newSocket.on("job_accepted", (data) => {
-      console.log("📡 Job accepted by worker:", data);
+      console.log("📡 job_accepted →", data);
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id === data.jobId
@@ -124,8 +160,9 @@ function App() {
       );
     });
 
+    // Legacy event — keep for backward compatibility
     newSocket.on("job_status", (data) => {
-      console.log("📡 Job status update:", data);
+      console.log("📡 job_status (legacy) →", data);
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id === data.jobId ? { ...job, status: data.status } : job,
@@ -133,30 +170,47 @@ function App() {
       );
     });
 
-    // ✅ Worker status changes — handles BOTH online and offline transitions instantly
-    // This fires when:
-    //   - Worker disconnects (server disconnect handler → status: "offline")
-    //   - Worker reconnects and sends heartbeat (heartbeat route → status: "online")
-    //   - Worker registers fresh (register route → status: "online")
-    //   - Heartbeat checker marks stale worker offline (status: "offline")
+    // ✅ job_completed — emitted by /api/jobs/:jobId/complete route
+    newSocket.on("job_completed", (data) => {
+      console.log("📡 job_completed →", data);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job._id?.toString() === data.jobId?.toString()
+            ? { ...job, status: "completed", modelUrl: data.modelUrl, completedAt: data.completedAt }
+            : job,
+        ),
+      );
+    });
+
+    // ✅ job_failed — emitted by /api/jobs/:jobId/fail route
+    newSocket.on("job_failed", (data) => {
+      console.log("📡 job_failed →", data);
+      setJobs((prevJobs) =>
+        prevJobs.map((job) =>
+          job._id?.toString() === data.jobId?.toString()
+            ? { ...job, status: "failed", errorMessage: data.errorMessage }
+            : job,
+        ),
+      );
+    });
+
+    // ✅ Worker status changes — handles online/offline transitions instantly
     newSocket.on("worker_status_changed", (data) => {
-      console.log("📡 Worker status changed:", data);
+      console.log("📡 worker_status_changed →", data);
 
       setWorkers((prevWorkers) => {
         const existingWorker = prevWorkers.find(
-          (w) => w._id === data.workerId || w.deviceId === data.deviceId
+          (w) => w._id === data.workerId || w.deviceId === data.deviceId,
         );
 
         if (existingWorker) {
-          // ✅ Update existing worker's status in place
           return prevWorkers.map((w) =>
             w._id === data.workerId || w.deviceId === data.deviceId
               ? { ...w, currentStatus: data.status, status: data.status }
               : w,
           );
         } else if (data.status === "online") {
-          // ✅ New worker came online that we don't have in state yet — fetch full list
-          // This covers the case where a brand new worker registers for the first time
+          // New worker not yet in state — refresh full list
           console.log("🆕 New worker came online, refreshing worker list...");
           fetchWorkers();
           return prevWorkers;
@@ -176,50 +230,41 @@ function App() {
       newSocket.off("job_status_changed");
       newSocket.off("job_accepted");
       newSocket.off("job_status");
+      newSocket.off("job_completed");
+      newSocket.off("job_failed");
       newSocket.off("worker_status_changed");
       newSocket.disconnect();
     };
-  }, []);
+  }, [fetchWorkers]);
 
   useEffect(() => {
     if (isAuthenticated) {
       fetchJobs();
       fetchWorkers();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchJobs, fetchWorkers]);
 
-  const fetchJobs = async () => {
-    try {
-      const token = localStorage.getItem("dtrain_token");
-      const response = await fetch(`${API_BASE}/api/jobs`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setJobs(data.jobs);
-        console.log("✅ Jobs fetched:", data.jobs.length);
-      }
-    } catch (error) {
-      console.error("Error fetching jobs:", error);
-    }
-  };
+  // Polling fallback: re-fetch jobs every 5s when any job is in a non-terminal state.
+  // Ensures completed/failed always show even if a socket event is missed.
+  useEffect(() => {
+    if (!isAuthenticated) return;
 
-  const fetchWorkers = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/api/worker`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("dtrain_token")}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        setWorkers(data.workers);
-        console.log("✅ Workers fetched:", data.workers.length);
+    const interval = setInterval(() => {
+      const hasActiveJobs = jobs.some(
+        (j) =>
+          j.status === 'pending' ||
+          j.status === 'assigned' ||
+          j.status === 'running' ||
+          j.status === 'processing'
+      );
+      if (hasActiveJobs) {
+        console.log('Polling: active jobs in flight, refreshing...');
+        fetchJobs();
       }
-    } catch (error) {
-      console.error("Error fetching workers:", error);
-    }
-  };
+    }, 5000);
+
+    return () => clearInterval(interval);
+  }, [isAuthenticated, jobs, fetchJobs]);
 
   const handleSignIn = async (
     email: string,
@@ -391,7 +436,7 @@ function App() {
     }, 800);
   };
 
-  // ✅ Filtered job arrays — single source of truth
+  // ✅ Filtered job arrays derived from single `jobs` state
   const pendingJobs = jobs.filter(
     (j) => j.status === "pending" || j.status === "queued",
   );
@@ -534,7 +579,6 @@ function App() {
                       onViewWorkers={handleViewWorkers}
                       onViewWallet={handleViewWallet}
                       onSignOut={handleSignOut}
-                      socket={socket}
                       jobs={jobs}
                       workers={workers}
                     />

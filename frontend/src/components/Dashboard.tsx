@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus, Trash2, Wallet } from 'lucide-react';
 import { Job, Worker } from '../types';
-import { Socket } from 'socket.io-client';
 import ProfileDropdown from './ProfileDropdown';
 
 interface DashboardProps {
@@ -13,7 +12,6 @@ interface DashboardProps {
   onViewWorkers: () => void;
   onViewWallet: () => void;
   onSignOut: () => void;
-  socket: Socket | null;
   jobs: Job[];
   workers: Worker[];
 }
@@ -26,7 +24,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   onViewWorkers,
   onViewWallet,
   onSignOut,
-  socket,
   jobs,
   workers
 }) => {
@@ -53,11 +50,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     failed: 'bg-[#FEE2E2] text-slate-900',
   };
 
-  // ✅ Update local jobs when props change
+  // ✅ Sync localJobs whenever the jobs prop changes (driven by App.tsx socket events)
   useEffect(() => {
     setLocalJobs(jobs);
   }, [jobs]);
 
+  // ✅ On mount: load user info and set loading false
+  // NOTE: All socket listeners are handled in App.tsx — no duplicate listeners here
   useEffect(() => {
     setLoading(false);
 
@@ -73,62 +72,9 @@ const Dashboard: React.FC<DashboardProps> = ({
         console.error('Error parsing user data:', error);
       }
     }
+  }, []);
 
-    if (socket) {
-      console.log('🔌 Setting up socket listeners in Dashboard');
-
-      socket.on('job_status_changed', (data) => {
-        console.log('📡 Job status changed:', data);
-        setLocalJobs(prevJobs =>
-          prevJobs.map(job =>
-            job._id === data.jobId
-              ? { ...job, status: data.status, assignedWorkerId: data.assignedWorkerId }
-              : job
-          )
-        );
-      });
-
-      socket.on('job_accepted', (data) => {
-        console.log('📡 Job accepted:', data);
-        setLocalJobs(prevJobs =>
-          prevJobs.map(job =>
-            job._id === data.jobId
-              ? { ...job, status: data.status, assignedWorkerId: data.workerId }
-              : job
-          )
-        );
-      });
-
-      socket.on('job_status', (data) => {
-        console.log('📡 Job status updated (legacy):', data);
-        setLocalJobs(prevJobs =>
-          prevJobs.map(job =>
-            job._id === data.jobId
-              ? { ...job, status: data.status }
-              : job
-          )
-        );
-      });
-
-      socket.on('connect', () => console.log('✅ Socket connected in Dashboard'));
-      socket.on('disconnect', () => console.log('⚠️ Socket disconnected in Dashboard'));
-      socket.on('connect_error', (error) => console.error('❌ Socket connection error:', error));
-    }
-
-    return () => {
-      if (socket) {
-        console.log('🧹 Cleaning up socket listeners');
-        socket.off('job_status_changed');
-        socket.off('job_accepted');
-        socket.off('job_status');
-        socket.off('connect');
-        socket.off('disconnect');
-        socket.off('connect_error');
-      }
-    };
-  }, [socket]);
-
-  // Fetch wallet balance
+  // ✅ Fetch wallet balance on mount
   useEffect(() => {
     const fetchWalletBalance = async () => {
       try {
@@ -324,7 +270,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
               </motion.div>
 
-              {/* ✅ FIX: Active Workers — only count online/busy/idle */}
+              {/* Active Workers */}
               <motion.div
                 whileHover={{ y: -2 }}
                 whileTap={{ y: 0 }}
