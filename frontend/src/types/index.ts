@@ -25,6 +25,18 @@ export interface Job {
 
   logs?: string[] | any[];
 
+  pricing?: {
+    estimatedCost?: number;
+    actualCost?: number;
+    workerRate?: number;
+    gpuName?: string;
+    gpuMultiplier?: number;
+    effectiveRate?: number;
+    startTime?: string;
+    endTime?: string;
+    durationSeconds?: number;
+  };
+
   // Legacy/compatibility fields
   name?: string;
   bundle_filename?: string;

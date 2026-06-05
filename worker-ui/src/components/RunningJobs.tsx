@@ -102,6 +102,10 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   const [elapsedTime, setElapsedTime] = useState(0);
   const logsRef = useRef<HTMLDivElement>(null);
   const logListenerRef = useRef<((data: string) => void) | null>(null);
+  const startTimeRef = useRef<Date | null>(null);
+  const localTickerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const workerRateRef = useRef<number>(2.0);
+  const gpuMultiplierRef = useRef<number>(1.0);
 
   const scrollToBottom = useCallback(() => {
     logsRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -112,9 +116,14 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     if (!socket) return;
 
     const handleCostUpdate = (data: any) => {
+      // Only update display while job is actively running
+      // — prevents cost ticking before Start is clicked or after completion
+      if (!isRunning || isCompleted) return;
       if (data.jobId === jobId) {
         setCurrentCost(data.currentCost);
         setElapsedTime(data.elapsedSeconds);
+        if (data.gpuMultiplier) gpuMultiplierRef.current = data.gpuMultiplier;
+        if (data.effectiveRate) workerRateRef.current = data.effectiveRate;
       }
     };
 
@@ -123,7 +132,51 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     return () => {
       socket.off('job:cost_update', handleCostUpdate);
     };
-  }, [socket, jobId]);
+  }, [socket, jobId, isRunning, isCompleted]);
+
+  // ── Local fallback ticker ─────────────────────────────────────────
+  // Keeps timer/cost ticking even if socket is slow or disconnected
+  useEffect(() => {
+    if (localTickerRef.current) clearInterval(localTickerRef.current);
+    if (!isRunning) return;
+
+    localTickerRef.current = setInterval(() => {
+      if (!startTimeRef.current) return;
+      const elapsedSeconds = Math.floor((Date.now() - startTimeRef.current.getTime()) / 1000);
+      const elapsedHours = elapsedSeconds / 3600;
+      const cost = Math.max(workerRateRef.current * gpuMultiplierRef.current * elapsedHours, 0.0001);
+      setElapsedTime(elapsedSeconds);
+      setCurrentCost(parseFloat(cost.toFixed(4)));
+    }, 1000);
+
+    return () => { if (localTickerRef.current) clearInterval(localTickerRef.current); };
+  }, [isRunning]);
+
+  // ── Docker metrics via electron IPC ───────────────────────────────
+  useEffect(() => {
+    const w = (window as any).worker;
+    if (!w?.onMetrics) return;
+
+    w.onMetrics(async (data: { cpu: number; memory: number; timestamp: string }) => {
+      try {
+        await fetch('http://localhost:5000/api/worker/metrics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            deviceId: workerId,
+            cpu: data.cpu,
+            ram: data.memory,
+            gpu: 0,
+            durationMs: startTimeRef.current ? Date.now() - startTimeRef.current.getTime() : 0,
+            timestamp: data.timestamp,
+          }),
+        });
+      } catch (_) {}
+    });
+
+    return () => { (window as any).worker?.offMetrics?.(); };
+  }, [jobId, workerId]);
 
   useEffect(() => {
     scrollToBottom();
@@ -142,11 +195,12 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
         setJob(jobData);
         setLogs(prev => [...prev, `\n[INFO] Job: ${jobData.title || 'Untitled'}\n`]);
 
-        // Initial cost/time if available
-        if (jobData.pricing) {
-          setCurrentCost(jobData.pricing.actualCost || jobData.pricing.estimatedCost || 0);
-          if (jobData.pricing.durationSeconds) setElapsedTime(jobData.pricing.durationSeconds);
-        }
+        // ✅ Only seed rate refs here — NOT startTime
+        // startTime is set in handleStart so the clock only begins when
+        // the worker actually clicks Start, not when they open the page
+        if (jobData.pricing?.workerRate) workerRateRef.current = jobData.pricing.workerRate;
+        if (jobData.pricing?.gpuMultiplier) gpuMultiplierRef.current = jobData.pricing.gpuMultiplier;
+        // Don't pre-set cost/time — show 0 until Start is clicked
       })
       .catch(err => {
         console.error('[ERROR] Job fetch failed:', err);
@@ -173,7 +227,11 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
       return;
     }
 
+    // ✅ Seed startTime NOW — cost clock starts from this moment, not from accept-job
+    startTimeRef.current = new Date();
     setIsRunning(true);
+    setCurrentCost(0);
+    setElapsedTime(0);
     setLogs(prev => [...prev, `\n> Starting job ${jobId.slice(-8)}...\n`]);
 
     const logListener = (data: string) => {
@@ -195,6 +253,11 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
       console.log('[DOWNLOAD] Electron result:', result);
 
       setIsCompleted(true);
+      setIsRunning(false); // ✅ explicitly stop ticker on completion
+      if (localTickerRef.current) {
+        clearInterval(localTickerRef.current);
+        localTickerRef.current = null;
+      }
 
       if (result.success && onJobComplete && job) {
         console.log('[OK] Calling onJobComplete');

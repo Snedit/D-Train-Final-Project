@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Wallet as WalletIcon, CreditCard, History, TrendingUp } from 'lucide-react';
+import { Wallet as WalletIcon, CreditCard, History, TrendingUp, CheckCircle, XCircle } from 'lucide-react';
 
 interface Transaction {
   id: string;
-  type: 'topup' | 'reservation' | 'charge' | 'refund';
+  type: 'topup' | 'reservation' | 'charge' | 'refund' | 'withdrawal' | 'worker_payout';
   amount: number;
   status: 'pending' | 'completed' | 'failed';
   description: string;
   createdAt: string;
-  razorpayOrderId?: string;
-  razorpayPaymentId?: string;
 }
 
 interface WalletProps {
   onBack: () => void;
 }
+
+const API_BASE = 'http://localhost:5000/api/payment';
 
 const Wallet: React.FC<WalletProps> = ({ onBack }) => {
   const [balance, setBalance] = useState(0);
@@ -26,15 +26,14 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const RAZORPAY_KEY_ID = 'rzp_test_SEkIf7zpx0v0Lc';
-  const API_BASE = 'http://localhost:5000/api/payment';
-
   const getTransactionColor = (type: Transaction['type']) => {
     const colors: Record<string, string> = {
       topup: 'bg-[#7CF2D0] text-slate-900',
       reservation: 'bg-[#FFE66D] text-slate-900',
       charge: 'bg-[#FEE2E2] text-slate-900',
-      refund: 'bg-[#4ADE80] text-slate-900'
+      refund: 'bg-[#4ADE80] text-slate-900',
+      withdrawal: 'bg-[#FDE68A] text-slate-900',
+      worker_payout: 'bg-[#BBF7D0] text-slate-900',
     };
     return colors[type] || 'bg-slate-200 text-slate-900';
   };
@@ -42,28 +41,61 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
   const fetchWalletData = async () => {
     try {
       const token = localStorage.getItem('dtrain_token');
-
-      const balanceRes = await fetch(`${API_BASE}/wallet/balance`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const [balanceRes, txRes] = await Promise.all([
+        fetch(`${API_BASE}/wallet/balance`, { headers: { Authorization: `Bearer ${token}` } }),
+        fetch(`${API_BASE}/wallet/transactions?limit=10`, { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
       if (balanceRes.ok) {
-        const balanceData = await balanceRes.json();
-        setBalance(balanceData.balance);
+        const d = await balanceRes.json();
+        setBalance(d.balance);
       }
-
-      const transactionsRes = await fetch(`${API_BASE}/wallet/transactions?limit=10`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (transactionsRes.ok) {
-        const transactionsData = await transactionsRes.json();
-        setTransactions(transactionsData.transactions || []);
+      if (txRes.ok) {
+        const d = await txRes.json();
+        setTransactions(d.transactions || []);
       }
-
-      setLoading(false);
     } catch (err) {
-      console.error('Error fetching wallet data:', err);
       setError('Failed to load wallet data');
+    } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Check if we're returning from Stripe Checkout ───────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    const status = params.get('status');
+
+    if (status === 'cancelled') {
+      setError('Payment was cancelled. No charge was made.');
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    } else if (sessionId && status === 'success') {
+      verifyStripeSession(sessionId);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []);
+
+  const verifyStripeSession = async (sessionId: string) => {
+    try {
+      const token = localStorage.getItem('dtrain_token');
+      const res = await fetch(`${API_BASE}/stripe/verify`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sessionId }),
+      });
+      const data = await res.json();
+      if (data.newBalance !== undefined && data.newBalance !== null) {
+        setBalance(data.newBalance);
+        setSuccess('Wallet recharged successfully via Stripe!');
+        fetchWalletData();
+      } else if (data.message === 'Already processed') {
+        fetchWalletData();
+      } else {
+        setError(data.message || 'Payment verification failed');
+      }
+    } catch (err) {
+      setError('Failed to verify payment');
     }
   };
 
@@ -73,88 +105,59 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
       setError('Minimum recharge amount is ₹10');
       return;
     }
-
     setProcessing(true);
     setError('');
     setSuccess('');
 
     try {
       const token = localStorage.getItem('dtrain_token');
-
-      const orderRes = await fetch(`${API_BASE}/wallet/topup`, {
+      const res = await fetch(`${API_BASE}/wallet/topup`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ amount: rechargeAmount })
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: rechargeAmount }),
       });
+      const data = await res.json();
 
-      const orderData = await orderRes.json();
-
-      if (!orderData.orderId) {
-        throw new Error(orderData.message || 'Order creation failed');
+      if (!data.checkoutUrl) {
+        throw new Error(data.message || 'Failed to create checkout session');
       }
 
-      const options = {
-        key: RAZORPAY_KEY_ID,
-        amount: orderData.amount,
-        currency: orderData.currency,
-        order_id: orderData.orderId,
-        name: 'DTrain Wallet',
-        description: `Recharge ₹${rechargeAmount}`,
-        handler: async (response: any) => {
-          const verifyRes = await fetch(`${API_BASE}/razorpay/verify`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature
-            })
-          });
-
-          const verifyData = await verifyRes.json();
-
-          if (verifyData.newBalance !== undefined) {
-            setSuccess(`Recharged ₹${rechargeAmount} successfully!`);
-            fetchWalletData();
-          } else {
-            setError(verifyData.message || 'Payment verification failed');
-          }
-        },
-        prefill: {
-          name: 'DTrain User',
-          email: localStorage.getItem('dtrain_user')
-            ? JSON.parse(localStorage.getItem('dtrain_user')!).email
-            : 'user@example.com'
-        },
-        theme: { color: '#1e293b' }
-      };
-
-      // @ts-ignore
-      const rzp = new (window as any).Razorpay(options);
-
-      rzp.on('payment.failed', (response: any) => {
-        console.error('Razorpay payment failed:', response.error);
-        setError(`Payment failed: ${response.error.description}`);
-      });
-
-      rzp.open();
+      // Redirect to Stripe Checkout
+      window.location.href = data.checkoutUrl;
     } catch (err: any) {
-      console.error('Recharge error:', err);
       setError(err.message || 'Recharge failed. Please try again.');
+      setProcessing(false);
+    }
+  };
+
+  const handleDevTopup = async () => {
+    const rechargeAmount = parseFloat(amount);
+    if (!rechargeAmount || rechargeAmount <= 0) return;
+    setProcessing(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('dtrain_token');
+      const res = await fetch(`${API_BASE}/wallet/fake-topup`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: rechargeAmount }),
+      });
+      const data = await res.json();
+      if (data.newBalance !== undefined) {
+        setBalance(data.newBalance);
+        setSuccess(`[DEV] Added ₹${rechargeAmount} to wallet.`);
+        fetchWalletData();
+      } else {
+        setError(data.message || 'Dev top-up failed');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Dev top-up failed');
     } finally {
       setProcessing(false);
     }
   };
 
-  useEffect(() => {
-    fetchWalletData();
-  }, []);
+  useEffect(() => { fetchWalletData(); }, []);
 
   if (loading) {
     return (
@@ -194,7 +197,7 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
             }}
           />
 
-          {/* Memphis Decorative Shapes */}
+          {/* Decorative Shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFD447] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
@@ -220,22 +223,18 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
           {/* Main Content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
 
-            {/* Top Nav — exact same as JobDetail */}
+            {/* Top Nav */}
             <nav className="flex items-center justify-between mb-8">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                   <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
                 </div>
-                <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
-                  DTrain
-                </span>
+                <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">DTrain</span>
               </div>
-
               <motion.button
-                whileHover={{ y: -2 }}
-                whileTap={{ y: 0 }}
+                whileHover={{ y: -2 }} whileTap={{ y: 0 }}
                 onClick={onBack}
-                className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
+                className="flex items-center px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500"
               >
                 Back to Dashboard
               </motion.button>
@@ -246,7 +245,6 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
               {/* Balance Card */}
               <motion.div
                 whileHover={{ y: -2 }}
-                whileTap={{ y: 0 }}
                 className="lg:col-span-1 rounded-[22px] border-[3px] border-slate-900 bg-gradient-to-br from-[#A8E6CF] to-[#7CF2D0] p-8 shadow-[8px_8px_0_0_rgba(15,23,42,1)]"
               >
                 <div className="flex items-center gap-2 mb-4">
@@ -262,28 +260,31 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
                 <div className="flex items-center gap-2 mb-6">
                   <CreditCard className="w-5 h-5 text-slate-900" />
                   <h2 className="text-xl font-extrabold text-slate-900">Recharge Wallet</h2>
+                  {/* Stripe badge */}
+                  <span className="ml-auto px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#635BFF] text-white text-[10px] font-extrabold tracking-wide shadow-[2px_2px_0_0_rgba(15,23,42,1)]">
+                    Powered by Stripe
+                  </span>
                 </div>
 
                 {/* Quick Amount Buttons */}
                 <div className="grid grid-cols-4 gap-3 mb-6">
-                  {[50, 100, 500, 1000].map((quickAmount) => (
+                  {[50, 100, 500, 1000].map((q) => (
                     <motion.button
-                      key={quickAmount}
-                      whileHover={{ y: -2 }}
-                      whileTap={{ y: 0 }}
-                      onClick={() => setAmount(quickAmount.toString())}
+                      key={q}
+                      whileHover={{ y: -2 }} whileTap={{ y: 0 }}
+                      onClick={() => setAmount(q.toString())}
                       className={`px-4 py-3 rounded-[12px] border-[3px] border-slate-900 font-bold shadow-[3px_3px_0_0_rgba(15,23,42,1)] transition-all ${
-                        amount === quickAmount.toString()
-                          ? 'bg-[#60A5FA] text-white'
-                          : 'bg-white text-slate-900 hover:bg-[#EFF6FF]'
+                        amount === q.toString()
+                          ? 'bg-[#635BFF] text-white'
+                          : 'bg-white text-slate-900 hover:bg-[#EEF2FF]'
                       }`}
                     >
-                      ₹{quickAmount}
+                      ₹{q}
                     </motion.button>
                   ))}
                 </div>
 
-                {/* Custom Amount Input */}
+                {/* Custom Amount */}
                 <div className="mb-6">
                   <label className="block text-sm font-bold text-slate-900 mb-2">Custom Amount (₹)</label>
                   <input
@@ -291,57 +292,65 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
                     value={amount}
                     onChange={(e) => setAmount(e.target.value)}
                     min="10"
-                    className="w-full px-4 py-3 rounded-[12px] border-[3px] border-slate-900 font-bold text-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] focus:outline-none focus:shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all placeholder:text-slate-500"
+                    className="w-full px-4 py-3 rounded-[12px] border-[3px] border-slate-900 font-bold text-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] focus:outline-none focus:shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all"
                     placeholder="Enter amount (min ₹10)"
                   />
                 </div>
 
-                {/* Recharge Button */}
+                {/* Stripe Recharge Button */}
                 <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: 0 }}
+                  whileHover={{ y: -2 }} whileTap={{ y: 0 }}
                   onClick={handleRecharge}
                   disabled={processing}
-                  className="w-full px-6 py-4 rounded-[14px] border-[3px] border-slate-900 bg-[#60A5FA] text-white text-lg font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-[#3B82F6] disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-4 rounded-[14px] border-[3px] border-slate-900 bg-[#635BFF] text-white text-lg font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] hover:bg-[#5249E5] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {processing ? (
-                    <>
+                    <span className="flex items-center justify-center gap-2">
                       <motion.div
                         animate={{ rotate: 360 }}
                         transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                        className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full mr-2 inline-block"
+                        className="w-5 h-5 border-[3px] border-white border-t-transparent rounded-full"
                       />
-                      Processing...
-                    </>
+                      Redirecting to Stripe...
+                    </span>
                   ) : (
-                    'Recharge Now'
+                    'Pay with Stripe →'
                   )}
+                </motion.button>
+
+                {/* DEV mode fake topup */}
+                <motion.button
+                  whileHover={{ y: -1 }} whileTap={{ y: 0 }}
+                  onClick={handleDevTopup}
+                  disabled={processing}
+                  className="w-full mt-3 px-6 py-3 rounded-[12px] border-[2px] border-dashed border-slate-400 text-slate-500 text-sm font-bold transition-all hover:border-slate-600 hover:text-slate-700 disabled:opacity-40"
+                >
+                  ⚙️ Dev Mode — Add Fake Balance
                 </motion.button>
               </div>
             </div>
 
-            {/* Error/Success Messages */}
+            {/* Status Messages */}
             {error && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 rounded-[16px] border-[3px] border-slate-900 bg-[#FEE2E2] shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-4 rounded-[16px] border-[3px] border-slate-900 bg-[#FEE2E2] shadow-[4px_4px_0_0_rgba(15,23,42,1)] flex items-center gap-3"
               >
+                <XCircle className="w-5 h-5 text-red-600 flex-shrink-0" />
                 <span className="font-bold text-slate-900">{error}</span>
               </motion.div>
             )}
-
             {success && (
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 p-4 rounded-[16px] border-[3px] border-slate-900 bg-[#7CF2D0] shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+                initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+                className="mb-6 p-4 rounded-[16px] border-[3px] border-slate-900 bg-[#7CF2D0] shadow-[4px_4px_0_0_rgba(15,23,42,1)] flex items-center gap-3"
               >
+                <CheckCircle className="w-5 h-5 text-green-800 flex-shrink-0" />
                 <span className="font-bold text-slate-900">{success}</span>
               </motion.div>
             )}
 
-            {/* Transaction History Table */}
+            {/* Transaction History */}
             <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
               <div className="p-6 border-b-[3px] border-slate-900 bg-[#F5F3FF]">
                 <div className="flex items-center gap-2">
@@ -352,7 +361,7 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
 
               {transactions.length === 0 ? (
                 <div className="p-12 text-center">
-                  <div className="w-16 h-16 rounded-[14px] bg-[#60A5FA] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
+                  <div className="w-16 h-16 rounded-[14px] bg-[#635BFF] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                     <History className="w-8 h-8 text-white" />
                   </div>
                   <p className="text-slate-700 font-semibold mb-2">No transactions yet</p>
@@ -371,40 +380,40 @@ const Wallet: React.FC<WalletProps> = ({ onBack }) => {
                       </tr>
                     </thead>
                     <tbody>
-                      {transactions.map((transaction, index) => (
+                      {transactions.map((tx, index) => (
                         <motion.tr
-                          key={transaction.id}
+                          key={tx.id}
                           initial={{ opacity: 0, x: -20 }}
                           animate={{ opacity: 1, x: 0 }}
                           transition={{ duration: 0.3, delay: index * 0.05 }}
                           className="border-b-[2px] border-slate-900/10 hover:bg-[#F9F5FF] transition-colors"
                         >
                           <td className="px-6 py-4">
-                            <div className={`inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${getTransactionColor(transaction.type)}`}>
-                              {transaction.type.toUpperCase()}
+                            <div className={`inline-flex items-center px-3 py-1 rounded-full border-[2px] border-slate-900 text-xs font-bold shadow-[2px_2px_0_0_rgba(15,23,42,1)] ${getTransactionColor(tx.type)}`}>
+                              {tx.type.replace('_', ' ').toUpperCase()}
                             </div>
                           </td>
                           <td className="px-6 py-4">
-                            <p className="text-sm font-medium text-slate-900">{transaction.description}</p>
+                            <p className="text-sm font-medium text-slate-900">{tx.description}</p>
                           </td>
                           <td className="px-6 py-4">
                             <span className="text-lg font-extrabold text-slate-900">
-                              {transaction.type === 'charge'
-                                ? `-₹${transaction.amount.toFixed(2)}`
-                                : `+₹${transaction.amount.toFixed(2)}`}
+                              {tx.type === 'charge' || tx.type === 'withdrawal' || tx.type === 'reservation'
+                                ? `-₹${tx.amount.toFixed(2)}`
+                                : `+₹${tx.amount.toFixed(2)}`}
                             </span>
                           </td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 rounded-full text-xs font-bold ${
-                              transaction.status === 'completed' ? 'bg-[#4ADE80] text-white' :
-                              transaction.status === 'pending' ? 'bg-[#FFE66D] text-slate-900' :
+                              tx.status === 'completed' ? 'bg-[#4ADE80] text-white' :
+                              tx.status === 'pending' ? 'bg-[#FFE66D] text-slate-900' :
                               'bg-[#FEE2E2] text-slate-900'
                             }`}>
-                              {transaction.status.toUpperCase()}
+                              {tx.status.toUpperCase()}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-xs text-slate-700 font-medium">
-                            {new Date(transaction.createdAt).toLocaleString()}
+                            {new Date(tx.createdAt).toLocaleString()}
                           </td>
                         </motion.tr>
                       ))}

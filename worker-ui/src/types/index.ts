@@ -14,7 +14,7 @@ export interface Transaction {
   id: string;
   type: 'topup' | 'reservation' | 'charge' | 'refund' | 'withdrawal' | 'worker_payout';
   amount: number;
-  status: string;
+  status: 'pending' | 'completed' | 'failed';
   description: string;
   jobTitle?: string;
   createdAt: string;
@@ -28,14 +28,15 @@ export interface Worker {
   ram: string;
   gpu: string;
   status: string;
-  currentStatus: string;        // ✅ Added — used by App.tsx and socket events
-  lastHeartbeatAt?: number;     // ✅ Renamed from lastHeartbeat to match backend + App.tsx
+  currentStatus: string;
+  lastHeartbeatAt?: number;
   createdAt: string;
   pricing?: Pricing;
   walletBalance?: number;
   totalEarnings?: number;
-  pendingEarnings?: number;     // ✅ Added — returned by /earnings and /wallet endpoints
-  totalJobsCompleted?: number;  // ✅ Added — returned by /earnings endpoint
+  pendingEarnings?: number;
+  totalJobsCompleted?: number;
+  stripeAccountId?: string | null;  // Stripe Connect account for bank payouts
 }
 
 export interface Job {
@@ -61,6 +62,9 @@ export interface Job {
     estimatedCost?: number;
     actualCost?: number;
     workerRate?: number;
+    gpuName?: string;         // GPU used for this job
+    gpuMultiplier?: number;   // Tier multiplier applied
+    effectiveRate?: number;   // Actual rate after GPU adjustment
     startTime?: string;
     endTime?: string;
     durationSeconds?: number;

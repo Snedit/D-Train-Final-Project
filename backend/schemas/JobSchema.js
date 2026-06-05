@@ -27,12 +27,15 @@ const jobSchema = new mongoose.Schema(
 
     // Pricing and payment tracking
     pricing: {
-      estimatedCost: Number, // Estimated before job starts
-      actualCost: Number, // Final cost after completion
-      workerRate: Number, // Worker's rate at job acceptance time
-      startTime: Date, // When job execution started
-      endTime: Date, // When job execution ended
-      durationSeconds: Number, // Total execution time
+      estimatedCost: Number,
+      actualCost: Number,
+      workerRate: Number,
+      gpuName: String,
+      gpuMultiplier: Number,
+      effectiveRate: Number,
+      startTime: Date,
+      endTime: Date,
+      durationSeconds: Number,
     },
 
     paymentStatus: {

@@ -31,15 +31,19 @@ const workerSchema = new mongoose.Schema(
 
     // Pricing configuration
     pricing: {
-      hourlyRate: { type: Number, default: 0.10 }, // Default $0.10/hour
-      minimumCharge: { type: Number, default: 0.05 }, // Minimum charge per job
-      currency: { type: String, default: "INR" }, // Indian Rupees for Razorpay
+      hourlyRate: { type: Number, default: 2.0 },       // ₹2/hour base
+      minimumCharge: { type: Number, default: 0.05 },   // Minimum per job
+      currency: { type: String, default: "INR" },
     },
 
     // Earnings tracking
     totalEarnings: { type: Number, default: 0 },
-    pendingEarnings: { type: Number, default: 0 }, // From in-progress jobs
-    walletBalance: { type: Number, default: 0 }, // Available balance for withdrawal
+    pendingEarnings: { type: Number, default: 0 },  // In-progress jobs
+    walletBalance: { type: Number, default: 0 },    // Available for withdrawal
+
+    // Stripe Connect — for real bank payouts (optional)
+    // Worker links their Stripe account via onboarding flow to enable instant payouts
+    stripeAccountId: { type: String, default: null },
   },
   { timestamps: true }
 );

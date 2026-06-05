@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Socket } from 'socket.io-client';
 import {
   Cpu,
@@ -19,6 +19,7 @@ import {
 import type { Worker, Pricing, Wallet as WalletType, Transaction } from '../types';
 import PricingSettings from './PricingSettings';
 import WalletCard from './WalletCard';
+import PayoutRequest from './PayoutRequest';
 
 interface WorkerDashboardProps {
   worker: Worker | null;
@@ -62,6 +63,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showPricingSettings, setShowPricingSettings] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [walletData, setWalletData] = useState<WalletType>({
     balance: 0,
     totalEarnings: 0,
@@ -629,6 +631,23 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         onUpdate={handleUpdatePricing}
       />
 
+      {/* Payout Request Modal */}
+      <AnimatePresence>
+        {showPayoutModal && (
+          <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <PayoutRequest
+              walletBalance={walletData.balance}
+              hasStripeAccount={!!worker?.stripeAccountId}
+              onPayoutSuccess={(newBalance) => {
+                setWalletData(prev => ({ ...prev, balance: newBalance }));
+                setShowPayoutModal(false);
+              }}
+              onClose={() => setShowPayoutModal(false)}
+            />
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Wallet Modal */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -642,6 +661,8 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               totalEarnings={walletData.totalEarnings}
               pendingEarnings={walletData.pendingEarnings}
               transactions={transactions}
+              hasStripeAccount={!!worker?.stripeAccountId}
+              onRequestPayout={() => { setShowWalletModal(false); setShowPayoutModal(true); }}
               onClose={() => setShowWalletModal(false)}
             />
           </motion.div>
