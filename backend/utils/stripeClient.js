@@ -8,7 +8,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
 });
 
 /**
- * Create a Stripe Checkout Session for wallet top-up
+ * Create a Stripe Embedded Checkout Session for wallet top-up.
+ * Uses ui_mode: "embedded" — no redirect, renders inside a modal.
  * @param {number} amount   Amount in INR (rupees)
  * @param {string} userId   MongoDB user ID (stored in metadata)
  * @param {string} receipt  Unique receipt string
@@ -18,6 +19,7 @@ export const createCheckoutSession = async (amount, userId, receipt) => {
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",
+      ui_mode: "embedded",                         // ← key change
       line_items: [
         {
           price_data: {
@@ -36,9 +38,9 @@ export const createCheckoutSession = async (amount, userId, receipt) => {
         receipt,
         type: "wallet_topup",
       },
-      // Frontend redirects — adjust origins as needed
-      success_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/wallet?session_id={CHECKOUT_SESSION_ID}&status=success`,
-      cancel_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/wallet?status=cancelled`,
+      // return_url is called by the embedded component after payment
+      // {CHECKOUT_SESSION_ID} is auto-replaced by Stripe
+      return_url: `${process.env.FRONTEND_URL || "http://localhost:5173"}/wallet?session_id={CHECKOUT_SESSION_ID}&status=success`,
     });
     return { success: true, session };
   } catch (error) {

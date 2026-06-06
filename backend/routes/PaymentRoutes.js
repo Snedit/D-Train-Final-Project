@@ -28,7 +28,8 @@ PaymentRouter.get("/wallet/balance", authMiddleware, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// POST /wallet/topup  — create Stripe Checkout session
+// POST /wallet/topup  — create Stripe Embedded Checkout session
+// Returns clientSecret (not checkoutUrl) for embedded modal
 // ─────────────────────────────────────────────────────────────
 PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
   try {
@@ -58,7 +59,7 @@ PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
     res.json({
       message: "Checkout session created",
       sessionId: result.session.id,
-      checkoutUrl: result.session.url,
+      clientSecret: result.session.client_secret,  // ← embedded checkout uses this
     });
   } catch (error) {
     res.status(500).json({ message: "Server error", error: error.message });
@@ -66,7 +67,7 @@ PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
 });
 
 // ─────────────────────────────────────────────────────────────
-// POST /stripe/verify  — called after user returns from Stripe
+// POST /stripe/verify  — called after embedded checkout completes
 //   Frontend sends: { sessionId }
 // ─────────────────────────────────────────────────────────────
 PaymentRouter.post("/stripe/verify", authMiddleware, async (req, res) => {
@@ -212,9 +213,6 @@ PaymentRouter.post(
 
 // ─────────────────────────────────────────────────────────────
 // POST /worker/payout-request
-//   Worker requests a cash payout of their in-app wallet balance
-//   In test/dev mode this simply marks a pending payout record.
-//   In production it would trigger a Stripe Connect transfer.
 // ─────────────────────────────────────────────────────────────
 PaymentRouter.post("/worker/payout-request", authMiddleware, async (req, res) => {
   try {
@@ -234,14 +232,12 @@ PaymentRouter.post("/worker/payout-request", authMiddleware, async (req, res) =>
         requested: amount,
       });
 
-    // Deduct from wallet immediately — payout is in-progress
     worker.walletBalance -= amount;
     await worker.save();
 
     let stripeResult = null;
     let payoutStatus = "pending";
 
-    // If worker has a Stripe Connected Account, trigger real payout
     if (worker.stripeAccountId) {
       stripeResult = await createWorkerPayout(
         worker.stripeAccountId,
@@ -251,7 +247,6 @@ PaymentRouter.post("/worker/payout-request", authMiddleware, async (req, res) =>
       payoutStatus = stripeResult.success ? "completed" : "failed";
 
       if (!stripeResult.success) {
-        // Rollback wallet deduction on failure
         worker.walletBalance += amount;
         await worker.save();
         return res.status(500).json({
@@ -260,7 +255,6 @@ PaymentRouter.post("/worker/payout-request", authMiddleware, async (req, res) =>
         });
       }
     }
-    // else: no Stripe account → stays as "pending" (admin processes manually)
 
     const transaction = await Transaction.create({
       userId: req.user.userId,
