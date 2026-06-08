@@ -59,12 +59,11 @@ export interface Job {
   createdAt: string;
   updatedAt: string;
   pricing?: {
-    estimatedCost?: number;
-    actualCost?: number;
-    workerRate?: number;
-    gpuName?: string;         // GPU used for this job
-    gpuMultiplier?: number;   // Tier multiplier applied
-    effectiveRate?: number;   // Actual rate after GPU adjustment
+    tierPrice?: number;       // Groq-assigned flat fee
+    workerPay?: number;       // 80% of tierPrice
+    platformFee?: number;     // 20% of tierPrice
+    actualCost?: number;      // Set on completion (= tierPrice)
+    gpuName?: string;
     startTime?: string;
     endTime?: string;
     durationSeconds?: number;

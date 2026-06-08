@@ -13,6 +13,7 @@
     "@stripe/react-stripe-js": "^6.6.0",
     "@stripe/stripe-js": "^9.7.0",
     "framer-motion": "^12.23.12",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.344.0",
     "mermaid": "^11.12.2",
     "react": "^18.3.1",

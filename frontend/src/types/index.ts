@@ -4,7 +4,7 @@ export interface Job {
   userId?: string;
   title: string;
   description: string;
-  status: 'pending' | 'queued' | 'assigned' | 'processing' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'draft' | 'pending' | 'queued' | 'assigned' | 'processing' | 'running' | 'completed' | 'failed' | 'cancelled';
   createdAt: string;
   updatedAt?: string;
 

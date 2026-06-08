@@ -14,8 +14,9 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
  * @param {string} userId   MongoDB user ID (stored in metadata)
  * @param {string} receipt  Unique receipt string
  */
-export const createCheckoutSession = async (amount, userId, receipt) => {
+export const createCheckoutSession = async (rawAmount, userId, receipt) => {
   try {
+    const amount = parseFloat(rawAmount);
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
       mode: "payment",

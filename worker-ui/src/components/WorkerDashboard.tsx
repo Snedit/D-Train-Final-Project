@@ -37,6 +37,15 @@ interface PendingJob {
   description: string;
   status: string;
   createdAt: string;
+  pricing?: {
+    tierPrice?: number;
+    workerPay?: number;
+    platformFee?: number;
+    gpuName?: string;
+    startTime?: string;
+    endTime?: string;
+    durationSeconds?: number;
+  };
 }
 
 interface WorkerStats {
@@ -573,9 +582,17 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                               <p className="text-sm text-slate-600 font-medium mb-3">
                                 {job.description || 'Machine learning training task'}
                               </p>
-                              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
-                                <Clock className="w-4 h-4" />
-                                Posted {new Date(job.createdAt).toLocaleString()}
+                              <div className="flex items-center gap-3 mt-3 flex-wrap">
+                                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  Posted {new Date(job.createdAt).toLocaleString()}
+                                </div>
+                                {job.pricing?.workerPay != null && (
+                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#4ADE80] text-xs font-extrabold text-slate-900 shadow-[2px_2px_0_0_rgba(15,23,42,1)]">
+                                    You earn ₹{job.pricing.workerPay}
+                                  </div>
+                                )}
+
                               </div>
                             </div>
                             <motion.button

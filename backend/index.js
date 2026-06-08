@@ -11,19 +11,16 @@ import JobRouter from "./routes/JobRoutes.js";
 import PaymentRouter from "./routes/PaymentRoutes.js";
 import Job from "./schemas/JobSchema.js";
 import Worker from "./schemas/WorkerSchema.js";
-import { getRealTimeCost } from "./utils/paymentHelpers.js";
+import { getElapsedSeconds } from "./utils/paymentHelpers.js";
 import morgan from "morgan";
 
 dotenv.config();
 
-const app = express();
+const app  = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- middleware ---------- */
-app.use(cors({
-  origin: "*",
-  credentials: true
-}));
+app.use(cors({ origin: "*", credentials: true }));
 app.use(express.json({ limit: "50mb" }));
 app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 app.use(morgan("dev"));
@@ -38,7 +35,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  pingTimeout: 60000,
+  pingTimeout:  60000,
   pingInterval: 25000
 });
 
@@ -80,7 +77,6 @@ io.on("connection", (socket) => {
       try {
         const worker = await Worker.findOne({ deviceId });
         if (!worker) return;
-
         if (!["online", "idle", "busy"].includes(worker.currentStatus)) return;
 
         worker.currentStatus = "offline";
@@ -88,9 +84,9 @@ io.on("connection", (socket) => {
         console.log(`📴 Worker ${deviceId} marked offline instantly on disconnect`);
 
         io.emit("worker_status_changed", {
-          workerId: worker._id,
-          deviceId: worker.deviceId,
-          status: "offline",
+          workerId:  worker._id,
+          deviceId:  worker.deviceId,
+          status:    "offline",
           timestamp: new Date().toISOString()
         });
       } catch (err) {
@@ -118,7 +114,7 @@ mongoose
   .connect(`${process.env.MONGO_URI}/dtrain`)
   .then(() => {
     console.log("✅ MongoDB connected");
-    startCostTracking(io);
+    startTimeTracking(io);   // ← replaces startCostTracking
     startHeartbeatChecker(io);
   })
   .catch((err) => {
@@ -127,10 +123,13 @@ mongoose
   });
 
 /* ---------- routes ---------- */
-app.use("/api/user", UserRouter);
-app.use("/api/worker", WorkerRouter);
-app.use("/api/jobs", JobRouter);
+app.use("/api/user",    UserRouter);
+app.use("/api/worker",  WorkerRouter);
+app.use("/api/jobs",    JobRouter);
 app.use("/api/payment", PaymentRouter);
+
+// Alias so App.tsx fetchWalletBalance (GET /api/user/wallet) resolves correctly
+app.use("/api/user", PaymentRouter);
 
 /* ---------- health check ---------- */
 app.get("/", (req, res) => {
@@ -152,41 +151,35 @@ app.use((err, req, res, next) => {
   console.error("❌ Server error:", err);
   res.status(500).json({
     message: "Internal server error",
-    error: process.env.NODE_ENV === 'development' ? err.message : undefined
+    error: process.env.NODE_ENV === "development" ? err.message : undefined
   });
 });
 
-/* ---------- Real-time Cost Tracking ---------- */
-const startCostTracking = (io) => {
-  console.log("💰 Starting real-time cost tracking...");
+/* ---------- Real-time Time Tracking ---------- */
+// Replaces the old cost tracking interval.
+// Emits elapsed seconds only — pricing is a fixed tier fee, no per-second calc.
+const startTimeTracking = (io) => {
+  console.log("⏱️  Starting real-time time tracking...");
 
   setInterval(async () => {
     try {
       const activeJobs = await Job.find({
         status: { $in: ["assigned", "processing"] },
-        "pricing.workerRate": { $exists: true },
         "pricing.startTime": { $exists: true }
       });
 
-      activeJobs.forEach(job => {
+      activeJobs.forEach((job) => {
         if (!job.pricing.startTime) return;
 
-        const { currentCost, elapsedSeconds } = getRealTimeCost(
-          job.pricing.workerRate,
-          job.pricing.startTime,
-          0.05
-        );
-
-        io.to(`job:${job._id}`).emit("job:cost_update", {
-          jobId: job._id,
-          currentCost,
-          elapsedSeconds,
-          workerRate: job.pricing.workerRate,
-          timestamp: new Date().toISOString()
+        io.to(`job:${job._id}`).emit("job:time_update", {
+          jobId:          job._id,
+          elapsedSeconds: getElapsedSeconds(job.pricing.startTime),
+          tierPrice:      job.pricing?.tierPrice,
+          timestamp:      new Date().toISOString()
         });
       });
     } catch (err) {
-      console.error("❌ Cost tracking error:", err.message);
+      console.error("❌ Time tracking error:", err.message);
     }
   }, 1000);
 };
@@ -203,7 +196,7 @@ const startHeartbeatChecker = (io) => {
       const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS);
 
       const staleWorkers = await Worker.find({
-        currentStatus: { $in: ["online", "idle", "busy"] },
+        currentStatus:   { $in: ["online", "idle", "busy"] },
         lastHeartbeatAt: { $lt: cutoff }
       });
 
@@ -217,9 +210,9 @@ const startHeartbeatChecker = (io) => {
         console.log(`📴 Worker ${worker.deviceId} marked offline by heartbeat checker`);
 
         io.emit("worker_status_changed", {
-          workerId: worker._id,
-          deviceId: worker.deviceId,
-          status: "offline",
+          workerId:  worker._id,
+          deviceId:  worker.deviceId,
+          status:    "offline",
           timestamp: new Date().toISOString()
         });
       }
@@ -237,21 +230,21 @@ server.listen(port, () => {
 });
 
 /* ---------- graceful shutdown ---------- */
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM received, shutting down gracefully');
+process.on("SIGTERM", () => {
+  console.log("👋 SIGTERM received, shutting down gracefully");
   server.close(() => {
     mongoose.connection.close(false, () => {
-      console.log('✅ Server and MongoDB closed');
+      console.log("✅ Server and MongoDB closed");
       process.exit(0);
     });
   });
 });
 
-process.on('SIGINT', () => {
-  console.log('👋 SIGINT received, shutting down gracefully');
+process.on("SIGINT", () => {
+  console.log("👋 SIGINT received, shutting down gracefully");
   server.close(() => {
     mongoose.connection.close(false, () => {
-      console.log('✅ Server and MongoDB closed');
+      console.log("✅ Server and MongoDB closed");
       process.exit(0);
     });
   });
