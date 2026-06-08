@@ -9,6 +9,7 @@ const fetch = require('node-fetch');
 const FormData = require('form-data');
 
 let REGISTERED_DEVICE_ID = null;
+let mainWindow = null; // module-level so docker stats can access it
 
 // Icon replacements (using text symbols that match Lucide style)
 const icons = {
@@ -49,7 +50,7 @@ const streamLogToBackend = async (jobId, deviceId, logLine) => {
 };
 
 function createWindow() {
-  const win = new BrowserWindow({
+  mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     icon: path.join(__dirname, "assets", "icon.png"),
@@ -62,10 +63,10 @@ function createWindow() {
     }
   });
 
-  win.setMenu(null);
-  win.maximize();
-  win.loadFile(path.join(__dirname, "../worker-ui", "dist", "index.html"));
-  // win.webContents.openDevTools();
+  mainWindow.setMenu(null);
+  mainWindow.maximize();
+  mainWindow.loadFile(path.join(__dirname, "../worker-ui", "dist", "index.html"));
+  mainWindow.webContents.openDevTools(); // ✅ uncommented for debugging
 }
 
 ipcMain.handle("set-device-id", async (event, deviceId) => {
@@ -189,6 +190,19 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
 
   console.log(`${icons.rocket} Starting job ${jobId} (${shortId}) for worker ${deviceId}`);
 
+  // ✅ Notify backend that training is actually starting NOW
+  // This triggers the cost clock on the user's side
+  try {
+    await fetch(`http://localhost:5000/api/worker/start-job`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jobId, deviceId }),
+    });
+    console.log(`[start-job] Cost clock started for job ${shortId}`);
+  } catch (err) {
+    console.warn(`[start-job] Failed to notify start:`, err.message);
+  }
+
   const imageName = `dtrain-job-${shortId}`;
   const containerName = `dtrain-container-${shortId}`;
 
@@ -293,7 +307,42 @@ CMD ["python", "${mainFileName}"]
       run.stdout.on("data", async (data) => await sendLog(data.toString()));
       run.stderr.on("data", async (data) => await sendLog(data.toString()));
 
+      // ── Poll docker stats every 2s while container runs ──
+      let statsInterval = null;
+
+      const sendDockerStats = () => {
+        exec(
+          `docker stats ${containerName} --no-stream --format "{{.CPUPerc}}|{{.MemPerc}}"`,
+          (err, stdout) => {
+            if (err || !stdout || !mainWindow) return;
+            const line = stdout.trim().split("\n")[0];
+            if (!line) return;
+            const [cpuStr, memStr] = line.split("|");
+            const cpu = parseFloat((cpuStr || "0").replace("%", "")) || 0;
+            const memory = parseFloat((memStr || "0").replace("%", "")) || 0;
+            console.log(`[DockerStats] cpu=${cpu}% mem=${memory}% | sending to renderer`);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+              mainWindow.webContents.send("job-metrics", {
+                cpu,
+                memory,
+                timestamp: new Date().toISOString(),
+              });
+              console.log(`[DockerStats] IPC job-metrics sent to renderer`);
+            } else {
+              console.warn(`[DockerStats] mainWindow not available — metrics dropped`);
+            }
+          }
+        );
+      };
+
+      // Wait 500ms then poll every 1s — catches short-running jobs
+      const statsStart = setTimeout(() => {
+        statsInterval = setInterval(sendDockerStats, 1000);
+      }, 500);
+
       run.on("close", async (code) => {
+        clearTimeout(statsStart);
+        if (statsInterval) clearInterval(statsInterval);
         if (code === 0) {
           await sendLog(`\n${icons.check} Training completed!\n`);
           resolve();

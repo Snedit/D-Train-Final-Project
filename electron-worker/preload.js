@@ -35,5 +35,18 @@ contextBridge.exposeInMainWorld("worker", {
     });
     
     console.log('✅ Job-log listener registered');
+  },
+
+  // ✅ Real-time Docker metrics (cpu%, memory%)
+  onMetrics: (callback) => {
+    ipcRenderer.removeAllListeners('job-metrics');
+    ipcRenderer.on('job-metrics', (_, data) => {
+      callback(data);
+    });
+  },
+
+  // ✅ Remove metrics listener
+  offMetrics: () => {
+    ipcRenderer.removeAllListeners('job-metrics');
   }
 });

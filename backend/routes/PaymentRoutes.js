@@ -1,337 +1,317 @@
 import { Router } from "express";
+import express from "express";
 import authMiddleware from "../middlewares/authMiddleware.js";
 import User from "../schemas/UserSchema.js";
+import Worker from "../schemas/WorkerSchema.js";
 import Transaction from "../schemas/TransactionSchema.js";
-import { createOrder, verifyPaymentSignature, verifyWebhookSignature } from "../utils/razorpayClient.js";
-import { addFundsToWallet } from "../utils/paymentHelpers.js";
+import {
+  createCheckoutSession,
+  retrieveSession,
+  verifyWebhookSignature,
+  createWorkerPayout,
+} from "../utils/stripeClient.js";
+import { addFundsToWallet, getAvailableBalance } from "../utils/paymentHelpers.js";
 
 const PaymentRouter = Router();
 
-/**
- * GET /wallet/balance
- * Get current wallet balance
- */
+// ─────────────────────────────────────────────────────────────
+// GET /wallet/balance  — returns total, reserved, and available
+// ─────────────────────────────────────────────────────────────
 PaymentRouter.get("/wallet/balance", authMiddleware, async (req, res) => {
-    try {
-        const user = await User.findById(req.user.userId).select("walletBalance");
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        res.json({
-            balance: user.walletBalance,
-            currency: "INR",
-        });
-    } catch (error) {
-        console.error("Get balance error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
+  try {
+    const user = await User.findById(req.user.userId).select("walletBalance reservedBalance");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const available = getAvailableBalance(user);
+    res.json({
+      balance:   user.walletBalance,          // total in wallet
+      reserved:  user.reservedBalance ?? 0,   // locked for active jobs
+      available,                              // what can actually be spent
+      currency: "INR",
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * POST /wallet/fake-topup
- * Add fake balance for testing (DEVELOPMENT ONLY)
- */
-PaymentRouter.post("/wallet/fake-topup", authMiddleware, async (req, res) => {
-    try {
-        const { amount } = req.body;
-
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ message: "Invalid amount" });
-        }
-
-        if (amount > 10000) {
-            return res.status(400).json({ message: "Maximum fake top-up is ₹10,000" });
-        }
-
-        const user = await User.findById(req.user.userId);
-
-        if (!user) {
-            return res.status(404).json({ message: "User not found" });
-        }
-
-        user.walletBalance += amount;
-        await user.save();
-
-        const transaction = await Transaction.create({
-            userId: req.user.userId,
-            type: "topup",
-            amount,
-            status: "completed",
-            description: `Fake wallet top-up of ₹${amount.toFixed(2)} (TESTING)`,
-            metadata: {
-                isFake: true,
-                note: "Development testing only"
-            }
-        });
-
-        console.log(`💰 Fake top-up: ₹${amount} added to user ${req.user.userId}`);
-
-        res.json({
-            message: "Fake balance added successfully",
-            newBalance: user.walletBalance,
-            transaction: {
-                id: transaction._id,
-                amount: transaction.amount,
-                status: transaction.status,
-            },
-            note: "⚠️ This is a fake top-up for testing. Use real Razorpay once configured."
-        });
-    } catch (error) {
-        console.error("Fake top-up error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
+// ─────────────────────────────────────────────────────────────
+// GET /api/user/wallet  — alias used by App.tsx fetchWalletBalance
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.get("/user-wallet", authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.userId).select("walletBalance reservedBalance");
+    if (!user) return res.status(404).json({ message: "User not found" });
+    const available = getAvailableBalance(user);
+    res.json({
+      walletBalance: user.walletBalance,
+      reserved:      user.reservedBalance ?? 0,
+      available,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * POST /wallet/topup
- * Create Razorpay order for wallet top-up
- */
+// ─────────────────────────────────────────────────────────────
+// POST /wallet/topup  — create Stripe Embedded Checkout session
+// ─────────────────────────────────────────────────────────────
 PaymentRouter.post("/wallet/topup", authMiddleware, async (req, res) => {
-    try {
-        const { amount } = req.body;
+  try {
+    const { amount } = req.body;
+    if (!amount || amount <= 0)
+      return res.status(400).json({ message: "Invalid amount" });
+    if (amount < 50)
+      return res.status(400).json({ message: "Minimum top-up amount is ₹50 (Stripe minimum)" });
 
-        if (!amount || amount <= 0) {
-            return res.status(400).json({ message: "Invalid amount" });
-        }
+    const receipt = `TUP_${Date.now()}_${req.user.userId}`;
+    const result  = await createCheckoutSession(amount, req.user.userId, receipt);
+    if (!result.success)
+      return res.status(500).json({ message: "Failed to create payment session", error: result.error });
 
-        if (amount < 10) {
-            return res.status(400).json({ message: "Minimum top-up amount is ₹10" });
-        }
+    await Transaction.create({
+      userId:      req.user.userId,
+      type:        "topup",
+      amount,
+      status:      "pending",
+      description: `Wallet top-up of ₹${amount.toFixed(2)}`,
+      metadata:    { stripeSessionId: result.session.id },
+    });
 
-        const receipt = `TUP_${Date.now()}`;
-        const result = await createOrder(amount, receipt, {
-            userId: req.user.userId,
-            type: "wallet_topup",
-        });
-
-        if (!result.success) {
-            return res.status(500).json({
-                message: "Failed to create payment order",
-                error: result.error
-            });
-        }
-
-        // Create ONE pending transaction here — it will be updated (not duplicated)
-        // by addFundsToWallet when payment is verified
-        await Transaction.create({
-            userId: req.user.userId,
-            type: "topup",
-            amount,
-            status: "pending",
-            razorpayOrderId: result.order.id,
-            description: `Wallet top-up of ₹${amount.toFixed(2)}`,
-        });
-
-        res.json({
-            message: "Payment order created",
-            orderId: result.order.id,
-            amount: result.order.amount,
-            currency: result.order.currency,
-            keyId: process.env.RAZORPAY_KEY_ID,
-        });
-    } catch (error) {
-        console.error("Wallet top-up error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
+    res.json({
+      message:      "Checkout session created",
+      sessionId:    result.session.id,
+      clientSecret: result.session.client_secret,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * POST /razorpay/verify
- * Verify Razorpay payment and add funds to wallet
- */
-PaymentRouter.post("/razorpay/verify", authMiddleware, async (req, res) => {
-    try {
-        const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
+// ─────────────────────────────────────────────────────────────
+// POST /stripe/verify  — called after embedded checkout completes
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.post("/stripe/verify", authMiddleware, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ message: "sessionId required" });
 
-        if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
-            return res.status(400).json({ message: "Missing payment details" });
-        }
+    const result = await retrieveSession(sessionId);
+    if (!result.success)
+      return res.status(400).json({ message: "Could not retrieve session", error: result.error });
 
-        const isValid = verifyPaymentSignature(
-            razorpay_order_id,
-            razorpay_payment_id,
-            razorpay_signature
-        );
+    const session = result.session;
+    if (session.payment_status !== "paid")
+      return res.status(400).json({ message: "Payment not completed", status: session.payment_status });
 
-        if (!isValid) {
-            return res.status(400).json({ message: "Invalid payment signature" });
-        }
+    const already = await Transaction.findOne({
+      "metadata.stripeSessionId": sessionId,
+      status: "completed",
+    });
+    if (already) return res.json({ message: "Already processed", newBalance: null });
 
-        // Find the pending transaction to get amount and userId
-        const pendingTransaction = await Transaction.findOne({
-            razorpayOrderId: razorpay_order_id,
-            status: "pending",
-        });
+    const amount = session.amount_total / 100;
+    const userId = session.metadata?.userId || req.user.userId;
 
-        if (!pendingTransaction) {
-            return res.status(404).json({ message: "Transaction not found" });
-        }
+    const addResult = await addFundsToWallet(userId, amount, sessionId);
+    if (!addResult.success)
+      return res.status(500).json({ message: "Failed to add funds", error: addResult.error });
 
-        // addFundsToWallet will update the existing pending transaction to
-        // "completed" — no duplicate is created
-        const result = await addFundsToWallet(
-            pendingTransaction.userId,
-            pendingTransaction.amount,
-            razorpay_order_id,
-            razorpay_payment_id
-        );
+    // Return full balance breakdown so frontend can update immediately
+    const user      = await User.findById(userId).select("walletBalance reservedBalance");
+    const available = getAvailableBalance(user);
 
-        if (!result.success) {
-            return res.status(500).json({
-                message: "Failed to add funds",
-                error: result.error
-            });
-        }
-
-        // Save the signature onto the now-completed transaction
-        result.transaction.razorpaySignature = razorpay_signature;
-        await result.transaction.save();
-
-        res.json({
-            message: "Payment verified successfully",
-            newBalance: result.newBalance,
-            transaction: {
-                id: result.transaction._id,
-                amount: result.transaction.amount,
-                status: result.transaction.status,
-            },
-        });
-    } catch (error) {
-        console.error("Payment verification error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
+    res.json({
+      message:    "Payment verified and wallet updated",
+      newBalance: addResult.newBalance,
+      reserved:   user.reservedBalance ?? 0,
+      available,
+      transaction: {
+        id:     addResult.transaction._id,
+        amount: addResult.transaction.amount,
+        status: addResult.transaction.status,
+      },
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * GET /wallet/transactions
- * Get transaction history
- */
+
+// ─────────────────────────────────────────────────────────────
+// GET /wallet/transactions
+// ─────────────────────────────────────────────────────────────
 PaymentRouter.get("/wallet/transactions", authMiddleware, async (req, res) => {
-    try {
-        const { limit = 20, offset = 0, type } = req.query;
+  try {
+    const { limit = 20, offset = 0, type } = req.query;
+    const query = { userId: req.user.userId };
+    if (type) query.type = type;
 
-        const query = { userId: req.user.userId };
-        if (type) {
-            query.type = type;
-        }
+    const transactions = await Transaction.find(query)
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .skip(parseInt(offset))
+      .populate("jobId", "title status");
 
-        const transactions = await Transaction.find(query)
-            .sort({ createdAt: -1 })
-            .limit(parseInt(limit))
-            .skip(parseInt(offset))
-            .populate("jobId", "title status");
-
-        const total = await Transaction.countDocuments(query);
-
-        res.json({
-            transactions,
-            total,
-            limit: parseInt(limit),
-            offset: parseInt(offset),
-        });
-    } catch (error) {
-        console.error("Get transactions error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
-    }
+    const total = await Transaction.countDocuments(query);
+    res.json({ transactions, total, limit: parseInt(limit), offset: parseInt(offset) });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * POST /razorpay/webhook
- * Handle Razorpay webhook events
- */
-PaymentRouter.post("/razorpay/webhook", async (req, res) => {
-    try {
-        const signature = req.headers["x-razorpay-signature"];
-        const body = JSON.stringify(req.body);
 
-        const isValid = verifyWebhookSignature(body, signature);
+// ─────────────────────────────────────────────────────────────
+// POST /stripe/cancel  — marks abandoned checkout as cancelled
+// Called when user closes the Stripe modal without paying
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.post("/stripe/cancel", authMiddleware, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    if (!sessionId) return res.status(400).json({ message: "sessionId required" });
 
-        if (!isValid) {
-            console.error("Invalid webhook signature");
-            return res.status(400).json({ message: "Invalid signature" });
-        }
+    const result = await Transaction.findOneAndUpdate(
+      { "metadata.stripeSessionId": sessionId, status: "pending", userId: req.user.userId },
+      { status: "failed", description: "Payment cancelled by user (modal closed)" },
+      { new: true }
+    );
 
-        const event = req.body.event;
-        const payload = req.body.payload.payment.entity;
-
-        console.log(`📥 Webhook received: ${event}`);
-
-        if (event === "payment.captured") {
-            const orderId = payload.order_id;
-            const paymentId = payload.id;
-
-            const transaction = await Transaction.findOne({
-                razorpayOrderId: orderId,
-                status: "pending",
-            });
-
-            if (transaction) {
-                // addFundsToWallet updates the existing pending transaction —
-                // no duplicate even if webhook and verify both fire
-                const result = await addFundsToWallet(
-                    transaction.userId,
-                    transaction.amount,
-                    orderId,
-                    paymentId
-                );
-
-                if (result.success) {
-                    console.log(`✅ Wallet topped up via webhook: ₹${transaction.amount} for user ${transaction.userId}`);
-                }
-            }
-        }
-
-        if (event === "payment.failed") {
-            const orderId = payload.order_id;
-
-            const transaction = await Transaction.findOne({
-                razorpayOrderId: orderId,
-                status: "pending",
-            });
-
-            if (transaction) {
-                transaction.status = "failed";
-                await transaction.save();
-                console.log(`❌ Payment failed for order ${orderId}`);
-            }
-        }
-
-        res.json({ status: "ok" });
-    } catch (error) {
-        console.error("Webhook error:", error);
-        res.status(500).json({ message: "Webhook processing error" });
+    if (!result) {
+      // Already processed or not found — safe to ignore
+      return res.json({ message: "No pending transaction found", cancelled: false });
     }
+
+    console.log(`🚫 Stripe session ${sessionId} cancelled by user — transaction marked failed`);
+    res.json({ message: "Transaction cancelled", cancelled: true });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
-/**
- * GET /transactions
- * Get all user transactions with filters
- */
-PaymentRouter.get("/transactions", authMiddleware, async (req, res) => {
-    try {
-        const { status, type, startDate, endDate } = req.query;
+// ─────────────────────────────────────────────────────────────
+// POST /stripe/webhook
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.post(
+  "/stripe/webhook",
+  express.raw({ type: "application/json" }),
+  async (req, res) => {
+    const sig = req.headers["stripe-signature"];
+    const { valid, event, error } = verifyWebhookSignature(req.body, sig);
 
-        const query = { userId: req.user.userId };
-
-        if (status) query.status = status;
-        if (type) query.type = type;
-        if (startDate || endDate) {
-            query.createdAt = {};
-            if (startDate) query.createdAt.$gte = new Date(startDate);
-            if (endDate) query.createdAt.$lte = new Date(endDate);
-        }
-
-        const transactions = await Transaction.find(query)
-            .sort({ createdAt: -1 })
-            .populate("jobId", "title status");
-
-        res.json({ transactions });
-    } catch (error) {
-        console.error("Get transactions error:", error);
-        res.status(500).json({ message: "Server error", error: error.message });
+    if (!valid) {
+      console.error("❌ Invalid Stripe webhook signature:", error);
+      return res.status(400).json({ message: "Invalid signature" });
     }
+
+    console.log(`📥 Stripe webhook: ${event.type}`);
+
+    if (event.type === "checkout.session.completed") {
+      const session = event.data.object;
+      if (session.payment_status === "paid") {
+        const amount = session.amount_total / 100;
+        const userId = session.metadata?.userId;
+        if (userId) {
+          const result = await addFundsToWallet(userId, amount, session.id);
+          if (result.success) {
+            console.log(`✅ Stripe webhook: ₹${amount} added to user ${userId}`);
+          } else {
+            console.error(`⚠️ Stripe webhook addFunds failed: ${result.error}`);
+          }
+        }
+      }
+    }
+
+    res.json({ received: true });
+  }
+);
+
+// ─────────────────────────────────────────────────────────────
+// POST /worker/payout-request
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.post("/worker/payout-request", authMiddleware, async (req, res) => {
+  try {
+    const { amount } = req.body;
+    if (!amount || amount <= 0) return res.status(400).json({ message: "Invalid amount" });
+
+    const worker = await Worker.findOne({ userId: req.user.userId });
+    if (!worker) return res.status(404).json({ message: "Worker not found. Register as a worker first." });
+
+    if (worker.walletBalance < amount)
+      return res.status(400).json({
+        message: "Insufficient worker wallet balance",
+        available: worker.walletBalance,
+        requested: amount,
+      });
+
+    worker.walletBalance -= amount;
+    await worker.save();
+
+    let stripeResult = null;
+    let payoutStatus = "pending";
+
+    if (worker.stripeAccountId) {
+      stripeResult = await createWorkerPayout(
+        worker.stripeAccountId, amount,
+        `DTrain payout for worker ${worker.deviceId}`
+      );
+      payoutStatus = stripeResult.success ? "completed" : "failed";
+
+      if (!stripeResult.success) {
+        worker.walletBalance += amount;
+        await worker.save();
+        return res.status(500).json({ message: "Payout failed", error: stripeResult.error });
+      }
+    }
+
+    const transaction = await Transaction.create({
+      userId:   req.user.userId,
+      workerId: worker._id,
+      type:     "withdrawal",
+      amount,
+      status:   payoutStatus,
+      description: `Payout request of ₹${amount.toFixed(2)}`,
+      metadata: {
+        stripeTransferId: stripeResult?.transfer?.id || null,
+        note: worker.stripeAccountId
+          ? "Stripe Connect transfer initiated"
+          : "Manual payout pending — no Stripe account connected",
+      },
+    });
+
+    res.json({
+      message: worker.stripeAccountId
+        ? "Payout initiated via Stripe"
+        : "Payout request recorded. Connect a Stripe account for instant payouts.",
+      transaction:      { id: transaction._id, amount, status: payoutStatus },
+      newWalletBalance: worker.walletBalance,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────
+// GET /worker/payout-history
+// ─────────────────────────────────────────────────────────────
+PaymentRouter.get("/worker/payout-history", authMiddleware, async (req, res) => {
+  try {
+    const worker = await Worker.findOne({ userId: req.user.userId });
+    if (!worker) return res.status(404).json({ message: "Worker not found" });
+
+    const payouts = await Transaction.find({
+      workerId: worker._id,
+      type: { $in: ["withdrawal", "worker_payout"] },
+    }).sort({ createdAt: -1 }).limit(50).populate("jobId", "title");
+
+    res.json({
+      payouts: payouts.map((p) => ({
+        id: p._id, type: p.type, amount: p.amount, status: p.status,
+        description: p.description, jobTitle: p.jobId?.title || null, createdAt: p.createdAt,
+      })),
+      walletBalance: worker.walletBalance,
+      totalEarnings: worker.totalEarnings,
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Server error", error: error.message });
+  }
 });
 
 export default PaymentRouter;

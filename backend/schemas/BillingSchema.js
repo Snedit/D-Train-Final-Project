@@ -2,15 +2,20 @@ import mongoose from "mongoose";
 
 const billingSchema = new mongoose.Schema(
   {
-    jobId: { type: mongoose.Schema.Types.ObjectId, ref: "Job", required: true },
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-    workerId: { type: mongoose.Schema.Types.ObjectId, ref: "Worker", required: true },
+    jobId:    { type: mongoose.Schema.Types.ObjectId, ref: "Job",    required: true },
+    userId:   { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    workerId: { type: mongoose.Schema.Types.ObjectId, ref: "Worker" },
 
-    amount: { type: Number, required: true },
+    amount:      { type: Number, default: 0 },  // full tier price charged to user
+    workerPay:   { type: Number, default: 0 },  // 80%
+    platformFee: { type: Number, default: 0 },  // 20%
 
-    // Pricing details
-    workerRate: { type: Number, required: true }, // Rate at time of job
-    durationSeconds: Number, // Execution duration
+    durationSeconds: Number,
+
+    // Docker stats snapshots (used for graphs — NOT for billing)
+    cpu: { type: Number, default: 0 },
+    ram: { type: Number, default: 0 },
+    gpu: { type: Number, default: 0 },
 
     status: {
       type: String,
@@ -18,9 +23,7 @@ const billingSchema = new mongoose.Schema(
       default: "pending",
     },
 
-    // Reference to transaction
     transactionId: { type: mongoose.Schema.Types.ObjectId, ref: "Transaction" },
-
     invoiceUrl: String,
   },
   { timestamps: true }

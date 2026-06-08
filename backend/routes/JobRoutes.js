@@ -3,131 +3,102 @@ import authMiddleware from "../middlewares/authMiddleware.js";
 import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
 import Worker from "../schemas/WorkerSchema.js";
-
 import multer from "multer";
 import AdmZip from "adm-zip";
 import { supabase } from "../utils/supabaseClient.js";
 import redisPublisher from "../utils/redis.js";
 import {
-  calculateEstimatedCost,
-  calculateActualCost,
+  assignTierWithGroq,
   validateSufficientBalance,
   reserveFunds,
+  releaseReservation,
   chargeFunds,
-  refundFunds,
-  getRealTimeCost
+  creditWorkerWallet,
+  workerEarnings,
+  platformEarnings,
+  hashRequirements,
+  getElapsedSeconds,
 } from "../utils/paymentHelpers.js";
+import { stopCostInterval } from "./WorkerRoutes.js";
 
 const JobRouter = Router();
-const upload = multer({ storage: multer.memoryStorage() }); // handle zip upload
+const upload = multer({ storage: multer.memoryStorage() });
 
-JobRouter.get('/', authMiddleware, async (req, res) => {
+// ── GET / — list user's jobs (includes drafts) ────────────────────────────────
+JobRouter.get("/", authMiddleware, async (req, res) => {
   try {
-    const jobs = await Job.find({
-      userId: req.user.userId
-    });
-    return res.status(200).json({ message: "jobs fetched", jobs })
-  }
-  catch (err) {
-    console.log(err);
-    return res.status(500).json({ messae: " error fetching the jobs" })
+    const jobs = await Job.find({ userId: req.user.userId }).sort({ createdAt: -1 });
+    return res.status(200).json({ message: "jobs fetched", jobs });
+  } catch {
+    return res.status(500).json({ message: "error fetching the jobs" });
   }
 });
 
+// ── POST /create — upload zip, analyse with Groq, save as DRAFT ──────────────
+// No payment, no reservation. Job is invisible to workers until published.
 JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res) => {
   try {
-    const { mainFileName, title, description, estimatedDurationHours = 1 } = req.body;
-    console.table(req.body);
-    console.log(req.user);
-    if (!req.file)
-      return res.status(400).json({ message: "ZIP file is required." });
-    if (!mainFileName)
-      return res.status(400).json({ message: "mainFileName is required." });
+    const { mainFileName, title, description } = req.body;
 
-    // validate zip
-    const zip = new AdmZip(req.file.buffer);
+    if (!req.file)            return res.status(400).json({ message: "ZIP file is required." });
+    if (!mainFileName)        return res.status(400).json({ message: "mainFileName is required." });
+    if (!title?.trim())       return res.status(400).json({ message: "Job title is required." });
+    if (!description?.trim()) return res.status(400).json({ message: "Job description is required." });
+
+    // ── 1. Validate ZIP ───────────────────────────────────────────────────────
+    const zip     = new AdmZip(req.file.buffer);
     const entries = zip.getEntries().map((e) => e.entryName);
 
     if (!entries.includes("requirements.txt"))
-      return res
-        .status(400)
-        .json({ message: "requirements.txt missing in ZIP." });
-
+      return res.status(400).json({ message: "requirements.txt missing in ZIP." });
     if (!entries.includes(mainFileName))
-      return res
-        .status(400)
-        .json({ message: `Main file '${mainFileName}' not found.` });
+      return res.status(400).json({ message: `Main file '${mainFileName}' not found in ZIP.` });
 
-    // ✅ PAYMENT: Estimate cost based on average worker rate
-    const avgWorkerRate = 0.10; // Default rate, can be calculated from active workers
-    const estimatedCost = calculateEstimatedCost(avgWorkerRate, parseFloat(estimatedDurationHours), 0.05);
+    // ── 2. Read both files for Groq pricing ───────────────────────────────────
+    const reqEntry    = zip.getEntry("requirements.txt");
+    const mainEntry   = zip.getEntry(mainFileName);
+    const requirementsTxt = reqEntry  ? reqEntry.getData().toString("utf8")  : "";
+    const mainFileTxt     = mainEntry ? mainEntry.getData().toString("utf8") : "";
 
-    // ✅ PAYMENT: Check wallet balance
-    const balanceCheck = await validateSufficientBalance(req.user.userId, estimatedCost);
-    if (!balanceCheck.sufficient) {
-      return res.status(400).json({
-        message: "Insufficient wallet balance",
-        required: estimatedCost,
-        available: balanceCheck.balance,
-      });
-    }
+    // ── 3. Groq + rule-based pricing ──────────────────────────────────────────
+    const tierPrice   = await assignTierWithGroq(requirementsTxt, mainFileTxt, mainFileName);
+    const workerPay   = workerEarnings(tierPrice);
+    const platformFee = platformEarnings(tierPrice);
 
-    // -----------------------------
-    // 2. Upload ZIP to Supabase
-    // -----------------------------
+    // ── 4. Upload ZIP to Supabase ─────────────────────────────────────────────
     const filePath = `jobs/${Date.now()}-${req.file.originalname}`;
-
-    const { data, error } = await supabase.storage
+    const { error: uploadError } = await supabase.storage
       .from("jobs")
-      .upload(filePath, req.file.buffer, {
-        cacheControl: "3600",
-        upsert: false,
-      });
+      .upload(filePath, req.file.buffer, { cacheControl: "3600", upsert: false });
 
-    if (error) {
-      console.error(error);
+    if (uploadError) {
+      console.error(uploadError);
       return res.status(500).json({ message: "Supabase upload failed." });
     }
 
-    // Public link
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("jobs").getPublicUrl(filePath);
+    const { data: { publicUrl } } = supabase.storage.from("jobs").getPublicUrl(filePath);
 
-    // -----------------------------
-    // 3. Create Job in MongoDB
-    // -----------------------------
+    // ── 5. Save as DRAFT — not visible to workers yet ─────────────────────────
     const job = await Job.create({
-      userId: req.user.userId,
-      config: { entryFile: mainFileName },
-      zipFileUrl: publicUrl,
-      status: "pending",
-      title: title,
-      description: description,
-      logs: [],
-      pricing: {
-        estimatedCost: estimatedCost,
-      },
-      paymentStatus: "pending",
-      createdAt: new Date(),
+      userId:        req.user.userId,
+      config:        { entryFile: mainFileName },
+      zipFileUrl:    publicUrl,
+      status:        "draft",          // ← key: invisible to workers
+      paymentStatus: "unpaid",
+      title,
+      description,
+      logs:          [],
+      pricing:       { tierPrice, workerPay, platformFee },
     });
 
-    // -----------------------------
-    // 4. Publish Redis Event
-    // -----------------------------
-    await redisPublisher.publish(
-      "new_job",
-      JSON.stringify({ jobId: job._id, title: title, description: description })
-    );
+    console.log(`📝 Draft job ${job._id} created | Tier: ₹${tierPrice} | User: ${req.user.userId}`);
 
-    // -----------------------------
-    // 5. Response
-    // -----------------------------
     res.status(201).json({
-      message: "Request submitted",
-      jobId: job._id,
-      success: true,
-      estimatedCost: estimatedCost,
+      message:  "Job saved as draft",
+      jobId:    job._id,
+      success:  true,
+      isDraft:  true,
+      tierPrice,
       currency: "INR",
     });
   } catch (err) {
@@ -136,501 +107,279 @@ JobRouter.post("/create", authMiddleware, upload.single("file"), async (req, res
   }
 });
 
+// ── POST /:jobId/publish — user pays and publishes draft to workers ────────────
+// This is the "pay & submit" action on the dashboard draft card.
+JobRouter.post("/:jobId/publish", authMiddleware, async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.jobId);
+    if (!job)
+      return res.status(404).json({ message: "Job not found" });
+    if (job.userId.toString() !== req.user.userId)
+      return res.status(403).json({ message: "Unauthorized" });
+    if (job.status !== "draft")
+      return res.status(400).json({ message: `Job is already ${job.status} — only drafts can be published.` });
+
+    const tierPrice = job.pricing?.tierPrice;
+    if (!tierPrice)
+      return res.status(400).json({ message: "Job has no pricing. Please delete and re-upload." });
+
+    // ── Balance check + reserve ───────────────────────────────────────────────
+    const balanceCheck = await validateSufficientBalance(req.user.userId, tierPrice);
+    if (!balanceCheck.sufficient) {
+      return res.status(400).json({
+        message:   `Insufficient balance. This job costs ₹${tierPrice}. You have ₹${balanceCheck.available?.toFixed(2)} available.`,
+        tierPrice,
+        required:  tierPrice,
+        available: balanceCheck.available ?? 0,
+        balance:   balanceCheck.balance ?? 0,
+        reserved:  balanceCheck.reserved ?? 0,
+        code:      "INSUFFICIENT_BALANCE",
+      });
+    }
+
+    const reserveResult = await reserveFunds(req.user.userId, tierPrice, job._id);
+    if (!reserveResult.success)
+      return res.status(400).json({ message: `Reservation failed: ${reserveResult.error}`, code: "RESERVE_FAILED" });
+
+    // ── Publish job — now visible to workers ──────────────────────────────────
+    job.status        = "pending";
+    job.paymentStatus = "reserved";
+    await job.save();
+
+    await redisPublisher.publish("new_job", JSON.stringify({
+      jobId: job._id, title: job.title, description: job.description, tierPrice,
+    }));
+
+    console.log(`🚀 Job ${job._id} published | Tier: ₹${tierPrice} | Reserved ₹${tierPrice} from user ${req.user.userId}`);
+
+    res.json({
+      message:          "Job published successfully — workers can now see it",
+      jobId:            job._id,
+      status:           "pending",
+      tierPrice,
+      availableBalance: reserveResult.availableBalance,
+    });
+  } catch (err) {
+    console.error("Publish error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+// ── GET /:jobId/status ────────────────────────────────────────────────────────
 JobRouter.get("/:jobId/status", authMiddleware, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
-
     if (!job) return res.status(404).json({ message: "Job not found" });
     if (job.userId.toString() !== req.user.userId)
       return res.status(403).json({ message: "Unauthorized" });
 
-    // ✅ PAYMENT: Include real-time cost if job is in progress
-    let realTimeCost = null;
-    if (job.status === "processing" && job.pricing?.startTime && job.pricing?.workerRate) {
-      const costData = getRealTimeCost(job.pricing.workerRate, job.pricing.startTime, 0.05);
-      realTimeCost = costData;
-    }
+    let elapsedSeconds = null;
+    if (["assigned", "processing"].includes(job.status) && job.pricing?.startTime)
+      elapsedSeconds = getElapsedSeconds(job.pricing.startTime);
 
-    res.json({
-      ...job.toObject(),
-      realTimeCost,
-    });
-  } catch (err) {
-    console.error(err);
+    res.json({ ...job.toObject(), elapsedSeconds });
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-// ✅ NEW: Get job logs endpoint for frontend
+// ── GET /:jobId/logs ──────────────────────────────────────────────────────────
 JobRouter.get("/:jobId/logs", authMiddleware, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
-
     if (!job) return res.status(404).json({ message: "Job not found" });
     if (job.userId.toString() !== req.user.userId)
       return res.status(403).json({ message: "Unauthorized" });
-
-    res.json({
-      logs: job.logs || [],
-      status: job.status
-    });
-  } catch (err) {
-    console.error(err);
+    res.json({ logs: job.logs || [], status: job.status, pricing: job.pricing || {} });
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * GET /:jobId/results
- * Returns model + logs
- */
+// ── GET /:jobId/results ───────────────────────────────────────────────────────
 JobRouter.get("/:jobId/results", authMiddleware, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
     if (!job) return res.status(404).json({ message: "Job not found" });
-
-    res.json({
-      modelUrl: job.modelUrl,
-      logsUrl: job.logsUrl,
-      status: job.status,
-    });
-  } catch (err) {
-    console.error(err);
+    res.json({ modelUrl: job.modelUrl, logsUrl: job.logsUrl, status: job.status });
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * GET /:jobId/bill
- * Returns billing summary
- */
+// ── GET /:jobId/bill ──────────────────────────────────────────────────────────
 JobRouter.get("/:jobId/bill", authMiddleware, async (req, res) => {
   try {
     const bills = await Billing.find({ jobId: req.params.jobId });
-
-    res.json({
-      total: bills.reduce((a, b) => a + b.amount, 0),
-      breakdown: bills,
-    });
-  } catch (err) {
-    console.error(err);
+    res.json({ total: bills.reduce((a, b) => a + b.amount, 0), breakdown: bills });
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * GET /:jobId/cost
- * Get real-time cost for ongoing job
- */
-JobRouter.get("/:jobId/cost", authMiddleware, async (req, res) => {
-  try {
-    const job = await Job.findById(req.params.jobId);
-
-    if (!job) return res.status(404).json({ message: "Job not found" });
-    if (job.userId.toString() !== req.user.userId)
-      return res.status(403).json({ message: "Unauthorized" });
-
-    // If job is completed, return actual cost
-    if (job.status === "completed") {
-      return res.json({
-        status: "completed",
-        actualCost: job.pricing?.actualCost || 0,
-        durationSeconds: job.pricing?.durationSeconds || 0,
-        currency: "INR",
-      });
-    }
-
-    // If job is in progress, calculate real-time cost
-    if ((job.status === "assigned" || job.status === "processing") && job.pricing?.startTime) {
-      const costData = getRealTimeCost(
-        job.pricing.workerRate,
-        job.pricing.startTime,
-        0.05
-      );
-
-      return res.json({
-        status: "in_progress",
-        currentCost: costData.currentCost,
-        elapsedSeconds: costData.elapsedSeconds,
-        estimatedCost: job.pricing.estimatedCost,
-        workerRate: job.pricing.workerRate,
-        currency: "INR",
-      });
-    }
-
-    // Job is pending or cancelled
-    res.json({
-      status: job.status,
-      estimatedCost: job.pricing?.estimatedCost || 0,
-      currency: "INR",
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ message: "Server error" });
-  }
-});
-
-/**
- * DELETE /:jobId
- * Delete a job (only if it's pending and not accepted/running)
- */
+// ── DELETE /:jobId — delete draft or pending job ──────────────────────────────
 JobRouter.delete("/:jobId", authMiddleware, async (req, res) => {
   try {
     const job = await Job.findById(req.params.jobId);
-
-    // Check if job exists
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
-
-    // Check authorization
-    if (job.userId.toString() !== req.user.userId) {
-      return res.status(403).json({ message: "Unauthorized - you can only delete your own jobs" });
-    }
-
-    // Check if job is in a deletable state
-    if (job.status !== "pending") {
-      return res.status(400).json({
-        message: `Cannot delete job with status '${job.status}'. Only pending jobs can be deleted.`,
-        currentStatus: job.status,
-        allowedStatus: "pending"
-      });
-    }
-
-    // Check if job has been assigned to a worker
-    if (job.assignedWorkerId) {
-      return res.status(400).json({
-        message: "Cannot delete job that has been assigned to a worker",
-        assignedWorkerId: job.assignedWorkerId
-      });
-    }
-
-    // ✅ PAYMENT: Refund if funds were reserved
-    if (job.paymentStatus === "reserved" && job.pricing?.estimatedCost) {
-      const refundResult = await refundFunds(
-        job.userId,
-        job.pricing.estimatedCost,
-        req.params.jobId
-      );
-
-      if (refundResult.success) {
-        console.log(`💰 Refunded ₹${job.pricing.estimatedCost} for deleted job ${req.params.jobId}`);
-      } else {
-        console.warn(`⚠️  Refund failed for deleted job ${req.params.jobId}:`, refundResult.error);
-      }
-    }
-
-    // Delete the job from database
-    await Job.findByIdAndDelete(req.params.jobId);
-
-    console.log(`🗑️  Job ${req.params.jobId} deleted by user ${req.user.userId}`);
-
-    res.status(200).json({
-      message: "Job deleted successfully",
-      jobId: req.params.jobId
-    });
-
-  } catch (err) {
-    console.error("❌ Delete job error:", err);
-    res.status(500).json({
-      message: "Server error while deleting job",
-      error: err.message
-    });
-  }
-});
-
-/**
- * DELETE /:jobId/cancel
- * User cancels pending job
- */
-JobRouter.delete("/:jobId/cancel", authMiddleware, async (req, res) => {
-  try {
-    const job = await Job.findById(req.params.jobId);
-
     if (!job) return res.status(404).json({ message: "Job not found" });
     if (job.userId.toString() !== req.user.userId)
       return res.status(403).json({ message: "Unauthorized" });
+    if (!["draft", "pending"].includes(job.status))
+      return res.status(400).json({ message: `Cannot delete job with status '${job.status}'.` });
+    if (job.assignedWorkerId)
+      return res.status(400).json({ message: "Cannot delete an assigned job." });
 
-    if (job.status !== "pending")
-      return res.status(400).json({ message: "Cannot cancel active job" });
+    // Release reservation if it was published (pending)
+    if (job.status === "pending" && job.pricing?.tierPrice)
+      await releaseReservation(job.userId, job.pricing.tierPrice, job._id);
 
-    // ✅ PAYMENT: Refund if funds were reserved
-    if (job.paymentStatus === "reserved" && job.pricing?.estimatedCost) {
-      const refundResult = await refundFunds(
-        job.userId,
-        job.pricing.estimatedCost,
-        req.params.jobId
-      );
-
-      if (refundResult.success) {
-        job.paymentStatus = "refunded";
-        console.log(`💰 Refunded ₹${job.pricing.estimatedCost} for cancelled job`);
-      }
-    }
-
-    job.status = "cancelled";
-    await job.save();
-
-    res.json({ message: "Job cancelled" });
-  } catch (err) {
-    console.error(err);
+    await Job.findByIdAndDelete(req.params.jobId);
+    res.status(200).json({ message: "Job deleted successfully", jobId: req.params.jobId });
+  } catch {
     res.status(500).json({ message: "Server error" });
   }
 });
 
-/**
- * POST /:jobId/complete
- * Worker uploads output ZIP and logs to complete the job
- * No authMiddleware needed - worker uses deviceId verification
- */
+// ── DELETE /:jobId/cancel ─────────────────────────────────────────────────────
+JobRouter.delete("/:jobId/cancel", authMiddleware, async (req, res) => {
+  try {
+    const job = await Job.findById(req.params.jobId);
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.userId.toString() !== req.user.userId)
+      return res.status(403).json({ message: "Unauthorized" });
+    if (!["draft", "pending"].includes(job.status))
+      return res.status(400).json({ message: "Can only cancel draft or pending jobs." });
+
+    const tierPrice = job.pricing?.tierPrice;
+    if (job.status === "pending" && tierPrice)
+      await releaseReservation(job.userId, tierPrice, job._id);
+
+    job.status        = "cancelled";
+    job.paymentStatus = "cancelled";
+    await job.save();
+    res.json({ message: "Job cancelled" });
+  } catch {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
+// ── POST /:jobId/complete — worker uploads output, user is charged ─────────────
 JobRouter.post("/:jobId/complete", upload.single("outputZip"), async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const { jobId }          = req.params;
     const { deviceId, logs } = req.body;
 
-    console.log(`📥 Completing job ${jobId} from worker ${deviceId}`);
+    if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
-    // Validate required fields
-    if (!deviceId) {
-      return res.status(400).json({ message: "deviceId required" });
-    }
-
-    // Find job
     const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
-
-    // Verify this worker is assigned to this job
-    if (job.assignedWorkerId !== deviceId) {
-      return res.status(403).json({
-        message: "Unauthorized - this job is not assigned to this worker"
-      });
-    }
-
-    // Check if output ZIP was uploaded
-    if (!req.file) {
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.assignedWorkerId !== deviceId)
+      return res.status(403).json({ message: "Unauthorized - job not assigned to this worker" });
+    if (!req.file)
       return res.status(400).json({ message: "Output ZIP file required" });
-    }
 
-    console.log(`📦 Received ZIP: ${(req.file.size / 1024 / 1024).toFixed(2)} MB`);
+    stopCostInterval(jobId.toString());
 
-    // Upload ZIP to Supabase
-    const timestamp = Date.now();
-    const filePath = `outputs/job-${jobId}-${timestamp}.zip`;
-
-    const { data, error } = await supabase.storage
+    const filePath = `outputs/job-${jobId}-${Date.now()}.zip`;
+    const { error } = await supabase.storage
       .from("jobs")
-      .upload(filePath, req.file.buffer, {
-        cacheControl: "3600",
-        upsert: false,
-        contentType: "application/zip"
-      });
+      .upload(filePath, req.file.buffer, { cacheControl: "3600", upsert: false, contentType: "application/zip" });
 
-    if (error) {
-      console.error("❌ Supabase upload error:", error);
-      return res.status(500).json({
-        message: "Failed to upload output files to storage",
-        error: error.message
-      });
-    }
+    if (error) return res.status(500).json({ message: "Failed to upload output", error: error.message });
 
-    // Get public URL
-    const {
-      data: { publicUrl },
-    } = supabase.storage.from("jobs").getPublicUrl(filePath);
+    const { data: { publicUrl } } = supabase.storage.from("jobs").getPublicUrl(filePath);
 
-    console.log(`✅ Output uploaded to: ${publicUrl}`);
-
-    // Parse logs (sent as JSON string)
     let parsedLogs = [];
-    try {
-      parsedLogs = logs ? JSON.parse(logs) : [];
-    } catch (err) {
-      console.warn("⚠️  Failed to parse logs, using raw:", err.message);
-      parsedLogs = [logs || "No logs provided"];
-    }
+    try { parsedLogs = logs ? JSON.parse(logs) : []; }
+    catch { parsedLogs = [logs || ""]; }
 
-    // ✅ PAYMENT: Calculate actual cost and settle payment
-    const endTime = new Date();
-    const startTime = job.pricing?.startTime || job.createdAt;
-    const workerRate = job.pricing?.workerRate || 0.10;
-    const minimumCharge = 0.05;
+    const endTime         = new Date();
+    const startTime       = job.pricing?.startTime || job.createdAt;
+    const durationSeconds = Math.floor((endTime - new Date(startTime)) / 1000);
+    const tierPrice       = job.pricing?.tierPrice ?? 30;
+    const workerPay       = workerEarnings(tierPrice);
+    const platformFee     = platformEarnings(tierPrice);
 
-    const { cost: actualCost, durationSeconds } = calculateActualCost(
-      workerRate,
-      startTime,
-      endTime,
-      minimumCharge
-    );
+    const worker  = await Worker.findOne({ deviceId });
+    const gpuName = worker?.systemInfo?.gpu || "N/A";
 
-    // Update job
-    job.status = "completed";
-    job.modelUrl = publicUrl; // Store ZIP URL
-    job.logs = parsedLogs; // Store logs array
-    job.completedAt = new Date();
-    job.pricing = {
-      ...job.pricing,
-      actualCost,
-      endTime,
-      durationSeconds,
-    };
-    job.paymentStatus = "charged";
-    await job.save();
-
-    // ✅ PAYMENT: Charge user and pay worker
-    const worker = await Worker.findOne({ deviceId });
-    const chargeResult = await chargeFunds(
-      job.userId,
-      actualCost,
-      jobId,
-      worker?._id
-    );
-
+    const chargeResult = await chargeFunds(job.userId, tierPrice, jobId);
     if (!chargeResult.success) {
-      console.error(`⚠️  Payment settlement failed for job ${jobId}:`, chargeResult.error);
+      job.status        = "failed";
+      job.paymentStatus = "failed";
+      job.errorMessage  = `Payment failed after training: ${chargeResult.error}`;
+      await job.save();
+      const io = req.app.get("io");
+      io?.to(`job:${jobId}`).emit("job_failed", {
+        jobId: job._id, status: "failed", errorMessage: job.errorMessage, paymentFailed: true,
+      });
+      return res.status(402).json({ message: "Payment failed", error: chargeResult.error });
     }
 
-    // ✅ PAYMENT: Create billing record
-    await Billing.create({
-      jobId: job._id,
-      userId: job.userId,
-      workerId: worker?._id,
-      amount: actualCost,
-      workerRate,
-      durationSeconds,
-      status: "paid",
-      transactionId: chargeResult.transaction?._id,
-    });
-
-    // ✅ PAYMENT: Update worker stats
     if (worker) {
+      await creditWorkerWallet(worker._id, workerPay, jobId);
       worker.totalJobsCompleted += 1;
       await worker.save();
     }
 
-    console.log(`✅ Job ${jobId} marked as completed | Cost: ₹${actualCost} | Duration: ${durationSeconds}s`);
+    await Billing.create({
+      jobId: job._id, userId: job.userId, workerId: worker?._id,
+      amount: tierPrice, workerPay, platformFee, durationSeconds,
+      status: "paid", transactionId: chargeResult.transaction?._id,
+    });
 
-    // ✅ NEW: Emit completion event to frontend via Socket.IO
+    job.status        = "completed";
+    job.modelUrl      = publicUrl;
+    job.logs          = parsedLogs;
+    job.completedAt   = endTime;
+    job.paymentStatus = "charged";
+    job.pricing       = { ...job.pricing, tierPrice, workerPay, platformFee, actualCost: tierPrice, gpuName, startTime, endTime, durationSeconds };
+    await job.save();
+
     const io = req.app.get("io");
-    if (io) {
-      io.to(`job:${jobId}`).emit("job_completed", {
-        jobId: job._id,
-        status: "completed",
-        modelUrl: publicUrl,
-        completedAt: job.completedAt
-      });
-      console.log(`📡 Emitted job_completed event for ${jobId}`);
-    }
-
-    res.status(200).json({
-      message: "Job completed successfully",
-      job: {
-        _id: job._id,
-        title: job.title,
-        status: job.status,
-        modelUrl: job.modelUrl,
-        completedAt: job.completedAt
-      },
-      outputUrl: publicUrl
+    io?.to(`job:${jobId}`).emit("job_completed", {
+      jobId: job._id, status: "completed", modelUrl: publicUrl, completedAt: job.completedAt, pricing: job.pricing,
     });
 
+    res.status(200).json({ message: "Job completed", outputUrl: publicUrl });
   } catch (err) {
-    console.error("❌ Complete job error:", err);
-    res.status(500).json({
-      message: "Server error while completing job",
-      error: err.message
-    });
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
-/**
- * POST /:jobId/fail
- * Worker reports job failure with error message
- */
+// ── POST /:jobId/fail ─────────────────────────────────────────────────────────
 JobRouter.post("/:jobId/fail", async (req, res) => {
   try {
-    const { jobId } = req.params;
+    const { jobId }                        = req.params;
     const { deviceId, errorMessage, logs } = req.body;
 
-    if (!deviceId) {
-      return res.status(400).json({ message: "deviceId required" });
-    }
+    if (!deviceId) return res.status(400).json({ message: "deviceId required" });
 
     const job = await Job.findById(jobId);
-    if (!job) {
-      return res.status(404).json({ message: "Job not found" });
-    }
+    if (!job) return res.status(404).json({ message: "Job not found" });
+    if (job.assignedWorkerId !== deviceId)
+      return res.status(403).json({ message: "Unauthorized" });
 
-    // Verify worker assignment
-    if (job.assignedWorkerId !== deviceId) {
-      return res.status(403).json({
-        message: "Unauthorized - this job is not assigned to this worker"
-      });
-    }
-
-    // Parse logs
     let parsedLogs = [];
-    try {
-      parsedLogs = logs ? JSON.parse(logs) : [];
-    } catch (err) {
-      parsedLogs = [logs || "No logs provided"];
-    }
+    try { parsedLogs = logs ? JSON.parse(logs) : []; }
+    catch { parsedLogs = []; }
 
-    // ✅ PAYMENT: Refund reserved funds on job failure
-    const estimatedCost = job.pricing?.estimatedCost || 0;
-    if (estimatedCost > 0 && job.paymentStatus === "reserved") {
-      const refundResult = await refundFunds(job.userId, estimatedCost, jobId);
-      if (refundResult.success) {
-        job.paymentStatus = "refunded";
-        console.log(`💰 Refunded ₹${estimatedCost} to user for failed job ${jobId}`);
-      } else {
-        console.error(`⚠️  Refund failed for job ${jobId}:`, refundResult.error);
-      }
-    }
+    const tierPrice = job.pricing?.tierPrice;
+    if (tierPrice) await releaseReservation(job.userId, tierPrice, jobId);
 
-    // Update job
-    job.status = "failed";
-    job.errorMessage = errorMessage || "Job failed without error message";
-    job.logs = parsedLogs;
-    job.completedAt = new Date();
-    job.pricing = {
-      ...job.pricing,
-      endTime: new Date(),
-    };
+    job.status        = "failed";
+    job.paymentStatus = "cancelled";
+    job.errorMessage  = errorMessage || "Job failed";
+    job.logs          = parsedLogs;
+    job.completedAt   = new Date();
+    job.pricing       = { ...job.pricing, endTime: new Date() };
     await job.save();
 
-    // ✅ PAYMENT: Update worker's pending earnings
-    const worker = await Worker.findOne({ deviceId });
-    if (worker && estimatedCost > 0) {
-      worker.pendingEarnings -= estimatedCost;
-      await worker.save();
-    }
-
-    console.log(`❌ Job ${jobId} marked as failed: ${errorMessage}`);
-
-    // ✅ NEW: Emit failure event to frontend via Socket.IO
     const io = req.app.get("io");
-    if (io) {
-      io.to(`job:${jobId}`).emit("job_failed", {
-        jobId: job._id,
-        status: "failed",
-        errorMessage: job.errorMessage
-      });
-      console.log(`📡 Emitted job_failed event for ${jobId}`);
-    }
+    io?.to(`job:${jobId}`).emit("job_failed", { jobId: job._id, status: "failed", errorMessage: job.errorMessage });
 
-    res.status(200).json({
-      message: "Job failure recorded",
-      job: {
-        _id: job._id,
-        status: job.status,
-        errorMessage: job.errorMessage
-      }
-    });
-
+    res.status(200).json({ message: "Job marked as failed" });
   } catch (err) {
-    console.error("❌ Fail job error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });

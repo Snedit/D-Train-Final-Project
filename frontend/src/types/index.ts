@@ -4,7 +4,7 @@ export interface Job {
   userId?: string;
   title: string;
   description: string;
-  status: 'pending' | 'queued' | 'assigned' | 'processing' | 'running' | 'completed' | 'failed' | 'cancelled';
+  status: 'draft' | 'pending' | 'queued' | 'assigned' | 'processing' | 'running' | 'completed' | 'failed' | 'cancelled';
   createdAt: string;
   updatedAt?: string;
 
@@ -24,6 +24,18 @@ export interface Job {
   accepted_by?: number | null;
 
   logs?: string[] | any[];
+
+  pricing?: {
+    estimatedCost?: number;
+    actualCost?: number;
+    workerRate?: number;
+    gpuName?: string;
+    gpuMultiplier?: number;
+    effectiveRate?: number;
+    startTime?: string;
+    endTime?: string;
+    durationSeconds?: number;
+  };
 
   // Legacy/compatibility fields
   name?: string;

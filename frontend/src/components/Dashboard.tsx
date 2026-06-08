@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus, Trash2, Wallet } from 'lucide-react';
+import { Clock, CheckCircle, XCircle, Play, Users, Activity, ArrowRight, Database, Plus, Trash2, Wallet, Send, IndianRupee, FileText } from 'lucide-react';
 import { Job, Worker } from '../types';
 import ProfileDropdown from './ProfileDropdown';
 
@@ -31,8 +31,34 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [userInfo, setUserInfo] = useState({ name: '', email: '' });
   const [localJobs, setLocalJobs] = useState<Job[]>(jobs);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [publishingId, setPublishingId] = useState<string | null>(null);
+  const [publishError, setPublishError] = useState<string>('');
+
+  const handlePublishDraft = async (job: Job) => {
+    setPublishingId(job._id);
+    setPublishError('');
+    try {
+      const token = localStorage.getItem('dtrain_token');
+      const res = await fetch(`http://localhost:5000/api/jobs/${job._id}/publish`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setLocalJobs(prev => prev.map(j => j._id === job._id ? { ...j, status: 'pending' } : j));
+        setWalletBalance(data.availableBalance ?? walletBalance);
+      } else {
+        setPublishError(data.message || 'Failed to publish');
+      }
+    } catch {
+      setPublishError('Network error — please try again');
+    } finally {
+      setPublishingId(null);
+    }
+  };
 
   const statusIcons = {
+    draft: FileText,
     pending: Clock,
     accepted: Play,
     assigned: Play,
@@ -42,6 +68,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const statusColors = {
+    draft: 'bg-slate-200 text-slate-700',
     pending: 'bg-[#FFE66D] text-slate-900',
     accepted: 'bg-[#7BC8FF] text-slate-900',
     assigned: 'bg-[#7BC8FF] text-slate-900',
@@ -92,6 +119,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     };
     fetchWalletBalance();
   }, []);
+
+  const draftJobs  = localJobs.filter(j => j.status === 'draft');
+  const activeJobs = localJobs.filter(j => j.status !== 'draft');
 
   // ✅ Active workers = only online/busy/idle, not offline
   const activeWorkersCount = workers.filter(w =>
@@ -211,7 +241,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <Activity className="w-5 h-5 text-slate-900" />
                   </div>
                   <div>
-                    <p className="text-2xl font-extrabold text-slate-900">{localJobs.length}</p>
+                    <p className="text-2xl font-extrabold text-slate-900">{activeJobs.length}</p>
                     <p className="text-xs font-semibold text-slate-700">Total Jobs</p>
                   </div>
                 </div>
@@ -258,7 +288,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     </div>
                     <div>
                       <p className="text-2xl font-extrabold text-slate-900">
-                        {localJobs.filter(j =>
+                        {activeJobs.filter(j =>
                           j.status === 'pending' ||
                           j.status === 'queued'
                         ).length}
@@ -315,13 +345,119 @@ const Dashboard: React.FC<DashboardProps> = ({
               </motion.div>
             </div>
 
+            {/* Drafts Section */}
+            {draftJobs.length > 0 && (
+              <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden mb-6">
+                <div className="p-5 border-b-[3px] border-slate-900 bg-[#FFE66D] flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileText className="w-5 h-5 text-slate-900" />
+                    <h2 className="text-lg font-extrabold text-slate-900">Drafts</h2>
+                    <span className="px-2 py-0.5 rounded-full border-[2px] border-slate-900 bg-white text-xs font-bold">{draftJobs.length}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-slate-700">Top up wallet then click Pay & Publish to send to workers</p>
+                </div>
+
+                {publishError && (
+                  <div className="mx-5 mt-4 px-4 py-3 rounded-[12px] border-[2px] border-slate-900 bg-[#FEE2E2] text-xs font-semibold text-slate-900">
+                    ⚠ {publishError}
+                  </div>
+                )}
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-[#FFFDF8] border-b-[2px] border-slate-900">
+                      <tr>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Job</th>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Cost</th>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Created</th>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Action</th>
+                        <th className="px-5 py-3 text-left text-xs font-extrabold text-slate-900">Delete</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {draftJobs.map((job, index) => {
+                        const tierPrice = (job.pricing as any)?.tierPrice;
+                        const canAfford = walletBalance >= (tierPrice ?? 0);
+                        const isPublishing = publishingId === job._id;
+                        return (
+                          <motion.tr key={job._id}
+                            initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }}
+                            transition={{ duration: 0.3, delay: index * 0.05 }}
+                            className="border-b-[2px] border-slate-900/10 hover:bg-[#FFFBEB] transition-colors">
+                            <td className="px-5 py-4">
+                              <p className="text-sm font-extrabold text-slate-900">{job.title || (job as any).name}</p>
+                              <p className="text-xs text-slate-500 font-medium font-mono">{job.config?.entryFile}</p>
+                            </td>
+                            <td className="px-5 py-4">
+                              {tierPrice ? (
+                                <div className="flex items-center gap-1.5">
+                                  <IndianRupee className="w-3.5 h-3.5 text-slate-700" />
+                                  <span className="text-sm font-extrabold text-slate-900">{tierPrice}</span>
+                                  {!canAfford && (
+                                    <span className="text-[10px] font-semibold text-red-600 ml-1">
+                                      (need ₹{(tierPrice - walletBalance).toFixed(0)} more)
+                                    </span>
+                                  )}
+                                </div>
+                              ) : <span className="text-xs text-slate-500">—</span>}
+                            </td>
+                            <td className="px-5 py-4 text-xs text-slate-700 font-medium">
+                              {new Date(job.createdAt).toLocaleString()}
+                            </td>
+                            <td className="px-5 py-4">
+                              <motion.button whileHover={{ y: -1 }} whileTap={{ y: 0 }}
+                                onClick={() => handlePublishDraft(job)}
+                                disabled={isPublishing || !canAfford}
+                                className={`flex items-center gap-2 px-4 py-2 rounded-[10px] border-[2px] border-slate-900 text-xs font-extrabold shadow-[3px_3px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[4px_4px_0_0_rgba(15,23,42,1)] ${
+                                  !canAfford ? 'bg-slate-200 text-slate-500 cursor-not-allowed' :
+                                  isPublishing ? 'bg-[#7CF2D0] text-slate-700 cursor-wait' :
+                                  'bg-[#4ADE80] text-slate-900'
+                                }`}>
+                                {isPublishing ? (
+                                  <><motion.div animate={{ rotate: 360 }} transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                    className="w-3 h-3 border-[2px] border-slate-900 border-t-transparent rounded-full" />
+                                    Publishing…</>
+                                ) : !canAfford ? (
+                                  <>Top Up First</>
+                                ) : (
+                                  <><Send className="w-3 h-3" /> Pay & Publish</>
+                                )}
+                              </motion.button>
+                            </td>
+                            <td className="px-5 py-4">
+                              <motion.button whileHover={{ y: -1 }} whileTap={{ y: 0 }}
+                                onClick={async (e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm('Delete this draft?')) {
+                                    try {
+                                      const token = localStorage.getItem('dtrain_token');
+                                      const res = await fetch(`http://localhost:5000/api/jobs/${job._id}`, {
+                                        method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+                                      });
+                                      if (res.ok) setLocalJobs(prev => prev.filter(j => j._id !== job._id));
+                                    } catch {}
+                                  }
+                                }}
+                                className="p-2 rounded-[10px] border-[2px] border-slate-900 bg-red-100 text-red-600 hover:bg-red-200 shadow-[3px_3px_0_0_rgba(15,23,42,1)] transition-all">
+                                <Trash2 className="w-4 h-4" />
+                              </motion.button>
+                            </td>
+                          </motion.tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
             {/* Jobs Table */}
             <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
               <div className="p-5 border-b-[3px] border-slate-900 bg-[#F5F3FF]">
                 <h2 className="text-lg font-extrabold text-slate-900">Recent Jobs</h2>
               </div>
 
-              {localJobs.length === 0 ? (
+              {activeJobs.length === 0 ? (
                 <div className="p-12 text-center">
                   <div className="w-16 h-16 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                     <Activity className="w-8 h-8 text-white" />
@@ -350,7 +486,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       </tr>
                     </thead>
                     <tbody>
-                      {localJobs.map((job, index) => {
+                      {activeJobs.map((job, index) => {
                         const StatusIcon = statusIcons[job.status as keyof typeof statusIcons] || Clock;
                         const statusStyle = statusColors[job.status as keyof typeof statusColors] || statusColors.pending;
 

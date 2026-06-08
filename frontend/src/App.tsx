@@ -108,6 +108,20 @@ function App() {
     }
   }, []);
 
+  const fetchWalletBalance = useCallback(async () => {
+    try {
+      const token = localStorage.getItem("dtrain_token");
+      const response = await fetch(`${API_BASE}/api/payment/wallet/balance`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (response.ok) {
+        await response.json();
+      }
+    } catch (error) {
+      console.error("Error fetching wallet balance:", error);
+    }
+  }, []);
+
   useEffect(() => {
     const savedUser = localStorage.getItem("dtrain_user");
     if (savedUser) {
@@ -241,8 +255,9 @@ function App() {
     if (isAuthenticated) {
       fetchJobs();
       fetchWorkers();
+      fetchWalletBalance();
     }
-  }, [isAuthenticated, fetchJobs, fetchWorkers]);
+  }, [isAuthenticated, fetchJobs, fetchWorkers, fetchWalletBalance]);
 
   // Polling fallback: re-fetch jobs every 5s when any job is in a non-terminal state.
   // Ensures completed/failed always show even if a socket event is missed.
@@ -338,7 +353,7 @@ function App() {
 
   const handleJobSubmit = async (
     formData: FormData,
-  ): Promise<{ success: boolean; jobId?: string; message?: string }> => {
+  ): Promise<{ success: boolean; jobId?: string; message?: string; tierPrice?: number; isDraft?: boolean }> => {
     try {
       const token = localStorage.getItem("dtrain_token");
       const response = await fetch(`${API_BASE}/api/jobs/create`, {
@@ -349,12 +364,8 @@ function App() {
       const data = await response.json();
       if (data.success) {
         await fetchJobs();
-        setIsLoading(true);
-        setTimeout(() => {
-          navigate("/dashboard");
-          setIsLoading(false);
-        }, 800);
-        return { success: true, jobId: data.jobId };
+        // Stay on submission page to show the draft-saved confirmation screen
+        return { success: true, jobId: data.jobId, tierPrice: data.tierPrice, isDraft: true };
       } else {
         return { success: false, message: data.message };
       }

@@ -1,6 +1,6 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Wallet, TrendingUp, Clock, History, ArrowUpRight, ArrowDownLeft, X } from 'lucide-react';
+import { Wallet, TrendingUp, Clock, History, ArrowUpRight, ArrowDownLeft, X, Banknote } from 'lucide-react';
 import type { Transaction } from '../types';
 
 interface WalletCardProps {
@@ -8,7 +8,8 @@ interface WalletCardProps {
   totalEarnings: number;
   pendingEarnings: number;
   transactions?: Transaction[];
-  onWithdraw?: () => void;
+  hasStripeAccount?: boolean;
+  onRequestPayout?: () => void;
   onClose?: () => void;
 }
 
@@ -17,30 +18,29 @@ const WalletCard: React.FC<WalletCardProps> = ({
   totalEarnings,
   pendingEarnings,
   transactions = [],
+  hasStripeAccount = false,
+  onRequestPayout,
   onClose,
 }) => {
+  const canPayout = balance >= 50;
+
   return (
     <div className="w-full max-w-lg mx-auto bg-white rounded-[24px] border-[3px] border-slate-900 shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
 
-      {/* Header — same structure as PricingSettings */}
+      {/* Header */}
       <div className="px-6 py-5 bg-[#FFD447] border-b-[3px] border-slate-900 flex items-center justify-between">
         <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
           <Wallet className="w-6 h-6" />
           My Wallet
         </h2>
         {onClose && (
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-black/5 rounded-full transition-colors"
-          >
+          <button onClick={onClose} className="p-2 hover:bg-black/5 rounded-full transition-colors">
             <X className="w-5 h-5 text-slate-900" />
           </button>
         )}
       </div>
 
-      {/* Body */}
       <div className="p-6 space-y-5">
-
         {/* Stats row */}
         <div className="grid grid-cols-3 gap-3">
           <div className="rounded-[14px] border-[3px] border-slate-900 bg-[#FFD447] p-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
@@ -68,16 +68,39 @@ const WalletCard: React.FC<WalletCardProps> = ({
           </div>
         </div>
 
-        {/* Withdraw coming soon */}
-        <div className="flex items-center justify-between px-4 py-3 rounded-[12px] border-[3px] border-dashed border-slate-300 bg-slate-50">
+        {/* Payout / Withdraw Button */}
+        <motion.button
+          whileHover={canPayout ? { y: -2 } : {}}
+          whileTap={canPayout ? { y: 0 } : {}}
+          onClick={canPayout ? onRequestPayout : undefined}
+          disabled={!canPayout}
+          className={`w-full flex items-center justify-between px-5 py-3.5 rounded-[14px] border-[3px] border-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all font-bold text-sm ${
+            canPayout
+              ? 'bg-[#7CF2D0] text-slate-900 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] cursor-pointer'
+              : 'bg-slate-100 text-slate-400 cursor-not-allowed border-dashed border-slate-300'
+          }`}
+        >
           <div className="flex items-center gap-2">
-            <ArrowUpRight className="w-4 h-4 text-slate-400" />
-            <span className="text-sm font-bold text-slate-400">Withdraw Funds</span>
+            <Banknote className={`w-4 h-4 ${canPayout ? 'text-slate-900' : 'text-slate-400'}`} />
+            <span>Withdraw Funds</span>
           </div>
-          <span className="px-3 py-1 rounded-full border-[2px] border-slate-300 bg-white text-[10px] font-extrabold text-slate-400">
-            Coming Soon
-          </span>
-        </div>
+          <div className="flex items-center gap-2">
+            {!hasStripeAccount && canPayout && (
+              <span className="px-2 py-0.5 rounded-full border border-slate-400 bg-white text-[9px] font-extrabold text-slate-500">
+                Manual
+              </span>
+            )}
+            {hasStripeAccount && canPayout && (
+              <span className="px-2 py-0.5 rounded-full border border-[#635BFF] bg-[#EEF2FF] text-[9px] font-extrabold text-[#635BFF]">
+                Instant
+              </span>
+            )}
+            {!canPayout && (
+              <span className="text-[10px] text-slate-400 font-semibold">Min ₹50</span>
+            )}
+            <ArrowUpRight className={`w-4 h-4 ${canPayout ? 'text-slate-900' : 'text-slate-400'}`} />
+          </div>
+        </motion.button>
 
         {/* Transaction History */}
         <div className="rounded-[14px] border-[3px] border-slate-900 overflow-hidden shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
@@ -91,7 +114,7 @@ const WalletCard: React.FC<WalletCardProps> = ({
             </span>
           </div>
 
-          <div className="divide-y-[2px] divide-slate-100 max-h-[220px] overflow-y-auto bg-white">
+          <div className="divide-y-[2px] divide-slate-100 max-h-[240px] overflow-y-auto bg-white">
             {transactions.length > 0 ? (
               transactions.map((tx, index) => {
                 const isCredit = tx.type === 'worker_payout' || tx.type === 'topup';
@@ -105,7 +128,7 @@ const WalletCard: React.FC<WalletCardProps> = ({
                   >
                     <div className="flex items-center gap-3">
                       <div className={`w-8 h-8 rounded-[8px] border-[2px] border-slate-900 flex items-center justify-center shadow-[2px_2px_0_0_rgba(15,23,42,1)] flex-shrink-0 ${
-                        isCredit ? 'bg-[#7CF2D0]' : 'bg-[#FFB4D3]'
+                        isCredit ? 'bg-[#7CF2D0]' : tx.type === 'withdrawal' ? 'bg-[#FDE68A]' : 'bg-[#FFB4D3]'
                       }`}>
                         {isCredit
                           ? <ArrowDownLeft className="w-4 h-4 text-slate-900" />
@@ -119,9 +142,18 @@ const WalletCard: React.FC<WalletCardProps> = ({
                         </p>
                       </div>
                     </div>
-                    <span className={`text-sm font-extrabold ${isCredit ? 'text-green-600' : 'text-slate-900'}`}>
-                      {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
-                    </span>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span className={`text-sm font-extrabold ${isCredit ? 'text-green-600' : 'text-slate-900'}`}>
+                        {isCredit ? '+' : '-'}₹{tx.amount.toFixed(2)}
+                      </span>
+                      <span className={`text-[9px] font-bold uppercase px-1.5 py-0.5 rounded-full ${
+                        tx.status === 'completed' ? 'bg-green-100 text-green-700' :
+                        tx.status === 'pending' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-red-100 text-red-700'
+                      }`}>
+                        {tx.status}
+                      </span>
+                    </div>
                   </motion.div>
                 );
               })
