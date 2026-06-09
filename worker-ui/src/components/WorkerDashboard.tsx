@@ -13,11 +13,9 @@ import {
   Server,
   AlertCircle,
   RefreshCw,
-  Wallet,
-  Settings
+  Wallet
 } from 'lucide-react';
-import type { Worker, Pricing, Wallet as WalletType, Transaction } from '../types';
-import PricingSettings from './PricingSettings';
+import type { Worker, Wallet as WalletType, Transaction } from '../types';
 import WalletCard from './WalletCard';
 import PayoutRequest from './PayoutRequest';
 
@@ -37,15 +35,6 @@ interface PendingJob {
   description: string;
   status: string;
   createdAt: string;
-  pricing?: {
-    tierPrice?: number;
-    workerPay?: number;
-    platformFee?: number;
-    gpuName?: string;
-    startTime?: string;
-    endTime?: string;
-    durationSeconds?: number;
-  };
 }
 
 interface WorkerStats {
@@ -70,7 +59,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     currentStatus: 'idle',
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showPricingSettings, setShowPricingSettings] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [walletData, setWalletData] = useState<WalletType>({
@@ -79,11 +67,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     pendingEarnings: 0,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [pricing, setPricing] = useState<Pricing>({
-    hourlyRate: 0.10,
-    minimumCharge: 0.05,
-    currency: 'INR',
-  });
 
   // Listen for Socket.io events
   useEffect(() => {
@@ -226,15 +209,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
       const token = localStorage.getItem("dtrain_worker_token");
       if (!token) return;
 
-      const pricingRes = await fetch('http://localhost:5000/api/worker/pricing', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-
-      if (pricingRes.ok) {
-        const data = await pricingRes.json();
-        if (data.pricing) setPricing(data.pricing);
-      }
-
       const walletRes = await fetch('http://localhost:5000/api/worker/wallet', {
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -251,29 +225,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     } catch (error) {
       console.error('Wallet fetch failed:', error);
     }
-  };
-
-  const handleUpdatePricing = async (rate: number, minCharge: number) => {
-    const token = localStorage.getItem("dtrain_worker_token");
-    if (!token) throw new Error("Not authenticated");
-
-    const res = await fetch('http://localhost:5000/api/worker/pricing', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify({ hourlyRate: rate, minimumCharge: minCharge })
-    });
-
-    if (!res.ok) {
-      const data = await res.json();
-      throw new Error(data.message || "Failed to update pricing");
-    }
-
-    const data = await res.json();
-    setPricing(data.pricing);
-    fetchPendingJobs();
   };
 
   const handleRefresh = () => {
@@ -345,17 +296,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
               </div>
 
               <div className="flex items-center gap-3">
-                {/* Pricing */}
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: 0 }}
-                  onClick={() => setShowPricingSettings(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-[#FEF3C7] text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5"
-                >
-                  <Settings className="w-4 h-4" />
-                  <span className="hidden sm:inline">Pricing</span>
-                </motion.button>
-
                 {/* Wallet */}
                 {worker && (
                   <motion.button
@@ -582,17 +522,9 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                               <p className="text-sm text-slate-600 font-medium mb-3">
                                 {job.description || 'Machine learning training task'}
                               </p>
-                              <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
-                                  <Clock className="w-3.5 h-3.5" />
-                                  Posted {new Date(job.createdAt).toLocaleString()}
-                                </div>
-                                {job.pricing?.workerPay != null && (
-                                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-[2px] border-slate-900 bg-[#4ADE80] text-xs font-extrabold text-slate-900 shadow-[2px_2px_0_0_rgba(15,23,42,1)]">
-                                    You earn ₹{job.pricing.workerPay}
-                                  </div>
-                                )}
-
+                              <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                                <Clock className="w-4 h-4" />
+                                Posted {new Date(job.createdAt).toLocaleString()}
                               </div>
                             </div>
                             <motion.button
@@ -638,15 +570,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
           </div>
         </div>
       </div>
-
-      {/* Pricing Settings Modal */}
-      <PricingSettings
-        isOpen={showPricingSettings}
-        onClose={() => setShowPricingSettings(false)}
-        currentRate={pricing.hourlyRate}
-        currentMinCharge={pricing.minimumCharge}
-        onUpdate={handleUpdatePricing}
-      />
 
       {/* Payout Request Modal */}
       <AnimatePresence>

@@ -44,7 +44,7 @@ const PayoutRequest: React.FC<PayoutRequestProps> = ({
     setSuccess('');
 
     try {
-      const token = localStorage.getItem('dtrain_token');
+      const token = localStorage.getItem('dtrain_worker_token');
       const res = await fetch(`${API_BASE}/worker/payout-request`, {
         method: 'POST',
         headers: {

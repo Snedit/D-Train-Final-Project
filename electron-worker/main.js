@@ -1,5 +1,5 @@
 // electron-worker/main.js - FIXED: Use Lucide-style symbols instead of emojis
-const { app, BrowserWindow, ipcMain } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const AdmZip = require("adm-zip");
@@ -66,7 +66,7 @@ function createWindow() {
   mainWindow.setMenu(null);
   mainWindow.maximize();
   mainWindow.loadFile(path.join(__dirname, "../worker-ui", "dist", "index.html"));
-  mainWindow.webContents.openDevTools(); // ✅ uncommented for debugging
+  // DevTools only open with Ctrl+Shift+I (like Chrome) — not automatically
 }
 
 ipcMain.handle("set-device-id", async (event, deviceId) => {
@@ -568,9 +568,15 @@ ipcMain.handle("accept-job", async (event, jobId) => {
 
 app.whenReady().then(() => {
   createWindow();
+
+  // Ctrl+Shift+I — toggle DevTools (same as Chrome)
+  globalShortcut.register("CommandOrControl+Shift+I", () => {
+    if (mainWindow) mainWindow.webContents.toggleDevTools();
+  });
 });
 
 app.on("window-all-closed", () => {
+  globalShortcut.unregisterAll();
   if (process.platform !== "darwin") app.quit();
 });
 

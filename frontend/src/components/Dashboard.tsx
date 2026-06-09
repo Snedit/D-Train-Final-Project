@@ -30,7 +30,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState({ name: '', email: '' });
   const [localJobs, setLocalJobs] = useState<Job[]>(jobs);
-  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(0);     // total in wallet
+  const [availableBalance, setAvailableBalance] = useState(0); // total minus reserved
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string>('');
 
@@ -46,7 +47,8 @@ const Dashboard: React.FC<DashboardProps> = ({
       const data = await res.json();
       if (res.ok) {
         setLocalJobs(prev => prev.map(j => j._id === job._id ? { ...j, status: 'pending' } : j));
-        setWalletBalance(data.availableBalance ?? walletBalance);
+        setAvailableBalance(data.availableBalance ?? availableBalance);
+        setWalletBalance(prev => prev); // total unchanged on reservation
       } else {
         setPublishError(data.message || 'Failed to publish');
       }
@@ -111,7 +113,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         });
         if (response.ok) {
           const data = await response.json();
-          setWalletBalance(data.balance);
+          setWalletBalance(data.balance ?? 0);
+          setAvailableBalance(data.available ?? data.balance ?? 0);
         }
       } catch (error) {
         console.error('Error fetching wallet balance:', error);
@@ -336,7 +339,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <Wallet className="w-5 h-5 text-slate-900" />
                     </div>
                     <div>
-                      <p className="text-2xl font-extrabold text-slate-900">₹{walletBalance.toFixed(2)}</p>
+                      <p className="text-2xl font-extrabold text-slate-900">₹{availableBalance.toFixed(2)}</p>
+                      <p className="text-[10px] text-slate-500 font-medium">available{walletBalance !== availableBalance ? ` (₹${walletBalance.toFixed(2)} total)` : ''}</p>
                       <p className="text-xs font-semibold text-slate-900">Your Wallet</p>
                     </div>
                   </div>
@@ -377,7 +381,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <tbody>
                       {draftJobs.map((job, index) => {
                         const tierPrice = (job.pricing as any)?.tierPrice;
-                        const canAfford = walletBalance >= (tierPrice ?? 0);
+                        const canAfford = availableBalance >= (tierPrice ?? 0);
                         const isPublishing = publishingId === job._id;
                         return (
                           <motion.tr key={job._id}
@@ -395,7 +399,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   <span className="text-sm font-extrabold text-slate-900">{tierPrice}</span>
                                   {!canAfford && (
                                     <span className="text-[10px] font-semibold text-red-600 ml-1">
-                                      (need ₹{(tierPrice - walletBalance).toFixed(0)} more)
+                                      (need ₹{(tierPrice - availableBalance).toFixed(0)} more — top up wallet)
                                     </span>
                                   )}
                                 </div>
