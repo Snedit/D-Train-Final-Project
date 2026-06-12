@@ -136,7 +136,7 @@ The platform has four distinct application layers that communicate via REST APIs
 2. **Poll** — Every ~5 seconds, the agent calls `GET /api/worker/available-jobs?deviceId=...`. This also acts as a heartbeat — if no poll arrives in 60s, the backend marks the worker offline.
 3. **Accept** — Agent accepts the first available job. Backend atomically assigns it (prevents two workers grabbing the same job).
 4. **Execute** — Agent downloads the ZIP from Supabase, extracts it to a temp folder, and runs:
-   ```bash
+   ```
    docker run --rm -v /tmp/job_xyz:/workspace python:3.10-slim bash -c "pip install -r requirements.txt && python train.py"
    ```
 5. **Stream** — Every line of `stdout`/`stderr` is POSTed to the backend, which relays it to the user via Socket.IO.
@@ -706,8 +706,8 @@ Docker Desktop  →  Redis container  →  Backend  →  Frontend / Worker UI  �
 |---|---|---|---|---|
 | <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Debjit Mitra** | 17600122046 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/debjitmitra000/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/debjitmitra000/) |
 | <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Soham De** | 17600122062 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/Snedit/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/soham-de-b5bb2b25b/) |
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Akash Poddar** | 17600122071 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)]() | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/akash150149/) |
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Sourodip Ghosh** | 17600122040 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://www.linkedin.com/in/sourodip-ghosh-177662253/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/RajSourodip/) |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Akash Poddar** | 17600122071 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/akash150149/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)]() |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Sourodip Ghosh** | 17600122040 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/RajSourodip/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/sourodip-ghosh-177662253/) |
 | <img width="18" height="18" alt="mentor" src="https://github.com/user-attachments/assets/04daea7b-46f5-4e85-8d4e-0a25674ead94" align="absmiddle"/> Project Mentor | **Ms. Agnimita Banerjee** | Assistant Professor, Dept. of CSE | — | — |
  
 ---
