@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://github.com/user-attachments/assets/ce7df309-b8cf-425c-9b7e-3e6fad9545ad" alt="DTrain Logo" width="130"/>
+<img src="https://github.com/user-attachments/assets/eeedb305-fd79-446d-ae55-1fb2cec42c90" alt="DTrain Logo" width="130"/>
 
 <h1>DTrain</h1>
 
@@ -10,7 +10,7 @@
 <table align="center" border="0" cellpadding="0" cellspacing="0">
   <tr>
     <td align="center" width="120">
-      <img src="https://github.com/user-attachments/assets/4813de92-b61f-4098-b97a-2103c76733f1" height="75" alt="HETC Logo"/>
+      <img src="https://github.com/user-attachments/assets/70ebabcf-4abb-4544-bcbc-8d7e8e7e99a7" height="75" alt="HETC Logo"/>
     </td>
     <td align="center" width="420">
       <strong>Hooghly Engineering & Technology College, Hooghly</strong><br/>
@@ -19,7 +19,7 @@
       <strong>2025–26</strong>
     </td>
     <td align="center" width="120">
-      <img src="https://github.com/user-attachments/assets/46a8f717-f20f-41da-94b3-be3f536ff14d" height="75" alt="MAKAUT Logo"/>
+      <img src="https://github.com/user-attachments/assets/f95b8057-4f12-4362-ab69-ba7f64a3ce3d" height="75" alt="MAKAUT Logo"/>
     </td>
   </tr>
 </table>
@@ -28,7 +28,7 @@
 
 ---
 
-## <img width="22" height="22" alt="clapperboard" src="https://github.com/user-attachments/assets/54966b81-fc6f-4bea-95ad-27d52dabc4d7" align="absmiddle"/> Demo
+## <img width="22" height="22" alt="clapperboard" src="https://github.com/user-attachments/assets/03f2ce2a-92fb-49b9-add3-1846319254eb" align="absmiddle"/> Demo
  
 [DTrain Demo Video](https://your-demo-video-url-here.mp4)
  
@@ -36,7 +36,7 @@
 
 ---
 
-## <img width="22" height="22" alt="table-of-contents" src="https://github.com/user-attachments/assets/d99e8c64-372d-4ddc-a94d-8a638872bd7b" align="absmiddle"/> Table of Contents
+## <img width="22" height="22" alt="table-of-contents" src="https://github.com/user-attachments/assets/bd7d9365-2042-435f-8278-8db21462762f" align="absmiddle"/> Table of Contents
 
 1. [About DTrain](#anchor-about)
 2. [The Problem It Solves](#anchor-problem)
@@ -62,7 +62,7 @@
 ---
 
 <a name="anchor-about"></a>
-## <img width="22" height="22" alt="about" src="https://github.com/user-attachments/assets/bcbb8c2f-15d6-47a2-b70c-2382b25bb789" align="absmiddle"/> About DTrain
+## <img width="22" height="22" alt="about" src="https://github.com/user-attachments/assets/d59f9a07-689c-4794-9459-ccb740c0fc24" align="absmiddle"/> About DTrain
 
 **DTrain** is a full-stack peer-to-peer distributed AI model training platform. It connects **ML researchers and developers** who need compute power with **GPU owners** who have idle machines — and handles everything in between: job analysis, pricing, payment escrow, execution, log streaming, and automatic payout.
 
@@ -73,7 +73,7 @@ No cloud accounts. No infrastructure setup. No per-hour billing surprises.
 ---
 
 <a name="anchor-problem"></a>
-## <img width="22" height="22" alt="problem" src="https://github.com/user-attachments/assets/c0ba776e-9050-45e6-8078-0a1af076483a" align="absmiddle"/> The Problem It Solves
+## <img width="22" height="22" alt="problem" src="https://github.com/user-attachments/assets/61a48af5-0043-4923-9acc-9bd57b8347a5" align="absmiddle"/> The Problem It Solves
 
 | Pain Point | Reality Today |
 |---|---|
@@ -89,7 +89,7 @@ DTrain solves all six simultaneously.
 ---
 
 <a name="anchor-features"></a>
-## <img width="22" height="22" alt="features" src="https://github.com/user-attachments/assets/b55e2c71-c446-43c8-9280-e33995438d4e" align="absmiddle"/> Key Features
+## <img width="22" height="22" alt="features" src="https://github.com/user-attachments/assets/830c54b7-ced2-4f49-9a7f-a148648dc7e2" align="absmiddle"/> Key Features
 
 - **AI-powered job pricing** — Groq LLM + rule-based static analyser reads your `requirements.txt` and training script to estimate complexity and assign a fair flat price from a ₹10–₹500 tier ladder. No surprises.
 - **Draft → Publish flow** — jobs are created as drafts with a price preview before any payment is taken. Users can review and cancel.
@@ -104,11 +104,11 @@ DTrain solves all six simultaneously.
 ---
 
 <a name="anchor-architecture"></a>
-## <img width="22" height="22" alt="architecture" src="https://github.com/user-attachments/assets/376863df-5853-466a-a007-cf469bb0f51a" align="absmiddle"/> System Architecture
+## <img width="22" height="22" alt="architecture" src="https://github.com/user-attachments/assets/d4fc401b-a9f4-4b29-afeb-e73603680993" align="absmiddle"/> System Architecture
  
 The platform has four distinct application layers that communicate via REST APIs and WebSockets:
  
-![DTrain System Architecture](https://github.com/user-attachments/assets/1baa0c26-9f41-47d4-be91-da52cca65b38)
+![DTrain System Architecture](https://github.com/user-attachments/assets/d780b76a-93a9-4b06-aaa4-23b255587140)
  
 ### Component Responsibilities
 
@@ -122,11 +122,11 @@ The platform has four distinct application layers that communicate via REST APIs
 ---
 
 <a name="anchor-how-it-works"></a>
-## <img width="22" height="22" alt="settings" src="https://github.com/user-attachments/assets/8786cd6c-f8a1-48cb-85d6-bd436dc3703d" align="absmiddle"/> How It Works
+## <img width="22" height="22" alt="settings" src="https://github.com/user-attachments/assets/da0e980a-9dd3-4844-b5a1-1b6ec80be7b3" align="absmiddle"/> How It Works
  
 ### User Flow (Step by Step)
  
-![DTrain User Flow Sequence](https://github.com/user-attachments/assets/014a0ee8-9498-48d5-ab02-4c8776709982)
+![DTrain User Flow Sequence](https://github.com/user-attachments/assets/74999b0d-8330-4f94-b8dc-f9ca46f128c4)
 
 ---
  
@@ -208,7 +208,7 @@ Workers can request a payout from their in-platform wallet to their bank account
 ---
 
 <a name="anchor-performance"></a>
-## <img width="22" height="22" alt="bar-chart" src="https://github.com/user-attachments/assets/b4d9d02b-eb7d-4446-bf20-09e1e1b4cf05" align="absmiddle"/> Performance & Cost Analysis
+## <img width="22" height="22" alt="bar-chart" src="https://github.com/user-attachments/assets/b3e175d7-186d-4dd3-8b18-a37fa18a812a" align="absmiddle"/> Performance & Cost Analysis
 
 The following benchmarks compare estimated training time and cost across four compute setups for common ML workloads. All values are derived mathematically from published GPU TFLOPS specifications and real AWS spot pricing.
 
@@ -218,15 +218,15 @@ The following benchmarks compare estimated training time and cost across four co
 
 ### Training Time Comparison
 
-![Training Time Comparison](https://github.com/user-attachments/assets/53c1d118-05aa-4ae3-bc2a-fc3d44b3f5c7)
+![Training Time Comparison](https://github.com/user-attachments/assets/4bf2b235-e6b5-4777-b388-cf63e89aaf1e)
 
 ### Cost Per Job Comparison
 
-![Cost Comparison](https://github.com/user-attachments/assets/f29dd6d8-6583-4049-8f60-ce0e1659b792)
+![Cost Comparison](https://github.com/user-attachments/assets/b2f367c7-782d-4524-a878-691dd8d2ea1e)
 
 ### DTrain Speed-up Factor vs Low-end PC
 
-![Speed-up Factor](https://github.com/user-attachments/assets/a22dfea3-3311-49f7-a1cf-d4ee97463f1c)
+![Speed-up Factor](https://github.com/user-attachments/assets/619b5da0-5f66-427f-bd3c-786edd90196f)
 
 ### Full Numbers at a Glance
 
@@ -256,7 +256,7 @@ The following benchmarks compare estimated training time and cost across four co
 ---
 
 <a name="anchor-tech-stack"></a>
-## <img width="22" height="22" alt="tech-stack" src="https://github.com/user-attachments/assets/8fcd412e-4df8-4501-9a66-8225010cd620" align="absmiddle"/> Tech Stack
+## <img width="22" height="22" alt="tech-stack" src="https://github.com/user-attachments/assets/ee9bfccc-fdde-41cc-9c2f-acc732b34c15" align="absmiddle"/> Tech Stack
  
 ### Backend (`backend/`)
  
@@ -314,140 +314,140 @@ The following benchmarks compare estimated training time and cost across four co
 ---
  
 <a name="anchor-project-structure"></a>
-## <img width="22" height="22" alt="project-structure" src="https://github.com/user-attachments/assets/a1a9740f-b472-43b6-878f-b00cc790ca8e" align="absmiddle"/> Project Structure
+## <img width="22" height="22" alt="project-structure" src="https://github.com/user-attachments/assets/6b4e3aef-fc93-4df2-bd39-c57c83a96240" align="absmiddle"/> Project Structure
 
 <pre>
-<img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> <b>dtrain/</b>
+<img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> <b>dtrain/</b>
 │
-├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> <b>backend</b>                                       # Express.js REST API + Socket.IO server
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> middlewares
-│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> authMiddleware.js                    # JWT verify → attaches req.user to every protected route
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> routes
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> JobRoutes.js                         # /create  /publish  /cancel  /list  /:id
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> PaymentRoutes.js                     # Stripe checkout, webhook handler, wallet top-up & payout
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> UserRoutes.js                        # /signup  /signin  /profile
-│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> WorkerRoutes.js                      # /register  /available-jobs  /accept  /push-log  /complete  /fail
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> schemas                                   # Mongoose data models (MongoDB)
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> BillingSchema.js                     # Per-job billing record — links user ↔ job ↔ worker
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> JobMetricsSchema.js                  # Training duration, resource usage snapshots
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> JobSchema.js                         # Core model — status enum, pricing, logs[], config{}
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> QuoteSchema.js                       # Pricing quote audit trail per job
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> TransactionSchema.js                 # Wallet credit / debit ledger
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> UserSchema.js                        # email, passwordHash, walletBalance
-│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> WorkerSchema.js                      # deviceId, gpu, currentStatus, walletBalance
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> utils
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> jwt.js                               # signToken / verifyToken helpers
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> <b>paymentHelpers.js</b> ⭐                  # Tier scoring engine + Groq LLM call + 80/20 split logic
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> redis.js                             # Redis publisher instance (job queue pub-sub)
-│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> stripeClient.js                      # Stripe SDK singleton
-│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> supabaseClient.js                    # Supabase client (service role — ZIP upload & model fetch)
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> .gitignore
-│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> <b>index.js</b> ⭐                            # Entry point — Express app, Socket.IO setup, DB connect
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package-lock.json
-│   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package.json
+├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> <b>backend</b>                                       # Express.js REST API + Socket.IO server
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> middlewares
+│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> authMiddleware.js                    # JWT verify → attaches req.user to every protected route
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> routes
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> JobRoutes.js                         # /create  /publish  /cancel  /list  /:id
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> PaymentRoutes.js                     # Stripe checkout, webhook handler, wallet top-up & payout
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> UserRoutes.js                        # /signup  /signin  /profile
+│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> WorkerRoutes.js                      # /register  /available-jobs  /accept  /push-log  /complete  /fail
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> schemas                                   # Mongoose data models (MongoDB)
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> BillingSchema.js                     # Per-job billing record — links user ↔ job ↔ worker
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> JobMetricsSchema.js                  # Training duration, resource usage snapshots
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> JobSchema.js                         # Core model — status enum, pricing, logs[], config{}
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> QuoteSchema.js                       # Pricing quote audit trail per job
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> TransactionSchema.js                 # Wallet credit / debit ledger
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> UserSchema.js                        # email, passwordHash, walletBalance
+│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> WorkerSchema.js                      # deviceId, gpu, currentStatus, walletBalance
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> utils
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> jwt.js                               # signToken / verifyToken helpers
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> <b>paymentHelpers.js</b> ⭐                  # Tier scoring engine + Groq LLM call + 80/20 split logic
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> redis.js                             # Redis publisher instance (job queue pub-sub)
+│   │   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> stripeClient.js                      # Stripe SDK singleton
+│   │   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> supabaseClient.js                    # Supabase client (service role — ZIP upload & model fetch)
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> .gitignore
+│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> <b>index.js</b> ⭐                            # Entry point — Express app, Socket.IO setup, DB connect
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package-lock.json
+│   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package.json
 │
-├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> <b>electron-worker</b>                               # Desktop worker agent (Windows .exe)
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> assets
-│   │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> icon.ico
-│   │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> icon.png
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> release                                   # Build output — do not edit manually
-│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> win-unpacked
-│   │   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> locales                          # Electron i18n locale packs (auto-generated)
-│   │   │   │   └── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/7c05b581-e5fc-4d89-a3b8-01205ef234fb" align="absmiddle"/> *.pak  (55 languages)
-│   │   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> resources
-│   │   │   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/7c05b581-e5fc-4d89-a3b8-01205ef234fb" align="absmiddle"/> app.asar                     # Packaged Electron app bundle
-│   │   │   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> elevate.exe
-│   │   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> DTrain Worker.exe               # Unpacked executable (for testing)
-│   │   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> *.dll / *.pak / *.bin           # Chromium runtime dependencies
-│   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> <b>DTrain Worker Setup 1.0.0.exe</b> ⭐       # Distributable installer (electron-builder)
-│   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/7c05b581-e5fc-4d89-a3b8-01205ef234fb" align="absmiddle"/> DTrain Worker Setup 1.0.0.exe.blockmap
-│   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> builder-debug.yml
-│   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> builder-effective-config.yaml
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> .gitignore
-│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> <b>main.js</b> ⭐                              # Core agent — job polling, Docker spawn, log streaming, upload
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package-lock.json
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package.json
-│   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> preload.js                                 # Electron contextBridge — IPC between main ↔ renderer
+├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> <b>electron-worker</b>                               # Desktop worker agent (Windows .exe)
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> assets
+│   │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> icon.ico
+│   │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> icon.png
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> release                                   # Build output — do not edit manually
+│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> win-unpacked
+│   │   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> locales                          # Electron i18n locale packs (auto-generated)
+│   │   │   │   └── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/33cf5060-48ab-4b57-8c36-a087dea7718d" align="absmiddle"/> *.pak  (55 languages)
+│   │   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> resources
+│   │   │   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/33cf5060-48ab-4b57-8c36-a087dea7718d" align="absmiddle"/> app.asar                     # Packaged Electron app bundle
+│   │   │   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> elevate.exe
+│   │   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> DTrain Worker.exe               # Unpacked executable (for testing)
+│   │   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> *.dll / *.pak / *.bin           # Chromium runtime dependencies
+│   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> <b>DTrain Worker Setup 1.0.0.exe</b> ⭐       # Distributable installer (electron-builder)
+│   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/33cf5060-48ab-4b57-8c36-a087dea7718d" align="absmiddle"/> DTrain Worker Setup 1.0.0.exe.blockmap
+│   │   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> builder-debug.yml
+│   │   └── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> builder-effective-config.yaml
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> .gitignore
+│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> <b>main.js</b> ⭐                              # Core agent — job polling, Docker spawn, log streaming, upload
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package-lock.json
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package.json
+│   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> preload.js                                 # Electron contextBridge — IPC between main ↔ renderer
 │
-├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> <b>frontend</b>                                      # User-facing React app  (port 5173)
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> public
-│   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/7c05b581-e5fc-4d89-a3b8-01205ef234fb" align="absmiddle"/> Favicon.ico
-│   │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> logo.png
-│   │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> logo1.png
-│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> src
-│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> components
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> ActiveWorkers.tsx               # Live map / list of online worker nodes
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>Dashboard.tsx</b> ⭐                   # Job list, status filters, stats overview
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> Documentation.tsx               # In-app how-to guide
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> HeroSection.tsx                 # Landing page — hero, CTA, feature highlights
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>JobDetail.tsx</b> ⭐                   # Live log stream, status timeline, model download
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>JobSubmission.tsx</b> ⭐               # Multi-step: upload → AI pricing preview → publish & pay
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> PendingJobs.tsx                 # Queue view of jobs awaiting a worker
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> ProfileDropdown.tsx             # User menu — profile info, sign out
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> RunningJobs.tsx                 # Live view of currently processing jobs
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> SignIn.tsx                      # Login form with JWT storage
-│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> SignUp.tsx                      # Registration form
-│   │   │   └── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>Wallet.tsx</b> ⭐                      # Balance card, Stripe top-up, transaction history
-│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> types
-│   │   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/b85e4564-6bfc-41b9-a59e-5fbd71787cf6" align="absmiddle"/> index.ts                         # Shared TypeScript interfaces — Job, Worker, User, Billing...
-│   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> App.tsx                             # Root component — router + auth guard
-│   │   ├── <img width="16" height="16" alt="css" src="https://github.com/user-attachments/assets/020b2930-34ab-4bdd-b270-3ab6d49db9d9" align="absmiddle"/> index.css                            # Tailwind base styles
-│   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> main.tsx                             # React DOM entry point
-│   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/b85e4564-6bfc-41b9-a59e-5fbd71787cf6" align="absmiddle"/> vite-env.d.ts                        # Vite env type declarations
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> .gitignore
-│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> eslint.config.js
-│   ├── <img width="16" height="16" alt="html" src="https://github.com/user-attachments/assets/64650b83-ff5e-49f8-8776-a396ed9d3059" align="absmiddle"/> index.html                           # HTML shell — Vite injects bundle here
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package-lock.json
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package.json
-│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> postcss.config.js
-│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> tailwind.config.js
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.app.json
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.json
-│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.node.json
-│   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> vite.config.ts
+├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> <b>frontend</b>                                      # User-facing React app  (port 5173)
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> public
+│   │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/33cf5060-48ab-4b57-8c36-a087dea7718d" align="absmiddle"/> Favicon.ico
+│   │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> logo.png
+│   │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> logo1.png
+│   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> src
+│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> components
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> ActiveWorkers.tsx               # Live map / list of online worker nodes
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>Dashboard.tsx</b> ⭐                   # Job list, status filters, stats overview
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> Documentation.tsx               # In-app how-to guide
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> HeroSection.tsx                 # Landing page — hero, CTA, feature highlights
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>JobDetail.tsx</b> ⭐                   # Live log stream, status timeline, model download
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>JobSubmission.tsx</b> ⭐               # Multi-step: upload → AI pricing preview → publish & pay
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> PendingJobs.tsx                 # Queue view of jobs awaiting a worker
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> ProfileDropdown.tsx             # User menu — profile info, sign out
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> RunningJobs.tsx                 # Live view of currently processing jobs
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> SignIn.tsx                      # Login form with JWT storage
+│   │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> SignUp.tsx                      # Registration form
+│   │   │   └── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>Wallet.tsx</b> ⭐                      # Balance card, Stripe top-up, transaction history
+│   │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> types
+│   │   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/0822a86b-1a9e-46c4-89d3-3464a1fad887" align="absmiddle"/> index.ts                         # Shared TypeScript interfaces — Job, Worker, User, Billing...
+│   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> App.tsx                             # Root component — router + auth guard
+│   │   ├── <img width="16" height="16" alt="css" src="https://github.com/user-attachments/assets/f09ee358-aaa2-4aea-be9a-e69a11bfc221" align="absmiddle"/> index.css                            # Tailwind base styles
+│   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> main.tsx                             # React DOM entry point
+│   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/0822a86b-1a9e-46c4-89d3-3464a1fad887" align="absmiddle"/> vite-env.d.ts                        # Vite env type declarations
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> .gitignore
+│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> eslint.config.js
+│   ├── <img width="16" height="16" alt="html" src="https://github.com/user-attachments/assets/f15960ef-2753-4b8e-8120-1d2737d84386" align="absmiddle"/> index.html                           # HTML shell — Vite injects bundle here
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package-lock.json
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package.json
+│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> postcss.config.js
+│   ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> tailwind.config.js
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.app.json
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.json
+│   ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.node.json
+│   └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> vite.config.ts
 │
-└── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> <b>worker-ui</b>                                     # Worker browser dashboard  (port 3000)
-    ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> public
-    │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/7c05b581-e5fc-4d89-a3b8-01205ef234fb" align="absmiddle"/> Favicon.ico
-    │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> logo.png
-    │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/061bec95-2d34-4eb4-a44a-1f3de3b79fe2" align="absmiddle"/> logo1.png
-    ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> src
-    │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> components
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> Documentation.tsx               # In-app guide for workers
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> HeroSection.tsx                 # Worker landing / onboarding page
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> JobDetail.tsx                   # Per-job detail with log preview
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>PayoutRequest.tsx</b> ⭐               # Payout form → POST /api/payment/payout-request
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> PricingSettings.tsx             # Worker sets minimum accepted job price
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> RunningJobs.tsx                 # Active job monitor with live log preview
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> SignIn.tsx                      # Worker login
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> SignUp.tsx                      # Worker registration
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> WalletCard.tsx                  # Earnings balance + payout trigger
-    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>WorkerDashboard.tsx</b> ⭐              # Earnings summary, recent jobs, wallet overview
-    │   │   └── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> <b>WorkerRegistration.tsx</b> ⭐          # First-time device registration — sends hardware specs
-    │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/de395ce2-8800-4e62-82e5-a0fef0e4b385" align="absmiddle"/> types
-    │   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/b85e4564-6bfc-41b9-a59e-5fbd71787cf6" align="absmiddle"/> index.ts                         # Shared TypeScript interfaces
-    │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> App.tsx                             # Router + auth guard
-    │   ├── <img width="16" height="16" alt="css" src="https://github.com/user-attachments/assets/020b2930-34ab-4bdd-b270-3ab6d49db9d9" align="absmiddle"/> index.css
-    │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/fe00f5d7-171e-4bbc-a1b4-fdec688d0f51" align="absmiddle"/> main.tsx
-    │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/b85e4564-6bfc-41b9-a59e-5fbd71787cf6" align="absmiddle"/> vite-env.d.ts
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> .gitignore
-    ├── <img width="16" height="16" alt="md" src="https://github.com/user-attachments/assets/5cb3af8a-3509-4660-912c-881f0e7d13cb" align="absmiddle"/> README.md
-    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> eslint.config.js
-    ├── <img width="16" height="16" alt="html" src="https://github.com/user-attachments/assets/64650b83-ff5e-49f8-8776-a396ed9d3059" align="absmiddle"/> index.html
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package-lock.json
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> package.json
-    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> postcss.config.js
-    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> tailwind.config.js
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.app.json
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.json
-    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/5618d9e1-5db0-4d6a-ab92-35087bc1528a" align="absmiddle"/> tsconfig.node.json
-    └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/e8290f91-60ad-4ba0-9640-700a1a8ee589" align="absmiddle"/> vite.config.ts
+└── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> <b>worker-ui</b>                                     # Worker browser dashboard  (port 3000)
+    ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> public
+    │   ├── <img width="16" height="16" alt="generic-files" src="https://github.com/user-attachments/assets/33cf5060-48ab-4b57-8c36-a087dea7718d" align="absmiddle"/> Favicon.ico
+    │   ├── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> logo.png
+    │   └── <img width="16" height="16" alt="image" src="https://github.com/user-attachments/assets/e9017024-82e7-4da6-a9be-c8932de02160" align="absmiddle"/> logo1.png
+    ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> src
+    │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> components
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> Documentation.tsx               # In-app guide for workers
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> HeroSection.tsx                 # Worker landing / onboarding page
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> JobDetail.tsx                   # Per-job detail with log preview
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>PayoutRequest.tsx</b> ⭐               # Payout form → POST /api/payment/payout-request
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> PricingSettings.tsx             # Worker sets minimum accepted job price
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> RunningJobs.tsx                 # Active job monitor with live log preview
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> SignIn.tsx                      # Worker login
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> SignUp.tsx                      # Worker registration
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> WalletCard.tsx                  # Earnings balance + payout trigger
+    │   │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>WorkerDashboard.tsx</b> ⭐              # Earnings summary, recent jobs, wallet overview
+    │   │   └── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> <b>WorkerRegistration.tsx</b> ⭐          # First-time device registration — sends hardware specs
+    │   ├── <img width="16" height="16" alt="folder" src="https://github.com/user-attachments/assets/826fa449-65a0-461e-84fd-765bec448de7" align="absmiddle"/> types
+    │   │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/0822a86b-1a9e-46c4-89d3-3464a1fad887" align="absmiddle"/> index.ts                         # Shared TypeScript interfaces
+    │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> App.tsx                             # Router + auth guard
+    │   ├── <img width="16" height="16" alt="css" src="https://github.com/user-attachments/assets/f09ee358-aaa2-4aea-be9a-e69a11bfc221" align="absmiddle"/> index.css
+    │   ├── <img width="16" height="16" alt="tsx" src="https://github.com/user-attachments/assets/aa2a1a97-19b0-4779-bc0d-42a3b616c8db" align="absmiddle"/> main.tsx
+    │   └── <img width="16" height="16" alt="ts" src="https://github.com/user-attachments/assets/0822a86b-1a9e-46c4-89d3-3464a1fad887" align="absmiddle"/> vite-env.d.ts
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> .gitignore
+    ├── <img width="16" height="16" alt="md" src="https://github.com/user-attachments/assets/d1454499-241f-461b-802b-06c0f174399e" align="absmiddle"/> README.md
+    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> eslint.config.js
+    ├── <img width="16" height="16" alt="html" src="https://github.com/user-attachments/assets/f15960ef-2753-4b8e-8120-1d2737d84386" align="absmiddle"/> index.html
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package-lock.json
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> package.json
+    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> postcss.config.js
+    ├── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> tailwind.config.js
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.app.json
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.json
+    ├── <img width="16" height="16" alt="config" src="https://github.com/user-attachments/assets/41696666-3a7f-406b-ade1-c07b3c0c1e9a" align="absmiddle"/> tsconfig.node.json
+    └── <img width="16" height="16" alt="js" src="https://github.com/user-attachments/assets/2a56c0f4-6765-4cac-8b2e-3ffc813f0fc6" align="absmiddle"/> vite.config.ts
 </pre>
 
 ---
 
 <a name="anchor-prerequisites"></a>
-## <img width="22" height="22" alt="prerequisites" src="https://github.com/user-attachments/assets/0956021f-40c2-411c-8a49-dff1cbf783b2" align="absmiddle"/> Prerequisites
+## <img width="22" height="22" alt="prerequisites" src="https://github.com/user-attachments/assets/13d10b6c-5325-4839-b991-2a8a3bdbc444" align="absmiddle"/> Prerequisites
 
 Ensure the following are installed and configured before running DTrain:
 
@@ -466,7 +466,7 @@ Ensure the following are installed and configured before running DTrain:
 ---
 
 <a name="anchor-env"></a>
-## <img width="22" height="22" alt="env" src="https://github.com/user-attachments/assets/cad6bd03-a0d1-483e-b165-3d4cd241c59b" align="absmiddle"/> Environment Variables
+## <img width="22" height="22" alt="env" src="https://github.com/user-attachments/assets/a58e0010-a6a1-4e80-ae00-868c067073f0" align="absmiddle"/> Environment Variables
 
 Create a file named `.env` inside the `backend/` directory. **Never commit this file** — it is already in `.gitignore`.
 
@@ -511,7 +511,7 @@ FRONTEND_URL=http://localhost:5173
 ---
 
 <a name="anchor-setup"></a>
-## <img width="22" height="22" alt="setup" src="https://github.com/user-attachments/assets/576236e0-4ce0-40b2-804c-a04c7be79d30" align="absmiddle"/> Setup & Installation
+## <img width="22" height="22" alt="setup" src="https://github.com/user-attachments/assets/607f7e06-d5ca-43be-9184-fc3eca3d3b3d" align="absmiddle"/> Setup & Installation
 
 ### Step 1 — Clone the repository
 
@@ -573,7 +573,7 @@ In your Supabase project, create a storage bucket named `jobs` and set it to **p
 ---
 
 <a name="anchor-running"></a>
-## <img width="22" height="22" alt="play" src="https://github.com/user-attachments/assets/f86fe8bd-93a1-49ba-bd0a-a1d8a4c45630" align="absmiddle"/> Running the Project
+## <img width="22" height="22" alt="play" src="https://github.com/user-attachments/assets/fd428ae0-fc7a-4f68-b18f-cfb1db1132d9" align="absmiddle"/> Running the Project
 
 Open **four separate terminal windows** from the project root directory:
 
@@ -629,7 +629,7 @@ Docker Desktop  →  Redis container  →  Backend  →  Frontend / Worker UI  �
 ---
 
 <a name="anchor-api"></a>
-## <img width="22" height="22" alt="api" src="https://github.com/user-attachments/assets/2601e2c0-7f4d-4fca-904b-9e91bb15cba8" align="absmiddle"/> API Reference
+## <img width="22" height="22" alt="api" src="https://github.com/user-attachments/assets/8a56b703-7eb3-4efb-abac-9f1c212b1a48" align="absmiddle"/> API Reference
 
 ### Authentication
 
@@ -675,7 +675,7 @@ Docker Desktop  →  Redis container  →  Backend  →  Frontend / Worker UI  �
 ---
 
 <a name="anchor-walkthrough"></a>
-## <img width="22" height="22" alt="walkthrough" src="https://github.com/user-attachments/assets/1d84c1d7-5144-4d72-99b5-1aecd9d126e0" align="absmiddle"/> Full Walkthrough
+## <img width="22" height="22" alt="walkthrough" src="https://github.com/user-attachments/assets/26b3ff41-fc2d-4133-bea4-b681ff9db650" align="absmiddle"/> Full Walkthrough
 
 **Manual walkthrough to test the full flow:**
 
@@ -700,19 +700,19 @@ Docker Desktop  →  Redis container  →  Backend  →  Frontend / Worker UI  �
 ---
 
 <a name="anchor-team"></a>
-## <img width="22" height="22" alt="team" src="https://github.com/user-attachments/assets/d2b9b626-fa9c-4b94-bfe8-0fd6769a0803" align="absmiddle"/> Team
+## <img width="22" height="22" alt="team" src="https://github.com/user-attachments/assets/6c85a5a4-5f4d-471f-a668-15b820383225" align="absmiddle"/> Team
  
 | Role | Name | Roll No. | GitHub | LinkedIn |
 |---|---|---|---|---|
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/c9206ee0-65f5-4998-8c10-54c79243c955" align="absmiddle"/> Team Member | **Debjit Mitra** | 17600122046 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/debjitmitra000/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/debjitmitra000/) |
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/c9206ee0-65f5-4998-8c10-54c79243c955" align="absmiddle"/> Team Member | **Soham De** | 17600122062 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/Snedit/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/soham-de-b5bb2b25b/) |
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/c9206ee0-65f5-4998-8c10-54c79243c955" align="absmiddle"/> Team Member | **Akash Poddar** | 17600122071 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)]() | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/akash150149/) |
-| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/c9206ee0-65f5-4998-8c10-54c79243c955" align="absmiddle"/> Team Member | **Sourodip Ghosh** | 17600122040 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://www.linkedin.com/in/sourodip-ghosh-177662253/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/RajSourodip/) |
-| <img width="18" height="18" alt="mentor" src="https://github.com/user-attachments/assets/72bdb4b0-1549-4aef-ba6f-124b473b192b" align="absmiddle"/> Project Mentor | **Ms. Agnimita Banerjee** | Assistant Professor, Dept. of CSE | — | — |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Debjit Mitra** | 17600122046 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/debjitmitra000/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/debjitmitra000/) |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Soham De** | 17600122062 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://github.com/Snedit/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://www.linkedin.com/in/soham-de-b5bb2b25b/) |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Akash Poddar** | 17600122071 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)]() | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/akash150149/) |
+| <img width="18" height="18" alt="team-member" src="https://github.com/user-attachments/assets/a38debe7-2e21-48e8-99d4-b9000762a006" align="absmiddle"/> Team Member | **Sourodip Ghosh** | 17600122040 | [![GitHub](https://img.shields.io/badge/GitHub-171515?logo=github&logoColor=white)](https://www.linkedin.com/in/sourodip-ghosh-177662253/) | [![LinkedIn](https://img.shields.io/badge/LinkedIn-0A66C2?logo=linkedin&logoColor=white)](https://github.com/RajSourodip/) |
+| <img width="18" height="18" alt="mentor" src="https://github.com/user-attachments/assets/04daea7b-46f5-4e85-8d4e-0a25674ead94" align="absmiddle"/> Project Mentor | **Ms. Agnimita Banerjee** | Assistant Professor, Dept. of CSE | — | — |
  
 ---
  
-## <img width="22" height="22" alt="roadmap" src="https://github.com/user-attachments/assets/baa78a47-b58c-4e66-866c-ed6981d86f35" align="absmiddle"/> Roadmap
+## <img width="22" height="22" alt="roadmap" src="https://github.com/user-attachments/assets/1232b205-b5ba-449f-8377-c9880b597564" align="absmiddle"/> Roadmap
 
 Potential improvements and features for future versions:
 
@@ -728,7 +728,7 @@ Potential improvements and features for future versions:
 ---
 
 <a name="anchor-license"></a>
-## <img width="22" height="22" alt="license" src="https://github.com/user-attachments/assets/56e9961d-014c-43ed-adbe-4ff655abbdb3" align="absmiddle"/> License
+## <img width="22" height="22" alt="license" src="https://github.com/user-attachments/assets/7489d11a-a65b-462d-b7cc-307a95630826" align="absmiddle"/> License
 
 This project was submitted as an academic final year B.Tech capstone project. All rights reserved by the authors and institution. Not licensed for commercial use or redistribution without explicit written permission from the team.
 
