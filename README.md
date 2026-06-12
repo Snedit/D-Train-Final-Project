@@ -126,7 +126,7 @@ The platform has four distinct application layers that communicate via REST APIs
  
 ### User Flow (Step by Step)
  
-![DTrain User Flow Sequence](https://github.com/user-attachments/assets/74999b0d-8330-4f94-b8dc-f9ca46f128c4)
+![DTrain User Flow Sequence](https://github.com/user-attachments/assets/a184d793-2014-4a8d-9ad1-61f419e7a5be)
 
 ---
  
