@@ -108,7 +108,7 @@ DTrain solves all six simultaneously.
  
 The platform has four distinct application layers that communicate via REST APIs and WebSockets:
  
-![DTrain System Architecture](https://github.com/user-attachments/assets/d780b76a-93a9-4b06-aaa4-23b255587140)
+![DTrain System Architecture](https://github.com/user-attachments/assets/d8ac82fb-f2a4-4f11-b9a8-8705e7810490)
  
 ### Component Responsibilities
 
@@ -126,7 +126,7 @@ The platform has four distinct application layers that communicate via REST APIs
  
 ### User Flow (Step by Step)
  
-![DTrain User Flow Sequence](https://github.com/user-attachments/assets/a184d793-2014-4a8d-9ad1-61f419e7a5be)
+![DTrain User Flow Sequence](https://github.com/user-attachments/assets/1e322a0a-d6cc-462e-a9e0-6124b6605343)
 
 ---
  
@@ -218,15 +218,15 @@ The following benchmarks compare estimated training time and cost across four co
 
 ### Training Time Comparison
 
-![Training Time Comparison](https://github.com/user-attachments/assets/4bf2b235-e6b5-4777-b388-cf63e89aaf1e)
+![Training Time Comparison](https://github.com/user-attachments/assets/1b0299dd-a64a-476b-ac3a-c0498248f915)
 
 ### Cost Per Job Comparison
 
-![Cost Comparison](https://github.com/user-attachments/assets/b2f367c7-782d-4524-a878-691dd8d2ea1e)
+![Cost Comparison](https://github.com/user-attachments/assets/a3e7ef48-fbed-4a5d-9ddc-070d4d71c8bc)
 
 ### DTrain Speed-up Factor vs Low-end PC
 
-![Speed-up Factor](https://github.com/user-attachments/assets/619b5da0-5f66-427f-bd3c-786edd90196f)
+![Speed-up Factor](https://github.com/user-attachments/assets/8eb35582-2d84-4d5f-813f-eeaa2e84cecc)
 
 ### Full Numbers at a Glance
 
