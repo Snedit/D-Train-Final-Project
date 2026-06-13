@@ -1,15 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, BookOpen, Github } from 'lucide-react';
+import { ArrowLeft, BookOpen, Github, CheckCircle2, XCircle, AlertTriangle, Heart } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import mermaid from 'mermaid';
-
 
 // ============================================
-// 🔧 CONFIGURATION - CHANGE THIS TO YOUR REPO
+// 🔧 CONFIGURATION
 // ============================================
 const CONFIG = {
   GITHUB_USERNAME: 'snedit',
@@ -20,176 +17,457 @@ const CONFIG = {
 };
 // ============================================
 
-
 interface DocumentationProps {
   onBack?: () => void;
 }
 
+const VIDEO_EXTS = ['.webm', '.mp4', '.mov', '.avi', '.mkv'];
 
+const isVideoSrc = (src: string): boolean =>
+  VIDEO_EXTS.some(ext => src.toLowerCase().endsWith(ext));
+
+const isInlineIcon = (width?: string | number, height?: string | number): boolean => {
+  const w = typeof width === 'string' ? parseInt(width, 10) : (width ?? 999);
+  const h = typeof height === 'string' ? parseInt(height, 10) : (height ?? 999);
+  return w <= 32 && h <= 32;
+};
+
+const isShieldsBadge = (src?: string): boolean =>
+  !!(src?.includes('shields.io') || src?.includes('img.shields.io'));
+
+// ─── GitHub-style heading slug generator ──────────────────────────────────────
+// Replicates github-slugger's algorithm closely enough to match the anchors
+// used in the README's Table of Contents (e.g. "User Flow (Step by Step)"
+// -> "user-flow-step-by-step").
+const getTextContent = (node: React.ReactNode): string => {
+  if (typeof node === 'string' || typeof node === 'number') return String(node);
+  if (Array.isArray(node)) return node.map(getTextContent).join('');
+  if (React.isValidElement(node)) {
+    const props = node.props as { children?: React.ReactNode };
+    return getTextContent(props?.children);
+  }
+  return '';
+};
+
+const slugify = (text: string): string =>
+  text
+    .toLowerCase()
+    .trim()
+    .replace(/[^\w\u00C0-\u024f\- ]/g, '') // strip punctuation/emoji, keep letters/numbers/spaces/hyphens
+    .replace(/\s+/g, '-');
+
+// ─── Emoji → Lucide icon replacement ──────────────────────────────────────────
+// We swap a small set of emoji characters for custom inline tags BEFORE the
+// markdown is parsed (rehype-raw will turn these into elements we can map to
+// Lucide icon components below). The ⭐ emoji is intentionally left untouched
+// so the "Star This Repo" badge keeps working.
+const replaceEmojisWithIconTags = (text: string): string =>
+  text
+    .replace(/✅/g, '<icon-check></icon-check>')
+    .replace(/❌/g, '<icon-x></icon-x>')
+    .replace(/⚠️/g, '<icon-warning></icon-warning>')
+    .replace(/❤️/g, '<icon-heart></icon-heart>');
+
+// ─── Video player ────────────────────────────────────────────────────────────
+const VideoPlayer: React.FC<{ src: string }> = ({ src }) => {
+  const [loaded, setLoaded] = React.useState(false);
+  return (
+    <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[200px]">
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+            />
+            <p className="text-sm font-bold text-slate-700">Loading video…</p>
+          </div>
+        </div>
+      )}
+      <video
+        src={src}
+        controls
+        className="w-full h-auto relative z-0"
+        preload="metadata"
+        onLoadedData={() => setLoaded(true)}
+        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
+      >
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  );
+};
+
+// ─── Context to track if we're inside a table cell ───────────────────────────
+const TableCellContext = React.createContext(false);
+
+// ─── Main component ──────────────────────────────────────────────────────────
 const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
   const [markdown, setMarkdown] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const mermaidRef = useRef<boolean>(false);
 
-
-  // Construct URLs from config
   const GITHUB_RAW_URL = `https://raw.githubusercontent.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}/${CONFIG.BRANCH}/${CONFIG.README_PATH}`;
   const GITHUB_REPO_URL = `https://github.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}`;
   const GITHUB_RAW_BASE = `https://raw.githubusercontent.com/${CONFIG.GITHUB_USERNAME}/${CONFIG.REPO_NAME}/${CONFIG.BRANCH}`;
 
-
-  useEffect(() => {
-    // Initialize Mermaid
-    mermaid.initialize({
-      startOnLoad: false,
-      theme: 'default',
-      securityLevel: 'loose',
-      fontFamily: 'ui-monospace, monospace',
-      logLevel: 'fatal',
-      themeVariables: {
-        primaryColor: '#7CF2D0',
-        primaryTextColor: '#0F172A',
-        primaryBorderColor: '#0F172A',
-        lineColor: '#0F172A',
-        secondaryColor: '#FFD447',
-        tertiaryColor: '#FF76B8',
-        background: '#FFFDF8',
-        mainBkg: '#FFFDF8',
-        secondBkg: '#FFEFE1',
-        border1: '#0F172A',
-        border2: '#0F172A',
-      }
-    });
-    mermaidRef.current = true;
-    
-    // Suppress mermaid error messages
-    const originalError = console.error;
-    console.error = (...args) => {
-      if (args[0]?.includes?.('mermaid') || args[0]?.includes?.('Syntax error')) {
-        return;
-      }
-      originalError.apply(console, args);
-    };
-  }, []);
-
-
-  useEffect(() => {
-    fetchReadme();
-  }, []);
-
-
-  useEffect(() => {
-    if (markdown && mermaidRef.current) {
-      setTimeout(() => {
-        renderMermaidDiagrams();
-      }, 100);
-    }
-  }, [markdown]);
-
-
-  const renderMermaidDiagrams = async () => {
-    const mermaidElements = document.querySelectorAll('.mermaid-diagram:not(.mermaid-rendered)');
-    
-    if (mermaidElements.length === 0) return;
-    
-    for (let i = 0; i < mermaidElements.length; i++) {
-      const element = mermaidElements[i] as HTMLElement;
-      const code = element.textContent || '';
-      
-      if (!code.trim()) {
-        element.style.display = 'none';
-        continue;
-      }
-      
-      try {
-        const id = `mermaid-${Date.now()}-${i}`;
-        const { svg } = await mermaid.render(id, code);
-        element.innerHTML = svg;
-        element.classList.add('mermaid-rendered');
-      } catch (err) {
-        element.style.display = 'none';
-        element.classList.add('mermaid-rendered');
-      }
-    }
+  const getMediaUrl = (src: string) => {
+    if (src.startsWith('http')) return src;
+    return `${GITHUB_RAW_BASE}/${src}`;
   };
 
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (!anchor) return;
+      const href = anchor.getAttribute('href') || '';
+      if (!href.startsWith('#')) return;
+      e.preventDefault();
+      const id = href.slice(1);
+      const el =
+        document.querySelector(`[name="${id}"]`) ||
+        document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
+    document.addEventListener('click', handler);
+    return () => document.removeEventListener('click', handler);
+  }, []);
+
+  useEffect(() => { fetchReadme(); }, []);
 
   const fetchReadme = async () => {
     try {
       setLoading(true);
       setError(null);
-      
       let response = await fetch(GITHUB_RAW_URL);
-      
       if (!response.ok) {
-        const alternateBranch = CONFIG.BRANCH === 'main' ? 'master' : 'main';
-        const alternateUrl = GITHUB_RAW_URL.replace(`/${CONFIG.BRANCH}/`, `/${alternateBranch}/`);
-        response = await fetch(alternateUrl);
+        const alt = GITHUB_RAW_URL.replace(`/${CONFIG.BRANCH}/`, '/master/');
+        response = await fetch(alt);
       }
-
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch README');
-      }
-
-
-      let text = await response.text();
-      
-      const lines = text.split('\n');
-      
-      // Convert video references to proper markdown image syntax
-      const processedLines = lines.map(line => {
-        const trimmedLine = line.trim();
-        
-        // Handle markdown link format: [filename.webm](url)
-        const markdownVideoMatch = trimmedLine.match(/^\[([^\]]+\.(webm|mp4|mov|avi|mkv))\]\(([^)]+)\)$/i);
-        if (markdownVideoMatch) {
-          const url = markdownVideoMatch[3];
-          return `![Video](${url})`;
-        }
-        
-        // Handle standalone video file references
-        if (trimmedLine.match(/^[^\[\]()!]*\.(webm|mp4|mov|avi|mkv)$/i)) {
-          return `![Video](${trimmedLine})`;
-        }
-        
-        return line;
-      });
-      
-      text = processedLines.join('\n');
-      setMarkdown(text);
+      if (!response.ok) throw new Error('Failed to fetch README');
+      const text = await response.text();
+      setMarkdown(replaceEmojisWithIconTags(text));
     } catch (err) {
       setError('Failed to load documentation. Please try again later.');
-      console.error('Error fetching README:', err);
     } finally {
       setLoading(false);
     }
   };
 
-
   const handleBack = () => {
-    if (onBack) {
-      onBack();
-    } else {
-      window.history.back();
-    }
+    if (onBack) onBack();
+    else window.history.back();
   };
 
+  // ── Markdown component overrides ─────────────────────────────────────────
+  const components: any = {
 
-  const getMediaUrl = (src: string) => {
-    if (src.startsWith('http')) {
-      return src;
-    }
-    return `${GITHUB_RAW_BASE}/${src}`;
+    // ── Emoji → Lucide icon replacements ──────────────────────────────────
+    'icon-check': () => (
+      <CheckCircle2
+        className="inline-block align-middle text-green-600"
+        style={{ width: '1.1em', height: '1.1em', verticalAlign: '-0.15em' }}
+      />
+    ),
+    'icon-x': () => (
+      <XCircle
+        className="inline-block align-middle text-red-600"
+        style={{ width: '1.1em', height: '1.1em', verticalAlign: '-0.15em' }}
+      />
+    ),
+    'icon-warning': () => (
+      <AlertTriangle
+        className="inline-block align-middle text-amber-500"
+        style={{ width: '1.1em', height: '1.1em', verticalAlign: '-0.15em' }}
+      />
+    ),
+    'icon-heart': () => (
+      <Heart
+        className="inline-block align-middle text-red-500"
+        fill="currentColor"
+        style={{ width: '1.1em', height: '1.1em', verticalAlign: '-0.15em' }}
+      />
+    ),
+
+    h1: ({ children, id, ...props }: any) => (
+      <h1 id={id || slugify(getTextContent(children))} className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-6 mt-8 pb-4 border-b-[4px] border-slate-900" {...props}>
+        {children}
+      </h1>
+    ),
+    h2: ({ children, id, ...props }: any) => (
+      <div className="mt-10 mb-6">
+        <h2
+          id={id || slugify(getTextContent(children))}
+          className="inline-flex items-center gap-2 text-xl md:text-2xl font-extrabold text-slate-900 px-5 py-3 rounded-[14px] border-[3px] border-slate-900 bg-[#FFE66D] shadow-[5px_5px_0_0_rgba(15,23,42,1)]"
+          {...props}
+        >
+          {children}
+        </h2>
+      </div>
+    ),
+    h3: ({ children, id, ...props }: any) => (
+      <h3 id={id || slugify(getTextContent(children))} className="text-xl md:text-2xl font-bold text-slate-900 mb-3 mt-6" {...props}>{children}</h3>
+    ),
+    h4: ({ children, id, ...props }: any) => (
+      <h4 id={id || slugify(getTextContent(children))} className="text-lg md:text-xl font-bold text-slate-900 mb-2 mt-5" {...props}>{children}</h4>
+    ),
+
+    p: ({ children, ...props }: any) => (
+      <p className="text-slate-700 text-base mb-5 leading-relaxed" {...props}>{children}</p>
+    ),
+
+    a: ({ href, children, ...props }: any) => {
+      if (href && isVideoSrc(href)) return <VideoPlayer src={getMediaUrl(href)} />;
+
+      // Detect badge-only links — no text nodes among children
+      const childArray = React.Children.toArray(children);
+      const hasNoText = childArray.every(child =>
+        React.isValidElement(child) ||
+        (typeof child === 'string' && child.trim() === '')
+      );
+      const hasImg = childArray.some(child => React.isValidElement(child));
+      const isImageOnly = hasNoText && hasImg;
+
+      if (isImageOnly) {
+        return (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ display: 'inline', textDecoration: 'none', border: 'none', background: 'none' }}
+            {...props}
+          >
+            {children}
+          </a>
+        );
+      }
+
+      return (
+        <a
+          href={href}
+          target={href?.startsWith('#') ? undefined : '_blank'}
+          rel={href?.startsWith('#') ? undefined : 'noopener noreferrer'}
+          style={{
+            display: 'inline',
+            color: '#1d4ed8',
+            fontWeight: 700,
+            textDecoration: 'none',
+            borderBottom: '2.5px solid #1d4ed8',
+            paddingBottom: '1px',
+            transition: 'all 0.15s ease',
+          }}
+          onMouseEnter={e => {
+            (e.currentTarget as HTMLAnchorElement).style.background = '#1d4ed8';
+            (e.currentTarget as HTMLAnchorElement).style.color = '#ffffff';
+            (e.currentTarget as HTMLAnchorElement).style.borderRadius = '4px';
+            (e.currentTarget as HTMLAnchorElement).style.padding = '1px 4px';
+          }}
+          onMouseLeave={e => {
+            (e.currentTarget as HTMLAnchorElement).style.background = 'transparent';
+            (e.currentTarget as HTMLAnchorElement).style.color = '#1d4ed8';
+            (e.currentTarget as HTMLAnchorElement).style.borderRadius = '0';
+            (e.currentTarget as HTMLAnchorElement).style.padding = '0 0 1px 0';
+          }}
+          {...props}
+        >
+          {children}
+        </a>
+      );
+    },
+
+    // ── Images ────────────────────────────────────────────────────────────
+    img: ({ src, alt, width, height }: any) => {
+      if (!src) return null;
+      const resolvedSrc = getMediaUrl(src);
+
+      // Video
+      if (isVideoSrc(resolvedSrc)) return <VideoPlayer src={resolvedSrc} />;
+
+      // Shields badge — render naturally at correct size
+      if (isShieldsBadge(src)) {
+        return (
+          <img
+            src={resolvedSrc}
+            alt={alt || ''}
+            style={{
+              display: 'inline',
+              verticalAlign: 'middle',
+              height: '22px',
+              width: 'auto',
+              margin: '2px 3px',
+              borderRadius: '4px',
+              boxShadow: '2px 2px 0 0 #0f172a',
+            }}
+            loading="lazy"
+          />
+        );
+      }
+
+      // Small inline icon (≤32px) — heading icons, file-tree icons, team icons
+      if (isInlineIcon(width, height)) {
+        return (
+          <img
+            src={resolvedSrc}
+            alt={alt || ''}
+            width={width}
+            height={height}
+            className="docs-inline-icon inline-block align-middle"
+            loading="lazy"
+          />
+        );
+      }
+
+      // DTrain logo (specific asset ID) — render small
+      const LOGO_ID = 'eeedb305-fd79-446d-ae55-1fb2cec42c90';
+      if (src.includes(LOGO_ID)) {
+        return (
+          <img
+            src={resolvedSrc}
+            alt={alt || ''}
+            className="my-6 block mx-auto"
+            style={{ maxWidth: '120px', objectFit: 'contain' }}
+            loading="lazy"
+          />
+        );
+      }
+
+      // Large content image (PNG diagrams) — full width
+      return (
+        <img
+          src={resolvedSrc}
+          alt={alt || ''}
+          className="rounded-[16px] border-[3px] border-slate-900 shadow-[6px_6px_0_0_rgba(15,23,42,1)] my-6 w-full h-auto block mx-auto"
+          loading="lazy"
+        />
+      );
+    },
+
+    // ── Code ──────────────────────────────────────────────────────────────
+    code: ({ inline, className, children, ...props }: any) => {
+      const inCell = React.useContext(TableCellContext);
+      const isBlock = !inline && className?.includes('language-');
+
+      // Block code (inside <pre>) — no styling, plain white text
+      if (isBlock || (!inline && !className?.includes('language-') && typeof children === 'string' && (children as string).includes('\n'))) {
+        return (
+          <code
+            className="font-mono text-sm text-[#e2e8f0] whitespace-pre"
+            style={{ background: 'transparent', border: 'none', padding: 0, boxShadow: 'none', borderRadius: 0 }}
+            {...props}
+          >
+            {children}
+          </code>
+        );
+      }
+
+      // Inside table cells — plain monospace, no box
+      if (inCell) {
+        return (
+          <code className="font-mono text-sm text-slate-900" {...props}>
+            {children}
+          </code>
+        );
+      }
+
+      // Inline code everywhere else (li, p, h3, etc.) — yellow pill with dark text
+      return (
+        <code
+          className="px-2 py-0.5 rounded-[6px] border-[2px] border-slate-900 bg-[#FFE66D] text-slate-900 font-mono text-sm font-bold"
+          style={{ wordBreak: 'keep-all', whiteSpace: 'pre-wrap' }}
+          {...props}
+        >
+          {children}
+        </code>
+      );
+    },
+
+    pre: ({ children, ...props }: any) => (
+      <pre className="my-6 rounded-[16px] overflow-x-auto" style={{ whiteSpace: 'pre' }} {...props}>
+        {children}
+      </pre>
+    ),
+
+    // ── Lists — SKIP bullet injection when inside a table cell ────────────
+    ul: ({ children, ...props }: any) => {
+      const inCell = React.useContext(TableCellContext);
+      if (inCell) return <span className="inline" {...props}>{children}</span>;
+      return <ul className="space-y-2 mb-6 ml-0" {...props}>{children}</ul>;
+    },
+    ol: ({ children, ...props }: any) => {
+      const inCell = React.useContext(TableCellContext);
+      if (inCell) return <span className="inline" {...props}>{children}</span>;
+      return <ol className="space-y-2 mb-6 ml-6 list-decimal" {...props}>{children}</ol>;
+    },
+    li: ({ children, ...props }: any) => {
+      const inCell = React.useContext(TableCellContext);
+      // Inside a table cell — render plain, no bullet dot injection
+      if (inCell) {
+        return <span className="block text-slate-800 font-medium text-sm" {...props}>{children}</span>;
+      }
+      return (
+        <li className="flex items-start gap-2 text-slate-700 font-medium" {...props}>
+          <span className="text-slate-900 font-bold mt-0.5 shrink-0">•</span>
+          <span className="flex-1 min-w-0">{children}</span>
+        </li>
+      );
+    },
+
+    blockquote: ({ ...props }: any) => (
+      <blockquote
+        className="my-6 pl-6 pr-4 py-4 border-l-[6px] border-blue-500 bg-blue-100 rounded-r-[14px] rounded-l-[4px] italic shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+        {...props}
+      />
+    ),
+
+    // ── Tables — provide TableCellContext inside td/th ─────────────────────
+    table: ({ ...props }: any) => (
+      <div className="overflow-x-auto my-8">
+        <div className="rounded-[20px] border-[3px] border-slate-900 overflow-hidden">
+          <table className="min-w-full" {...props} />
+        </div>
+      </div>
+    ),
+    thead: ({ ...props }: any) => (
+      <thead className="bg-[#FFE66D] border-b-[3px] border-slate-900" {...props} />
+    ),
+    th: ({ children, ...props }: any) => (
+      <th className="px-5 py-4 text-left font-extrabold text-slate-900 border-r-[3px] border-slate-900 last:border-r-0 text-sm" {...props}>
+        <TableCellContext.Provider value={true}>
+          {children}
+        </TableCellContext.Provider>
+      </th>
+    ),
+    tbody: ({ ...props }: any) => (
+      <tbody className="bg-[#ffd6e8]" {...props} />
+    ),
+    tr: ({ ...props }: any) => (
+      <tr className="border-b-[3px] border-slate-900 last:border-b-0" {...props} />
+    ),
+    td: ({ children, ...props }: any) => (
+      <td className="px-5 py-4 text-slate-800 font-medium border-r-[3px] border-slate-900 border-b-[3px] last:border-r-0 text-sm" {...props}>
+        <TableCellContext.Provider value={true}>
+          {children}
+        </TableCellContext.Provider>
+      </td>
+    ),
+
+    hr: ({ ...props }: any) => (
+      <hr className="my-10 border-t-[3px] border-dashed border-slate-900" {...props} />
+    ),
+    strong: ({ ...props }: any) => (
+      <strong className="font-extrabold text-slate-900" {...props} />
+    ),
+    em: ({ ...props }: any) => (
+      <em className="italic text-slate-700 font-semibold" {...props} />
+    ),
   };
-
 
   return (
     <div className="min-h-screen w-full bg-[#FFEFE1] px-4 py-10">
       <div className="max-w-6xl mx-auto">
         <div className="relative">
-          {/* Background card */}
           <div
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
@@ -199,34 +477,29 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
             }}
           />
 
-
-          {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFD447] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
-            transition={{ repeat: Infinity, duration: 4, ease: "easeInOut" }}
+            transition={{ repeat: Infinity, duration: 4, ease: 'easeInOut' }}
           >
             <BookOpen className="w-8 h-8 text-slate-900" />
           </motion.div>
-          
+
           <motion.div
             className="absolute -bottom-6 -right-6 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#7CF2D0]"
             animate={{ y: [0, -6, 0] }}
-            transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
+            transition={{ repeat: Infinity, duration: 5, ease: 'easeInOut' }}
           />
-          
+
           <motion.div
             className="absolute top-20 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
             animate={{ rotate: [6, -6, 6] }}
-            transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+            transition={{ repeat: Infinity, duration: 6, ease: 'easeInOut' }}
           >
             <Github className="w-8 h-8 text-slate-900" />
           </motion.div>
 
-
-          {/* Main content */}
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
-            {/* Header */}
             <div className="flex items-center justify-between mb-8">
               <motion.button
                 whileHover={{ x: -4 }}
@@ -237,7 +510,6 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </motion.button>
-
 
               <a
                 href={GITHUB_REPO_URL}
@@ -250,10 +522,8 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
               </a>
             </div>
 
-
-            {/* Title */}
             <div className="mb-10 text-center">
-              <motion.h1 
+              <motion.h1
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5 }}
@@ -263,9 +533,7 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
               </motion.h1>
             </div>
 
-
-            {/* Content area */}
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.5, delay: 0.2 }}
@@ -276,21 +544,21 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
                   <div className="relative w-24 h-24 mx-auto mb-6">
                     <motion.div
                       animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
                       className="absolute inset-0 rounded-[16px] border-[4px] border-slate-900 bg-blue-400 shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
                     />
                     <motion.div
                       animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeInOut' }}
                       className="absolute inset-4 rounded-full border-[4px] border-slate-900 bg-[#FFD447]"
                     />
                   </div>
-                  <p className="text-lg font-extrabold text-slate-900">Loading docs...</p>
+                  <p className="text-lg font-extrabold text-slate-900">Loading docs…</p>
                 </div>
               ) : error ? (
                 <div className="p-12 text-center">
                   <div className="w-20 h-20 rounded-[18px] bg-[#FEE2E2] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                    <span className="text-4xl">⚠️</span>
+                    <AlertTriangle className="w-10 h-10 text-amber-500" />
                   </div>
                   <p className="text-slate-900 font-extrabold mb-2 text-xl">Oops!</p>
                   <p className="text-slate-700 font-semibold mb-6">{error}</p>
@@ -304,310 +572,12 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
                   </motion.button>
                 </div>
               ) : (
-                <div className="p-8 md:p-12 overflow-x-auto">
+                <div className="p-8 md:p-12">
                   <article className="prose prose-slate max-w-none docs-content">
-                    <ReactMarkdown 
+                    <ReactMarkdown
                       remarkPlugins={[remarkGfm]}
-                      rehypePlugins={[rehypeRaw, rehypeSanitize]}
-                      components={{
-                        h1: ({...props}) => (
-                          <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-6 mt-8 pb-4 border-b-[4px] border-slate-900" {...props} />
-                        ),
-                        h2: ({...props}) => (
-                          <div className="mt-10 mb-6">
-                            <h2 className="inline-block text-2xl md:text-3xl font-extrabold text-slate-900 px-5 py-3 rounded-[14px] border-[3px] border-slate-900 bg-[#FFE66D] shadow-[5px_5px_0_0_rgba(15,23,42,1)]" {...props} />
-                          </div>
-                        ),
-                        h3: ({...props}) => (
-                          <h3 className="text-xl md:text-2xl font-bold text-slate-900 mb-3 mt-6" {...props} />
-                        ),
-                        h4: ({...props}) => (
-                          <h4 className="text-lg md:text-xl font-bold text-slate-900 mb-2 mt-5" {...props} />
-                        ),
-                        p: ({children, ...props}) => {
-                          // Check for video files
-                          if (typeof children === 'string') {
-                            const videoMatch = children.match(/^([^\s]+\.(webm|mp4|mov|avi|mkv))$/i);
-                            if (videoMatch) {
-                              const filename = videoMatch[1];
-                              const videoSrc = getMediaUrl(filename);
-                              const [videoLoaded, setVideoLoaded] = React.useState(false);
-                              
-                              return (
-                                <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[300px]">
-                                  {!videoLoaded && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
-                                      <div className="text-center">
-                                        <motion.div
-                                          animate={{ rotate: 360 }}
-                                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                          className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
-                                        />
-                                        <p className="text-sm font-bold text-slate-700">Loading video...</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                  <video 
-                                    src={videoSrc}
-                                    controls
-                                    className="w-full h-auto relative z-0"
-                                    preload="metadata"
-                                    onLoadedData={() => setVideoLoaded(true)}
-                                    style={{ opacity: videoLoaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
-                                  >
-                                    <source src={videoSrc} type={`video/${filename.split('.').pop()}`} />
-                                    Your browser does not support the video tag.
-                                  </video>
-                                </div>
-                              );
-                            }
-                          }
-                          
-                          if (Array.isArray(children) && children.length === 1 && typeof children[0] === 'string') {
-                            const videoMatch = children[0].match(/^([^\s]+\.(webm|mp4|mov|avi|mkv))$/i);
-                            if (videoMatch) {
-                              const filename = videoMatch[1];
-                              const videoSrc = getMediaUrl(filename);
-                              const [videoLoaded, setVideoLoaded] = React.useState(false);
-                              
-                              return (
-                                <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[300px]">
-                                  {!videoLoaded && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
-                                      <div className="text-center">
-                                        <motion.div
-                                          animate={{ rotate: 360 }}
-                                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                          className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
-                                        />
-                                        <p className="text-sm font-bold text-slate-700">Loading video...</p>
-                                      </div>
-                                    </div>
-                                  )}
-                                  <video 
-                                    src={videoSrc}
-                                    controls
-                                    className="w-full h-auto relative z-0"
-                                    preload="metadata"
-                                    onLoadedData={() => setVideoLoaded(true)}
-                                    style={{ opacity: videoLoaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
-                                  >
-                                    <source src={videoSrc} type={`video/${filename.split('.').pop()}`} />
-                                    Your browser does not support the video tag.
-                                  </video>
-                                </div>
-                              );
-                            }
-                          }
-                          
-                          return <p className="text-slate-700 text-base mb-5 leading-relaxed" {...props}>{children}</p>;
-                        },
-                        a: ({href, children, ...props}) => {
-                          const videoExtensions = ['.webm', '.mp4', '.mov', '.avi', '.mkv'];
-                          const isVideoLink = href && videoExtensions.some(ext => href.toLowerCase().endsWith(ext));
-                          
-                          if (isVideoLink && href) {
-                            const videoSrc = getMediaUrl(href);
-                            const [videoLoaded, setVideoLoaded] = React.useState(false);
-                            
-                            return (
-                              <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[300px]">
-                                {!videoLoaded && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
-                                    <div className="text-center">
-                                      <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                        className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
-                                      />
-                                      <p className="text-sm font-bold text-slate-700">Loading video...</p>
-                                    </div>
-                                  </div>
-                                )}
-                                <video 
-                                  src={videoSrc}
-                                  controls
-                                  className="w-full h-auto relative z-0"
-                                  preload="metadata"
-                                  onLoadedData={() => setVideoLoaded(true)}
-                                  style={{ opacity: videoLoaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
-                                >
-                                  <source src={videoSrc} type={`video/${href.split('.').pop()}`} />
-                                  Your browser does not support the video tag.
-                                </video>
-                              </div>
-                            );
-                          }
-                          
-                          return (
-                            <a 
-                              href={href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 font-bold hover:text-blue-700 underline decoration-2 underline-offset-2 hover:decoration-4 transition-all break-words" 
-                              {...props}
-                            >
-                              {children}
-                            </a>
-                          );
-                        },
-                        code: ({inline, className, children, ...props}: any) => {
-                          const match = /language-(\w+)/.exec(className || '');
-                          const language = match ? match[1] : '';
-                          
-                          if (!inline && (language === 'mermaid' || className?.includes('mermaid'))) {
-                            return (
-                              <div className="my-6 p-6 rounded-[16px] border-[3px] border-slate-900 bg-[#FFFDF8] overflow-x-auto shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                                <div className="mermaid-diagram flex justify-center items-center min-h-[200px]">
-                                  {String(children).replace(/\n$/, '')}
-                                </div>
-                              </div>
-                            );
-                          }
-                          
-                          return inline ? (
-                            <code className="px-3 py-1.5 rounded-[8px] border-[2px] border-slate-900 bg-[#FFE66D] text-slate-900 font-mono text-sm font-bold break-words" {...props}>
-                              {children}
-                            </code>
-                          ) : (
-                            <code className="block p-5 rounded-[16px] border-[3px] border-slate-900 bg-[#7cf2d0] text-slate-900 font-mono text-sm overflow-x-auto shadow-[6px_6px_0_0_rgba(15,23,42,1)] mb-6" {...props}>
-                              {children}
-                            </code>
-                          );
-                        },
-                        pre: ({children, ...props}) => {
-                          const childArray = React.Children.toArray(children);
-                          const codeElement = childArray.find((child: any) => child?.props?.className?.includes('mermaid'));
-                          
-                          if (codeElement) {
-                            return <>{children}</>;
-                          }
-                          
-                          return (
-                            <pre className="my-6 rounded-[16px] overflow-hidden" {...props}>
-                              {children}
-                            </pre>
-                          );
-                        },
-                        ul: ({...props}) => (
-                          <ul className="space-y-2 mb-6 ml-0" {...props} />
-                        ),
-                        ol: ({...props}) => (
-                          <ol className="space-y-2 mb-6 ml-6 list-decimal" {...props} />
-                        ),
-                        li: ({children, ...props}) => (
-                          <li className="flex items-start gap-2 text-slate-700 font-medium" {...props}>
-                            <span className="text-slate-900 font-bold mt-0.5">•</span>
-                            <span className="flex-1">{children}</span>
-                          </li>
-                        ),
-                        blockquote: ({...props}) => (
-                          <blockquote className="my-6 pl-6 pr-4 py-4 border-l-[6px] border-blue-500 bg-[#60a5fa] rounded-r-[14px] rounded-l-[4px] italic shadow-[4px_4px_0_0_rgba(15,23,42,1)]" {...props} />
-                        ),
-                        table: ({...props}) => (
-                          <div className="overflow-x-auto my-8">
-                            <div className="rounded-[20px] border-[3px] border-slate-900">
-                              <table className="min-w-full border-[3px] border-slate-900 rounded-[15px] overflow-hidden bg-slate-900" {...props} />
-                            </div>
-                          </div>
-                        ),
-                        thead: ({...props}) => (
-                          <thead className="bg-[#FFE66D] border-b-[3px] border-slate-900" {...props} />
-                        ),
-                        th: ({...props}) => (
-                          <th className="px-5 py-4 text-left font-extrabold text-slate-900 border-r-[3px] border-slate-900 last:border-r-0 text-sm" {...props} />
-                        ),
-                        td: ({...props}) => (
-                          <td className="px-5 py-4 text-slate-700 font-medium border-r-[3px] border-slate-900 border-b-[3px] last:border-r-0 text-sm" {...props} />
-                        ),
-                        tbody: ({...props}) => (
-                          <tbody className="bg-[#ffb4d3]" {...props} />
-                        ),
-                        tr: ({...props}) => (
-                          <tr className="border-b-[3px] border-slate-900 last:border-b-0" {...props} />
-                        ),
-                        img: ({src, alt, ...props}) => {
-                          // Check if it's a badge/shield
-                          if (src?.includes('shields.io') || src?.includes('badge') || src?.includes('img.shields.io')) {
-                            // Extract color from shields.io URL
-                            const colorMatch = src.match(/[?&]color=([^&]+)/i) || src.match(/-([A-F0-9]{6})\?/i);
-                            const badgeColor = colorMatch ? `#${colorMatch[1].replace('#', '')}` : '#E5E7EB';
-                            
-                            return (
-                              <span 
-                                className="inline-block px-2 pb-1 mx-1 my-1 rounded-[8px] border-[2px] border-slate-900 shadow-[2px_2px_0_0_rgba(15,23,42,1)]"
-                                style={{ backgroundColor: badgeColor }}
-                              >
-                                <img 
-                                  src={src} 
-                                  alt={alt || ''} 
-                                  className="inline-block h-5"
-                                  loading="lazy"
-                                  {...props} 
-                                />
-                              </span>
-                            );
-                          }
-                          
-                          // Check if it's a video - either by extension OR by GitHub user-attachments URL
-                          const videoExtensions = ['.webm', '.mp4', '.mov', '.avi', '.mkv'];
-                          const isVideo = (src && videoExtensions.some(ext => src.toLowerCase().includes(ext))) || 
-                                         (src?.includes('github.com/user-attachments/assets'));
-                          
-                          if (isVideo && src) {
-                            const [videoLoaded, setVideoLoaded] = React.useState(false);
-                            const videoSrc = getMediaUrl(src);
-                            
-                            return (
-                              <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[300px]">
-                                {!videoLoaded && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
-                                    <div className="text-center">
-                                      <motion.div
-                                        animate={{ rotate: 360 }}
-                                        transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                                        className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
-                                      />
-                                      <p className="text-sm font-bold text-slate-700">Loading video...</p>
-                                    </div>
-                                  </div>
-                                )}
-                                <video 
-                                  src={videoSrc}
-                                  controls
-                                  className="w-full h-auto relative z-0"
-                                  preload="metadata"
-                                  onLoadedData={() => setVideoLoaded(true)}
-                                  style={{ opacity: videoLoaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
-                                >
-                                  <source src={videoSrc} type="video/webm" />
-                                  Your browser does not support the video tag.
-                                </video>
-                                
-                              </div>
-                            );
-                          }
-                          
-                          return (
-                            <img 
-                              src={src} 
-                              alt={alt || ''} 
-                              className="rounded-[16px] border-[3px] border-slate-900 shadow-[6px_6px_0_0_rgba(15,23,42,1)] my-6 max-w-full h-auto"
-                              loading="lazy"
-                              {...props} 
-                            />
-                          );
-                        },
-                        hr: ({...props}) => (
-                          <hr className="my-10 border-t-[3px] border-dashed border-slate-900" {...props} />
-                        ),
-                        strong: ({...props}) => (
-                          <strong className="font-extrabold text-slate-900" {...props} />
-                        ),
-                        em: ({...props}) => (
-                          <em className="italic text-slate-700 font-semibold" {...props} />
-                        ),
-                      }}
+                      rehypePlugins={[rehypeRaw]}
+                      components={components}
                     >
                       {markdown}
                     </ReactMarkdown>
@@ -619,36 +589,245 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
         </div>
       </div>
 
-
       <style>{`
+        /* ═══════════════════════════════════════════════════════════════
+           CODE inside PRE — no inner box, white text
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content pre code,
+        .docs-content pre code * {
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
+          color: #e2e8f0 !important;
+          display: block !important;
+          font-size: inherit !important;
+          white-space: pre !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           FILE TREE <pre> — dark background, light text
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content pre {
+          overflow-x: auto;
+          white-space: pre;
+          font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace;
+          font-size: 0.8rem;
+          line-height: 1.6;
+          background: #1e293b !important;
+          color: #e2e8f0 !important;
+          border: 3px solid #0f172a;
+          border-radius: 16px;
+          padding: 20px 24px;
+          box-shadow: 6px 6px 0 0 rgba(15,23,42,1);
+          margin: 24px 0;
+        }
+
+        /* File tree inline icons — WHITE on dark bg */
+        .docs-content pre img,
+        .docs-content pre .docs-inline-icon {
+          display: inline !important;
+          vertical-align: middle;
+          margin: 0 2px;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          filter: brightness(0) invert(1) !important;  /* → pure white */
+        }
+
+        /* Heading inline code — dark text always */
+        .docs-content h1 code,
+        .docs-content h2 code,
+        .docs-content h3 code,
+        .docs-content h4 code {
+          color: #0f172a !important;
+          background: #FFE66D !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           HEADING icons — keep natural color (dark/black)
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content h1 img,
+        .docs-content h2 img,
+        .docs-content h3 img,
+        .docs-content h4 img {
+          display: inline !important;
+          vertical-align: middle;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          margin: 0 6px 0 0;
+          filter: brightness(0) !important;   /* force black */
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           INLINE CODE inside list items — force inline, no block box
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content li code,
+        .docs-content p code {
+          display: inline !important;
+          background: #FFE66D !important;
+          border: 2px solid #0f172a !important;
+          border-radius: 6px !important;
+          padding: 1px 6px !important;
+          font-family: ui-monospace, 'Cascadia Code', 'Fira Code', monospace !important;
+          font-size: 0.85em !important;
+          font-weight: 700 !important;
+          color: #0f172a !important;
+          white-space: nowrap !important;
+          word-break: keep-all !important;
+          box-shadow: none !important;
+          margin: 0 1px !important;
+        }
+
+        /* Pre code always wins — no yellow box, white text on dark bg */
+        .docs-content pre code,
+        .docs-content pre code * {
+          display: block !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
+          color: #e2e8f0 !important;
+          font-size: inherit !important;
+          white-space: pre !important;
+          margin: 0 !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           TABLE CELL code — no green box, no border, plain monospace, inline
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content td code,
+        .docs-content th code {
+          display: inline !important;
+          background: transparent !important;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          padding: 0 !important;
+          font-weight: 600 !important;
+          font-size: 0.85em !important;
+          color: inherit !important;
+          white-space: nowrap !important;
+        }
+
+        /* TABLE CELL paragraphs — no margin, stay inline flow */
+        .docs-content td p,
+        .docs-content th p {
+          display: inline !important;
+          margin: 0 !important;
+        }
+
+        /* TABLE CELL — prevent any block children from breaking lines */
+        .docs-content td *,
+        .docs-content th * {
+          display: inline !important;
+        }
+
+        /* But keep the td itself as table-cell */
+        .docs-content td,
+        .docs-content th {
+          display: table-cell !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           TABLE CELL images — no border/shadow by default, keep natural colors
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content td img,
+        .docs-content th img {
+          display: inline !important;
+          vertical-align: middle;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          filter: none !important;
+          margin: 1px 2px;
+        }
+
+        /* Small inline icons in td (team role icons w=18) — force black */
+        .docs-content td img[width="18"],
+        .docs-content td img[width="16"],
+        .docs-content th img[width="18"],
+        .docs-content th img[width="16"] {
+          filter: brightness(0) !important;
+        }
+
+        /* Shields badges inside table cells keep their own colors */
+        .docs-content td img[src*="shields.io"],
+        .docs-content th img[src*="shields.io"] {
+          filter: none !important;
+          border-radius: 4px !important;
+          box-shadow: 2px 2px 0 0 #0f172a !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           PARAGRAPH inline icons
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content p img[width="22"],
+        .docs-content p img[width="16"],
+        .docs-content p img[width="18"],
+        .docs-content p img[width="24"] {
+          display: inline !important;
+          vertical-align: middle;
+          border: none !important;
+          box-shadow: none !important;
+          border-radius: 0 !important;
+          filter: none !important;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           TOC list: no list-style
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content ol > li,
+        .docs-content ul > li {
+          list-style: none;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           BLOCKQUOTE text
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content blockquote p {
+          color: #1e3a5f;
+          margin-bottom: 0;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           Centre large section images
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content > article > p > img:not([width]),
+        .docs-content p img:not([width="22"]):not([width="16"]):not([width="18"]):not([width="24"]) {
+          display: block;
+          margin-left: auto;
+          margin-right: auto;
+        }
+
+        /* ═══════════════════════════════════════════════════════════════
+           General overflow guard, code/link wrapping
+        ═══════════════════════════════════════════════════════════════ */
         .docs-content {
-          word-wrap: break-word;
           overflow-wrap: break-word;
+          min-width: 0;
+        }
+        .docs-content code {
+          word-break: keep-all;
+          overflow-wrap: anywhere;
+        }
+        .docs-content a {
+          overflow-wrap: anywhere;
+          word-break: break-word;
         }
 
-
-        .docs-content h2::before {
-          content: '';
-          margin-right: 8px;
-        }
-
-
-        .mermaid-diagram {
-          min-height: 200px;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-
-        .mermaid-rendered svg {
-          max-width: 100%;
-          height: auto;
-        }
+        /* ═══════════════════════════════════════════════════════════════
+           Scrollbar styling for pre blocks
+        ═══════════════════════════════════════════════════════════════ */
+        .docs-content pre::-webkit-scrollbar { height: 6px; }
+        .docs-content pre::-webkit-scrollbar-track { background: #334155; border-radius: 99px; }
+        .docs-content pre::-webkit-scrollbar-thumb { background: #64748b; border-radius: 99px; }
       `}</style>
     </div>
   );
 };
-
 
 export default Documentation;
