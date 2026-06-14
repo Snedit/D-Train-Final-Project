@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Socket } from 'socket.io-client';
+import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Socket } from "socket.io-client";
+import SettingsModal from "./SettingsModal";
 import {
   Cpu,
   Activity,
@@ -12,12 +13,12 @@ import {
   Server,
   AlertCircle,
   RefreshCw,
-  Wallet
-} from 'lucide-react';
-import type { Worker, Wallet as WalletType, Transaction } from '../types';
-import WalletCard from './WalletCard';
-import PayoutRequest from './PayoutRequest';
-import ProfileDropdown from './ProfileDropdown';
+  Wallet,
+} from "lucide-react";
+import type { Worker, Wallet as WalletType, Transaction } from "../types";
+import WalletCard from "./WalletCard";
+import PayoutRequest from "./PayoutRequest";
+import ProfileDropdown from "./ProfileDropdown";
 
 interface WorkerDashboardProps {
   worker: Worker | null;
@@ -40,7 +41,7 @@ interface PendingJob {
 interface WorkerStats {
   totalCompleted: number;
   totalEarned: number;
-  currentStatus: 'idle' | 'working' | 'busy' | 'offline';
+  currentStatus: "idle" | "working" | "busy" | "offline";
 }
 
 const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
@@ -48,86 +49,88 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
   onViewJobDetails,
   onSignOut,
   onRegisterWorker,
-  socket
+  socket,
 }) => {
   const [pendingJobs, setPendingJobs] = useState<PendingJob[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string>('');
+  const [error, setError] = useState<string>("");
   const [stats, setStats] = useState<WorkerStats>({
     totalCompleted: 0,
     totalEarned: 0,
-    currentStatus: 'idle',
+    currentStatus: "idle",
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showWalletModal, setShowWalletModal] = useState(false);
   const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+
   const [walletData, setWalletData] = useState<WalletType>({
     balance: 0,
     totalEarnings: 0,
     pendingEarnings: 0,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  // ✅ NEW: worker user info for ProfileDropdown
-  const [userInfo, setUserInfo] = useState({ name: '', email: '' });
 
-  // ✅ NEW: read worker identity from localStorage or JWT
-useEffect(() => {
-  const saved = localStorage.getItem('dtrain_worker_user') ?? localStorage.getItem('dtrain_user');
-  if (saved) {
-    try {
-      const u = JSON.parse(saved);
-      setUserInfo({ name: u.name || 'Worker', email: u.email || '' });
-      return;
-    } catch {}
-  }
-  // Fall back: decode JWT payload
-  try {
-    const token = localStorage.getItem('dtrain_worker_token');
-    if (token) {
-      const payload = JSON.parse(atob(token.split('.')[1]));
-      setUserInfo({
-        name: payload.name || payload.username || 'Worker',
-        email: payload.email || '',
-      });
+  const [userInfo, setUserInfo] = useState({ name: "", email: "" });
+  useEffect(() => {
+    const saved =
+      localStorage.getItem("dtrain_worker_user") ??
+      localStorage.getItem("dtrain_user");
+    if (saved) {
+      try {
+        const u = JSON.parse(saved);
+        setUserInfo({ name: u.name || "Worker", email: u.email || "" });
+        return;
+      } catch {}
     }
-  } catch {}
-}, []);
+    // Fall back: decode JWT payload
+    try {
+      const token = localStorage.getItem("dtrain_worker_token");
+      if (token) {
+        const payload = JSON.parse(atob(token.split(".")[1]));
+        setUserInfo({
+          name: payload.name || payload.username || "Worker",
+          email: payload.email || "",
+        });
+      }
+    } catch {}
+  }, []);
 
   // Listen for Socket.io events
   useEffect(() => {
     if (!socket) return;
 
-    console.log('🔌 WorkerDashboard: Setting up socket listeners');
+    console.log("🔌 WorkerDashboard: Setting up socket listeners");
 
     const handleJobAccepted = (data: any) => {
-      console.log('📡 WorkerDashboard: Job accepted by another worker:', data);
-      setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+      console.log("📡 WorkerDashboard: Job accepted by another worker:", data);
+      setPendingJobs((prev) => prev.filter((job) => job._id !== data.jobId));
     };
 
     const handleJobStatusChanged = (data: any) => {
-      console.log('📡 WorkerDashboard: Job status changed:', data);
-      if (data.status === 'pending' || data.status === 'queued') {
+      console.log("📡 WorkerDashboard: Job status changed:", data);
+      if (data.status === "pending" || data.status === "queued") {
         fetchPendingJobs();
-      } else if (data.status === 'assigned' || data.status === 'completed') {
-        setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+      } else if (data.status === "assigned" || data.status === "completed") {
+        setPendingJobs((prev) => prev.filter((job) => job._id !== data.jobId));
       }
     };
 
-    socket.on('job_accepted', handleJobAccepted);
-    socket.on('job_status_changed', handleJobStatusChanged);
+    socket.on("job_accepted", handleJobAccepted);
+    socket.on("job_status_changed", handleJobStatusChanged);
 
     const handleWindowJobAccepted = (event: any) => {
       const data = event.detail;
-      console.log('📡 WorkerDashboard: Window event - job accepted:', data);
-      setPendingJobs(prev => prev.filter(job => job._id !== data.jobId));
+      console.log("📡 WorkerDashboard: Window event - job accepted:", data);
+      setPendingJobs((prev) => prev.filter((job) => job._id !== data.jobId));
     };
 
-    window.addEventListener('job_accepted', handleWindowJobAccepted);
+    window.addEventListener("job_accepted", handleWindowJobAccepted);
 
     return () => {
-      socket.off('job_accepted', handleJobAccepted);
-      socket.off('job_status_changed', handleJobStatusChanged);
-      window.removeEventListener('job_accepted', handleWindowJobAccepted);
+      socket.off("job_accepted", handleJobAccepted);
+      socket.off("job_status_changed", handleJobStatusChanged);
+      window.removeEventListener("job_accepted", handleWindowJobAccepted);
     };
   }, [socket]);
 
@@ -155,33 +158,33 @@ useEffect(() => {
       if (!worker?.deviceId) {
         setPendingJobs([]);
         setLoading(false);
-        setError('Worker device ID missing. Please re-register.');
+        setError("Worker device ID missing. Please re-register.");
         return;
       }
 
       const response = await fetch(
         `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
-        { headers: { 'Content-Type': 'application/json' } }
+        { headers: { "Content-Type": "application/json" } },
       );
 
       if (response.ok) {
         const data = await response.json();
         const availableJobs = data.jobs || data.availableJobs || [];
         setPendingJobs(availableJobs);
-        setError('');
+        setError("");
       } else {
         const errorText = await response.text();
-        console.error('❌ Jobs fetch failed:', response.status, errorText);
+        console.error("❌ Jobs fetch failed:", response.status, errorText);
         setPendingJobs([]);
         if (response.status === 404) {
-          setError('Worker not registered. Please register first.');
+          setError("Worker not registered. Please register first.");
         } else {
-          setError('Failed to load jobs');
+          setError("Failed to load jobs");
         }
       }
     } catch (error) {
-      console.error('❌ Network error:', error);
-      setError('Connection error. Check if backend is running on port 5000.');
+      console.error("❌ Network error:", error);
+      setError("Connection error. Check if backend is running on port 5000.");
       setPendingJobs([]);
     } finally {
       setLoading(false);
@@ -195,16 +198,19 @@ useEffect(() => {
     try {
       const token = localStorage.getItem("dtrain_worker_token");
       if (!token) {
-        setStats({ totalCompleted: 0, totalEarned: 0, currentStatus: 'idle' });
+        setStats({ totalCompleted: 0, totalEarned: 0, currentStatus: "idle" });
         return;
       }
 
-      const earningsRes = await fetch('http://localhost:5000/api/worker/earnings', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
+      const earningsRes = await fetch(
+        "http://localhost:5000/api/worker/earnings",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         },
-      });
+      );
 
       if (earningsRes.ok) {
         const earningsData = await earningsRes.json();
@@ -213,11 +219,11 @@ useEffect(() => {
         setStats({
           totalCompleted: earningsData.totalJobsCompleted ?? 0,
           totalEarned: earningsData.totalEarnings ?? 0,
-          currentStatus: hasActiveJob ? 'working' : 'idle',
+          currentStatus: hasActiveJob ? "working" : "idle",
         });
       }
     } catch (error) {
-      console.error('Stats fetch failed:', error);
+      console.error("Stats fetch failed:", error);
     }
   };
 
@@ -226,8 +232,8 @@ useEffect(() => {
       const token = localStorage.getItem("dtrain_worker_token");
       if (!token) return;
 
-      const walletRes = await fetch('http://localhost:5000/api/worker/wallet', {
-        headers: { Authorization: `Bearer ${token}` }
+      const walletRes = await fetch("http://localhost:5000/api/worker/wallet", {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (walletRes.ok) {
@@ -240,7 +246,7 @@ useEffect(() => {
         if (data.transactions) setTransactions(data.transactions);
       }
     } catch (error) {
-      console.error('Wallet fetch failed:', error);
+      console.error("Wallet fetch failed:", error);
     }
   };
 
@@ -249,6 +255,10 @@ useEffect(() => {
     fetchPendingJobs();
     fetchWorkerStats();
     fetchWalletAndPricing();
+  };
+
+  const handleProfileUpdated = (name: string, email: string) => {
+    setUserInfo({ name, email });
   };
 
   if (loading) {
@@ -262,7 +272,9 @@ useEffect(() => {
               className="absolute inset-0 rounded-[16px] border-[4px] border-slate-900 bg-blue-400 shadow-[6px_6px_0_0_rgba(15,23,42,1)]"
             />
           </div>
-          <p className="text-lg font-extrabold text-slate-900">Loading worker dashboard...</p>
+          <p className="text-lg font-extrabold text-slate-900">
+            Loading worker dashboard...
+          </p>
         </div>
       </div>
     );
@@ -276,8 +288,8 @@ useEffect(() => {
             className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
             style={{
               backgroundImage:
-                'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-              backgroundSize: '26px 26px',
+                "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+              backgroundSize: "26px 26px",
             }}
           />
 
@@ -333,13 +345,15 @@ useEffect(() => {
                   disabled={isRefreshing}
                   className="flex items-center gap-2 px-4 py-2 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 disabled:opacity-50"
                 >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                  <RefreshCw
+                    className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`}
+                  />
                   <span className="hidden sm:inline">Refresh</span>
                 </motion.button>
 
-                {/* ✅ ProfileDropdown replaces the old Sign Out button */}
                 <ProfileDropdown
                   onSignOut={onSignOut}
+                  onSettings={() => setShowSettings(true)}
                   userName={userInfo.name}
                   userEmail={userInfo.email}
                 />
@@ -353,7 +367,8 @@ useEffect(() => {
               </h1>
               {worker && (
                 <p className="text-sm text-slate-700 font-medium">
-                  Device ID: <span className="font-mono font-bold">{worker.deviceId}</span>
+                  Device ID:{" "}
+                  <span className="font-mono font-bold">{worker.deviceId}</span>
                   {socket?.connected && (
                     <span className="ml-3 inline-flex items-center gap-1 text-xs text-green-600">
                       <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
@@ -390,7 +405,8 @@ useEffect(() => {
                       Worker Not Registered
                     </h3>
                     <p className="text-sm text-slate-700 font-medium mb-4">
-                      You haven't registered as a worker yet. Register your device to start accepting and processing training jobs.
+                      You haven't registered as a worker yet. Register your
+                      device to start accepting and processing training jobs.
                     </p>
                     <motion.button
                       whileHover={{ y: -2 }}
@@ -421,7 +437,9 @@ useEffect(() => {
                         <p className="text-2xl font-extrabold text-slate-900 capitalize">
                           {stats.currentStatus}
                         </p>
-                        <p className="text-xs font-semibold text-slate-900">Current Status</p>
+                        <p className="text-xs font-semibold text-slate-900">
+                          Current Status
+                        </p>
                       </div>
                     </div>
                   </motion.div>
@@ -438,7 +456,9 @@ useEffect(() => {
                         <p className="text-2xl font-extrabold text-slate-900">
                           {stats.totalCompleted}
                         </p>
-                        <p className="text-xs font-semibold text-slate-900">Jobs Completed</p>
+                        <p className="text-xs font-semibold text-slate-900">
+                          Jobs Completed
+                        </p>
                       </div>
                     </div>
                   </motion.div>
@@ -455,7 +475,9 @@ useEffect(() => {
                         <p className="text-2xl font-extrabold text-slate-900">
                           ₹{stats.totalEarned.toFixed(2)}
                         </p>
-                        <p className="text-xs font-semibold text-slate-900">Total Earnings</p>
+                        <p className="text-xs font-semibold text-slate-900">
+                          Total Earnings
+                        </p>
                       </div>
                     </div>
                   </motion.div>
@@ -468,27 +490,43 @@ useEffect(() => {
                   </h2>
                   <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#F0F9FF] p-4">
-                      <p className="text-xs font-semibold text-slate-600 mb-1">Operating System</p>
+                      <p className="text-xs font-semibold text-slate-600 mb-1">
+                        Operating System
+                      </p>
                       <p className="text-sm font-extrabold text-slate-900">
-                        {(worker as any).os || (worker as any).systemInfo?.os || 'N/A'}
+                        {(worker as any).os ||
+                          (worker as any).systemInfo?.os ||
+                          "N/A"}
                       </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#FEF3C7] p-4">
-                      <p className="text-xs font-semibold text-slate-600 mb-1">CPU</p>
+                      <p className="text-xs font-semibold text-slate-600 mb-1">
+                        CPU
+                      </p>
                       <p className="text-sm font-extrabold text-slate-900">
-                        {(worker as any).cpu || (worker as any).systemInfo?.cpu || 'N/A'}
+                        {(worker as any).cpu ||
+                          (worker as any).systemInfo?.cpu ||
+                          "N/A"}
                       </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#DCFCE7] p-4">
-                      <p className="text-xs font-semibold text-slate-600 mb-1">RAM</p>
+                      <p className="text-xs font-semibold text-slate-600 mb-1">
+                        RAM
+                      </p>
                       <p className="text-sm font-extrabold text-slate-900">
-                        {(worker as any).ram || (worker as any).systemInfo?.ram || 'N/A'}
+                        {(worker as any).ram ||
+                          (worker as any).systemInfo?.ram ||
+                          "N/A"}
                       </p>
                     </div>
                     <div className="rounded-[14px] border-[2px] border-slate-900 bg-[#FCE7F3] p-4">
-                      <p className="text-xs font-semibold text-slate-600 mb-1">GPU</p>
+                      <p className="text-xs font-semibold text-slate-600 mb-1">
+                        GPU
+                      </p>
                       <p className="text-sm font-extrabold text-slate-900">
-                        {(worker as any).gpu || (worker as any).systemInfo?.gpu || 'N/A'}
+                        {(worker as any).gpu ||
+                          (worker as any).systemInfo?.gpu ||
+                          "N/A"}
                       </p>
                     </div>
                   </div>
@@ -507,8 +545,12 @@ useEffect(() => {
                       <div className="w-16 h-16 rounded-[14px] bg-[#7CF2D0] border-[3px] border-slate-900 flex items-center justify-center mx-auto mb-4 shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
                         <Clock className="w-8 h-8 text-slate-900" />
                       </div>
-                      <p className="text-slate-700 font-semibold mb-2">No jobs available</p>
-                      <p className="text-sm text-slate-600">Check back soon for new training jobs</p>
+                      <p className="text-slate-700 font-semibold mb-2">
+                        No jobs available
+                      </p>
+                      <p className="text-sm text-slate-600">
+                        Check back soon for new training jobs
+                      </p>
                     </div>
                   ) : (
                     <div className="p-5 space-y-4">
@@ -526,11 +568,13 @@ useEffect(() => {
                                 {job.title || `Training Job #${index + 1}`}
                               </h3>
                               <p className="text-sm text-slate-600 font-medium mb-3">
-                                {job.description || 'Machine learning training task'}
+                                {job.description ||
+                                  "Machine learning training task"}
                               </p>
                               <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                                 <Clock className="w-4 h-4" />
-                                Posted {new Date(job.createdAt).toLocaleString()}
+                                Posted{" "}
+                                {new Date(job.createdAt).toLocaleString()}
                               </div>
                             </div>
                             <motion.button
@@ -560,7 +604,8 @@ useEffect(() => {
                   Register to View Jobs
                 </h3>
                 <p className="text-slate-600 font-medium mb-6">
-                  Register as a worker to view and accept available training jobs
+                  Register as a worker to view and accept available training
+                  jobs
                 </p>
                 <motion.button
                   whileHover={{ y: -2 }}
@@ -584,7 +629,7 @@ useEffect(() => {
               walletBalance={walletData.balance}
               hasStripeAccount={!!worker?.stripeAccountId}
               onPayoutSuccess={(newBalance) => {
-                setWalletData(prev => ({ ...prev, balance: newBalance }));
+                setWalletData((prev) => ({ ...prev, balance: newBalance }));
                 setShowPayoutModal(false);
               }}
               onClose={() => setShowPayoutModal(false)}
@@ -606,12 +651,29 @@ useEffect(() => {
               pendingEarnings={walletData.pendingEarnings}
               transactions={transactions}
               hasStripeAccount={!!worker?.stripeAccountId}
-              onRequestPayout={() => { setShowWalletModal(false); setShowPayoutModal(true); }}
+              onRequestPayout={() => {
+                setShowWalletModal(false);
+                setShowPayoutModal(true);
+              }}
               onClose={() => setShowWalletModal(false)}
             />
           </motion.div>
         </div>
       )}
+
+      <AnimatePresence>
+        {showSettings && (
+          <SettingsModal
+            userName={userInfo.name}
+            userEmail={userInfo.email}
+            tokenKey="dtrain_worker_token"
+            userKey="dtrain_worker_user"
+            onClose={() => setShowSettings(false)}
+            onSignOut={onSignOut}
+            onProfileUpdated={handleProfileUpdated}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

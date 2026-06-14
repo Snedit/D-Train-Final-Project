@@ -4,62 +4,50 @@ import { LogOut, Settings, ChevronDown } from 'lucide-react';
 
 interface ProfileDropdownProps {
   onSignOut: () => void;
+  onSettings?: () => void;
   userName?: string;
   userEmail?: string;
 }
 
-const ProfileDropdown: React.FC<ProfileDropdownProps> = ({ 
-  onSignOut, 
+const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
+  onSignOut,
+  onSettings,
   userName = 'User',
   userEmail = 'user@example.com'
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
     };
-
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Get initials for avatar
   const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(n => n[0])
-      .join('')
-      .toUpperCase()
-      .slice(0, 2);
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
 
   return (
     <div className="relative flex-shrink-0" ref={dropdownRef}>
-      {/* Profile Button - Matches "New Job" button size */}
       <motion.button
         whileHover={{ y: -2 }}
         whileTap={{ y: 0 }}
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-1.5 px-3 py-2 rounded-[12px] border-[3px] border-slate-900 bg-white text-slate-900 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)] h-[38px]"
       >
-        {/* Avatar */}
         <div className="w-6 h-6 rounded-[6px] bg-blue-400 border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
           <span className="text-[10px] font-extrabold text-white leading-none">
             {getInitials(userName)}
           </span>
         </div>
-
-        {/* User Name (hidden on small screens) */}
         <span className="hidden sm:block text-sm font-bold text-slate-900 max-w-[80px] truncate">
           {userName.split(' ')[0]}
         </span>
-
-        {/* Chevron */}
         <motion.div
           animate={{ rotate: isOpen ? 180 : 0 }}
           transition={{ duration: 0.2 }}
@@ -69,7 +57,6 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
         </motion.div>
       </motion.button>
 
-      {/* Dropdown Menu */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
@@ -79,7 +66,6 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
             transition={{ duration: 0.2 }}
             className="absolute right-0 mt-2 w-64 rounded-[16px] border-[3px] border-slate-900 bg-white shadow-[6px_6px_0_0_rgba(15,23,42,1)] overflow-hidden z-50"
           >
-            {/* User Info Section */}
             <div className="p-4 border-b-[2px] border-slate-900 bg-[#F5F3FF]">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-[12px] bg-blue-400 border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
@@ -88,26 +74,20 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                   </span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-extrabold text-slate-900 truncate">
-                    {userName}
-                  </p>
-                  <p className="text-xs text-slate-600 font-medium truncate">
-                    {userEmail}
-                  </p>
+                  <p className="text-sm font-extrabold text-slate-900 truncate">{userName}</p>
+                  <p className="text-xs text-slate-600 font-medium truncate">{userEmail}</p>
                 </div>
               </div>
             </div>
 
-            {/* Menu Items */}
             <div className="p-2">
-              {/* Profile Settings (placeholder for future) */}
               <motion.button
                 whileHover={{ x: 2 }}
                 whileTap={{ scale: 0.98 }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-[10px] text-left hover:bg-[#F5F3FF] transition-colors group"
                 onClick={() => {
                   setIsOpen(false);
-                  // Add profile settings navigation here
+                  onSettings?.();
                 }}
               >
                 <div className="w-8 h-8 rounded-[8px] bg-[#E4ECFF] border-[2px] border-slate-900 flex items-center justify-center group-hover:bg-blue-400 transition-colors">
@@ -119,10 +99,8 @@ const ProfileDropdown: React.FC<ProfileDropdownProps> = ({
                 </div>
               </motion.button>
 
-              {/* Divider */}
               <div className="my-2 h-[2px] bg-slate-900/10" />
 
-              {/* Sign Out */}
               <motion.button
                 whileHover={{ x: 2 }}
                 whileTap={{ scale: 0.98 }}

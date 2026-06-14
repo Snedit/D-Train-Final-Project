@@ -6,6 +6,7 @@ import User from "../schemas/UserSchema.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 import Job from "../schemas/JobSchema.js";
 import Billing from "../schemas/BillingSchema.js";
+import Worker from "../schemas/WorkerSchema.js";
 
 const UserRouter = Router();
 
@@ -118,6 +119,55 @@ UserRouter.get("/profile", authMiddleware, async (req, res) => {
     res.json(user);
   } catch (err) {
     console.error("Profile fetch error:", err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── PATCH /profile — update name and/or email ─────────────────────────────────
+UserRouter.patch("/profile", authMiddleware, async (req, res) => {
+  try {
+    const { name, email } = req.body;
+    if (!name && !email)
+      return res.status(400).json({ message: "Nothing to update." });
+    const user = await User.findById(req.user.userId);
+    if (!user) return res.status(404).json({ message: "User not found." });
+    if (email && email !== user.email) {
+      const exists = await User.findOne({ email });
+      if (exists)
+        return res.status(400).json({ message: "Email already in use." });
+      user.email = email;
+    }
+    if (name) user.name = name;
+    await user.save();
+    res.json({
+      message: "Profile updated.",
+      user: { id: user._id, name: user.name, email: user.email, role: user.role },
+    });
+  } catch (err) {
+    console.error("Profile update error:", err);
+    res.status(500).json({ message: "Server error." });
+  }
+});
+
+// ── DELETE /account — delete user + worker doc, keep jobs/transactions ────────
+UserRouter.delete("/account", authMiddleware, async (req, res) => {
+  try {
+    const userId = req.user.userId;
+    const worker = await Worker.findOne({ userId });
+    if (worker) {
+      // Orphan any active jobs back to pending pool so clients aren't stuck
+      await Job.updateMany(
+        { assignedWorkerId: worker.deviceId, status: { $in: ["assigned", "processing"] } },
+        { $set: { status: "pending", assignedWorkerId: null } }
+      );
+      // Delete Worker document only — keep transactions/jobs for audit trail
+      await Worker.deleteOne({ userId });
+    }
+    // Delete User document only — keep jobs/billing for records
+    await User.findByIdAndDelete(userId);
+    res.json({ message: "Account deleted successfully." });
+  } catch (err) {
+    console.error("Account delete error:", err);
     res.status(500).json({ message: "Server error." });
   }
 });
