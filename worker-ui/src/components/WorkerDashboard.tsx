@@ -7,7 +7,6 @@ import {
   CheckCircle,
   Clock,
   FileText,
-  LogOut,
   Zap,
   TrendingUp,
   Server,
@@ -18,6 +17,7 @@ import {
 import type { Worker, Wallet as WalletType, Transaction } from '../types';
 import WalletCard from './WalletCard';
 import PayoutRequest from './PayoutRequest';
+import ProfileDropdown from './ProfileDropdown';
 
 interface WorkerDashboardProps {
   worker: Worker | null;
@@ -67,6 +67,31 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     pendingEarnings: 0,
   });
   const [transactions, setTransactions] = useState<Transaction[]>([]);
+  // ✅ NEW: worker user info for ProfileDropdown
+  const [userInfo, setUserInfo] = useState({ name: '', email: '' });
+
+  // ✅ NEW: read worker identity from localStorage or JWT
+useEffect(() => {
+  const saved = localStorage.getItem('dtrain_worker_user') ?? localStorage.getItem('dtrain_user');
+  if (saved) {
+    try {
+      const u = JSON.parse(saved);
+      setUserInfo({ name: u.name || 'Worker', email: u.email || '' });
+      return;
+    } catch {}
+  }
+  // Fall back: decode JWT payload
+  try {
+    const token = localStorage.getItem('dtrain_worker_token');
+    if (token) {
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      setUserInfo({
+        name: payload.name || payload.username || 'Worker',
+        email: payload.email || '',
+      });
+    }
+  } catch {}
+}, []);
 
   // Listen for Socket.io events
   useEffect(() => {
@@ -164,9 +189,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
     }
   };
 
-  // ✅ FIXED: fetchWorkerStats now uses the /earnings endpoint which has
-  // real totalJobsCompleted and totalEarnings from the Worker schema,
-  // instead of counting jobs manually with a hardcoded ₹5 per job.
   const fetchWorkerStats = async () => {
     if (!worker?.deviceId) return;
 
@@ -177,8 +199,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         return;
       }
 
-      // ✅ Use the dedicated /earnings endpoint — it returns totalJobsCompleted
-      // and totalEarnings directly from the Worker document
       const earningsRes = await fetch('http://localhost:5000/api/worker/earnings', {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -188,9 +208,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
       if (earningsRes.ok) {
         const earningsData = await earningsRes.json();
-
-        // ✅ Check if this worker has any currently active jobs
-        // so we can show "working" vs "idle" status
         const hasActiveJob = earningsData.inProgressJobs?.length > 0;
 
         setStats({
@@ -264,7 +281,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
             }}
           />
 
-          {/* Memphis shapes */}
           <motion.div
             className="absolute -top-8 -left-8 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#7CF2D0] flex items-center justify-center"
             animate={{ scale: [1, 1.1, 1] }}
@@ -321,19 +337,16 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   <span className="hidden sm:inline">Refresh</span>
                 </motion.button>
 
-                {/* Sign Out */}
-                <motion.button
-                  whileHover={{ y: -2 }}
-                  whileTap={{ y: 0 }}
-                  onClick={onSignOut}
-                  className="flex items-center gap-2 px-6 py-2 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 text-white text-sm font-semibold shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:bg-blue-500 active:translate-y-0"
-                >
-                  <LogOut className="w-4 h-4" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </motion.button>
+                {/* ✅ ProfileDropdown replaces the old Sign Out button */}
+                <ProfileDropdown
+                  onSignOut={onSignOut}
+                  userName={userInfo.name}
+                  userEmail={userInfo.email}
+                />
               </div>
             </nav>
 
+            {/* Everything below this line is untouched */}
             <div className="mb-8">
               <h1 className="text-3xl md:text-4xl font-extrabold text-slate-900 mb-2">
                 Worker Dashboard
@@ -395,9 +408,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
 
             {worker && (
               <>
-                {/* Stats Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-5 mb-8">
-                  {/* Current Status */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#dcfce7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -415,7 +426,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Jobs Completed — ✅ now reads from worker.totalJobsCompleted via /earnings */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fef3c7] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -433,7 +443,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                     </div>
                   </motion.div>
 
-                  {/* Total Earnings — ✅ renamed from "Session Earnings", uses real totalEarnings */}
                   <motion.div
                     whileHover={{ y: -2 }}
                     className="rounded-[18px] border-[3px] border-slate-900 bg-[#fce7f3] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all"
@@ -446,14 +455,12 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                         <p className="text-2xl font-extrabold text-slate-900">
                           ₹{stats.totalEarned.toFixed(2)}
                         </p>
-                        {/* ✅ Renamed from "Session Earnings" to "Total Earnings" */}
                         <p className="text-xs font-semibold text-slate-900">Total Earnings</p>
                       </div>
                     </div>
                   </motion.div>
                 </div>
 
-                {/* System Info */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] p-6 mb-8">
                   <h2 className="text-lg font-extrabold text-slate-900 mb-4 flex items-center gap-2">
                     <Cpu className="w-5 h-5" />
@@ -487,7 +494,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
                   </div>
                 </div>
 
-                {/* Available Jobs */}
                 <div className="rounded-[22px] border-[3px] border-slate-900 bg-white shadow-[8px_8px_0_0_rgba(15,23,42,1)] overflow-hidden">
                   <div className="p-5 border-b-[3px] border-slate-900 bg-[#DBEAFE]">
                     <h2 className="text-lg font-extrabold text-slate-900 flex items-center gap-2">
@@ -571,7 +577,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         </div>
       </div>
 
-      {/* Payout Request Modal */}
       <AnimatePresence>
         {showPayoutModal && (
           <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
@@ -588,7 +593,6 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Wallet Modal */}
       {showWalletModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <motion.div

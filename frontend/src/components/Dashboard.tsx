@@ -30,8 +30,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [loading, setLoading] = useState(true);
   const [userInfo, setUserInfo] = useState({ name: '', email: '' });
   const [localJobs, setLocalJobs] = useState<Job[]>(jobs);
-  const [walletBalance, setWalletBalance] = useState(0);     // total in wallet
-  const [availableBalance, setAvailableBalance] = useState(0); // total minus reserved
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [availableBalance, setAvailableBalance] = useState(0);
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [publishError, setPublishError] = useState<string>('');
 
@@ -48,7 +48,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       if (res.ok) {
         setLocalJobs(prev => prev.map(j => j._id === job._id ? { ...j, status: 'pending' } : j));
         setAvailableBalance(data.availableBalance ?? availableBalance);
-        setWalletBalance(prev => prev); // total unchanged on reservation
+        setWalletBalance(prev => prev);
       } else {
         setPublishError(data.message || 'Failed to publish');
       }
@@ -79,13 +79,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     failed: 'bg-[#FEE2E2] text-slate-900',
   };
 
-  // ✅ Sync localJobs whenever the jobs prop changes (driven by App.tsx socket events)
   useEffect(() => {
     setLocalJobs(jobs);
   }, [jobs]);
 
-  // ✅ On mount: load user info and set loading false
-  // NOTE: All socket listeners are handled in App.tsx — no duplicate listeners here
   useEffect(() => {
     setLoading(false);
 
@@ -103,7 +100,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
   }, []);
 
-  // ✅ Fetch wallet balance on mount
   useEffect(() => {
     const fetchWalletBalance = async () => {
       try {
@@ -126,7 +122,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const draftJobs  = localJobs.filter(j => j.status === 'draft');
   const activeJobs = localJobs.filter(j => j.status !== 'draft');
 
-  // ✅ Active workers = only online/busy/idle, not offline
   const activeWorkersCount = workers.filter(w =>
     w.currentStatus === 'online' ||
     w.currentStatus === 'busy' ||
@@ -181,11 +176,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             transition={{ repeat: Infinity, duration: 5, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute top-1/3 -right-10 w-24 h-24 rounded-[20px] border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
+            className="absolute top-1/3 -right-6 w-16 h-16 rounded-[20px] border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
             animate={{ rotate: [6, -6, 6] }}
             transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
           >
-            <Database className="w-8 h-8 text-slate-900" />
+            <Database className="w-6 h-6 text-slate-900" />
           </motion.div>
 
           <div className="relative z-10 px-6 py-7 md:px-10 md:py-9">
@@ -232,7 +227,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-5 mb-8">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-5 mb-8">
               {/* Total Jobs */}
               <motion.div
                 whileHover={{ y: -2 }}
@@ -333,18 +328,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                 onClick={onViewWallet}
                 className="rounded-[18px] border-[3px] border-slate-900 bg-[#A8E6CF] p-5 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)] cursor-pointer group"
               >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
-                      <Wallet className="w-5 h-5 text-slate-900" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-extrabold text-slate-900">₹{availableBalance.toFixed(2)}</p>
-                      <p className="text-[10px] text-slate-500 font-medium">available{walletBalance !== availableBalance ? ` (₹${walletBalance.toFixed(2)} total)` : ''}</p>
-                      <p className="text-xs font-semibold text-slate-900">Your Wallet</p>
-                    </div>
+                <div className="flex items-start gap-3">
+                  <div className="w-10 h-10 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
+                    <Wallet className="w-5 h-5 text-slate-900" />
                   </div>
-                  <ArrowRight className="w-5 h-5 text-slate-900 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex flex-col gap-0.5 overflow-hidden">
+                    <p className="text-2xl font-extrabold text-slate-900 leading-none">
+                      ₹{Math.round(availableBalance)}
+                    </p>
+                    <p className="text-[10px] font-semibold text-slate-900">Your Wallet</p>
+                    {walletBalance !== availableBalance && (
+                      <p className="text-[9px] text-slate-600 font-medium">
+                        ₹{Math.round(walletBalance)} total
+                      </p>
+                    )}
+                  </div>
                 </div>
               </motion.div>
             </div>
@@ -394,12 +392,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className="px-5 py-4">
                               {tierPrice ? (
-                                <div className="flex items-center gap-1.5">
+                                <div className="flex items-center gap-1.5 flex-wrap">
                                   <IndianRupee className="w-3.5 h-3.5 text-slate-700" />
-                                  <span className="text-sm font-extrabold text-slate-900">{tierPrice}</span>
+                                  <span className="text-sm font-extrabold text-slate-900">{Math.round(tierPrice)}</span>
                                   {!canAfford && (
                                     <span className="text-[10px] font-semibold text-red-600 ml-1">
-                                      (need ₹{(tierPrice - availableBalance).toFixed(0)} more — top up wallet)
+                                      (need ₹{Math.ceil(tierPrice - availableBalance)} more — top up wallet)
                                     </span>
                                   )}
                                 </div>

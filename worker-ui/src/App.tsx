@@ -173,6 +173,7 @@ function App() {
         // corrupted storage — clear and start fresh
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(WORKER_KEY);
+        localStorage.removeItem('dtrain_worker_user'); 
       }
     }
   }, []);
@@ -249,6 +250,7 @@ function App() {
       if (!loginRes.ok) throw new Error(loginData.message || "Login failed");
 
       localStorage.setItem(TOKEN_KEY, loginData.token);
+      localStorage.setItem('dtrain_worker_user', JSON.stringify(loginData.user));
       setIsAuthenticated(true);
       setIsLoading(true);
 
@@ -289,6 +291,7 @@ function App() {
 
       if (registerData.token) {
         localStorage.setItem(TOKEN_KEY, registerData.token);
+        localStorage.setItem('dtrain_worker_user', JSON.stringify(registerData.user)); 
         setIsAuthenticated(true);
 
         const existingWorker = await checkExistingWorker(registerData.token);
@@ -409,6 +412,7 @@ function App() {
     setWorker(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(WORKER_KEY);
+    localStorage.removeItem('dtrain_worker_user'); 
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("hero");
