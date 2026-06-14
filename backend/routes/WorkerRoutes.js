@@ -237,6 +237,7 @@ WorkerRouter.post("/accept-job", async (req, res) => {
 
     job.status           = "assigned";
     job.assignedWorkerId = deviceId;
+    job.acceptedAt       = new Date();   // ← track when the worker accepted
     job.pricing          = { ...job.pricing, gpuName, startTime };
     job.paymentStatus    = "pending"; // still pending — nothing charged yet
     await job.save();

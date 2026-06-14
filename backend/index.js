@@ -16,7 +16,7 @@ import morgan from "morgan";
 
 dotenv.config();
 
-const app  = express();
+const app = express();
 const port = process.env.PORT || 5000;
 
 /* ---------- middleware ---------- */
@@ -35,7 +35,7 @@ const io = new Server(server, {
     methods: ["GET", "POST"],
     credentials: true
   },
-  pingTimeout:  60000,
+  pingTimeout: 60000,
   pingInterval: 25000
 });
 
@@ -84,9 +84,9 @@ io.on("connection", (socket) => {
         console.log(`📴 Worker ${deviceId} marked offline instantly on disconnect`);
 
         io.emit("worker_status_changed", {
-          workerId:  worker._id,
-          deviceId:  worker.deviceId,
-          status:    "offline",
+          workerId: worker._id,
+          deviceId: worker.deviceId,
+          status: "offline",
           timestamp: new Date().toISOString()
         });
       } catch (err) {
@@ -116,6 +116,7 @@ mongoose
     console.log("✅ MongoDB connected");
     startTimeTracking(io);   // ← replaces startCostTracking
     startHeartbeatChecker(io);
+    startAssignedJobTimeoutChecker(io);  // ← re-queues idle assigned jobs
   })
   .catch((err) => {
     console.error("❌ MongoDB connection error:", err);
@@ -123,9 +124,9 @@ mongoose
   });
 
 /* ---------- routes ---------- */
-app.use("/api/user",    UserRouter);
-app.use("/api/worker",  WorkerRouter);
-app.use("/api/jobs",    JobRouter);
+app.use("/api/user", UserRouter);
+app.use("/api/worker", WorkerRouter);
+app.use("/api/jobs", JobRouter);
 app.use("/api/payment", PaymentRouter);
 
 // Alias so App.tsx fetchWalletBalance (GET /api/user/wallet) resolves correctly
@@ -172,10 +173,10 @@ const startTimeTracking = (io) => {
         if (!job.pricing.startTime) return;
 
         io.to(`job:${job._id}`).emit("job:time_update", {
-          jobId:          job._id,
+          jobId: job._id,
           elapsedSeconds: getElapsedSeconds(job.pricing.startTime),
-          tierPrice:      job.pricing?.tierPrice,
-          timestamp:      new Date().toISOString()
+          tierPrice: job.pricing?.tierPrice,
+          timestamp: new Date().toISOString()
         });
       });
     } catch (err) {
@@ -196,7 +197,7 @@ const startHeartbeatChecker = (io) => {
       const cutoff = new Date(Date.now() - HEARTBEAT_TIMEOUT_MS);
 
       const staleWorkers = await Worker.find({
-        currentStatus:   { $in: ["online", "idle", "busy"] },
+        currentStatus: { $in: ["online", "idle", "busy"] },
         lastHeartbeatAt: { $lt: cutoff }
       });
 
@@ -210,9 +211,9 @@ const startHeartbeatChecker = (io) => {
         console.log(`📴 Worker ${worker.deviceId} marked offline by heartbeat checker`);
 
         io.emit("worker_status_changed", {
-          workerId:  worker._id,
-          deviceId:  worker.deviceId,
-          status:    "offline",
+          workerId: worker._id,
+          deviceId: worker.deviceId,
+          status: "offline",
           timestamp: new Date().toISOString()
         });
       }
@@ -220,6 +221,51 @@ const startHeartbeatChecker = (io) => {
       console.error("❌ Heartbeat checker error:", err.message);
     }
   }, 30 * 1000);
+};
+
+/* ---------- Assigned Job Idle Timeout Checker ---------- */
+// If a worker accepts a job but never calls start-job within the timeout,
+// the job is reset back to "pending" so another worker can pick it up.
+const ASSIGNED_IDLE_TIMEOUT_MS = 2 * 60 * 1000; // 2 minutes
+
+const startAssignedJobTimeoutChecker = (io) => {
+  console.log("🕐 Starting assigned-job idle timeout checker...");
+
+  setInterval(async () => {
+    try {
+      const cutoff = new Date(Date.now() - ASSIGNED_IDLE_TIMEOUT_MS);
+
+      const idleJobs = await Job.find({
+        status: "assigned",
+        acceptedAt: { $lt: cutoff }
+      });
+
+      if (idleJobs.length === 0) return;
+
+      console.log(`⚠️  Re-queuing ${idleJobs.length} idle assigned job(s)`);
+
+      for (const job of idleJobs) {
+        const prevWorker = job.assignedWorkerId;
+
+        job.status = "pending";
+        job.assignedWorkerId = null;
+        job.acceptedAt = null;
+        job.pricing = { ...job.pricing, startTime: null, gpuName: null };
+        await job.save();
+
+        console.log(`🔄 Job ${job._id} re-queued (was held by worker: ${prevWorker})`);
+
+        io.emit("job_status_changed", {
+          jobId: job._id,
+          status: "pending",
+          reason: "worker_idle_timeout",
+          timestamp: new Date().toISOString()
+        });
+      }
+    } catch (err) {
+      console.error("❌ Assigned job timeout checker error:", err.message);
+    }
+  }, 30 * 1000); // check every 30 seconds
 };
 
 /* ---------- start ---------- */

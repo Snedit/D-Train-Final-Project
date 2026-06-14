@@ -3,18 +3,18 @@ import mongoose from "mongoose";
 const jobSchema = new mongoose.Schema(
   {
     userId: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true },
-
-    title:       { type: String, required: true },
+    acceptedAt: { type: Date },
+    title: { type: String, required: true },
     description: { type: String, required: true },
 
     zipFileUrl: { type: String, required: true },
 
     config: {
-      entryFile:        String,
+      entryFile: String,
       requirementsFile: String,
-      epochs:           Number,
-      datasetSize:      Number,
-      other:            Object,
+      epochs: Number,
+      datasetSize: Number,
+      other: Object,
     },
 
     assignedWorkerId: { type: String, ref: "Worker" },
@@ -29,13 +29,13 @@ const jobSchema = new mongoose.Schema(
 
     // Tier-based flat pricing — set by Groq+rule-engine at upload time, stored on job
     pricing: {
-      tierPrice:       Number,
-      workerPay:       Number,
-      platformFee:     Number,
-      actualCost:      Number,   // set on completion
-      gpuName:         String,
-      startTime:       Date,
-      endTime:         Date,
+      tierPrice: Number,
+      workerPay: Number,
+      platformFee: Number,
+      actualCost: Number,   // set on completion
+      gpuName: String,
+      startTime: Date,
+      endTime: Date,
       durationSeconds: Number,
     },
 
@@ -45,10 +45,10 @@ const jobSchema = new mongoose.Schema(
       default: "unpaid",
     },
 
-    logs:         [String],
-    modelUrl:     String,
+    logs: [String],
+    modelUrl: String,
     errorMessage: String,
-    completedAt:  Date,
+    completedAt: Date,
   },
   { timestamps: true }
 );
