@@ -1,5 +1,5 @@
 // electron-worker/main.js - FIXED: Use Lucide-style symbols instead of emojis
-const { app, BrowserWindow, ipcMain, globalShortcut } = require("electron");
+const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
 const AdmZip = require("adm-zip");
@@ -566,7 +566,37 @@ ipcMain.handle("accept-job", async (event, jobId) => {
   }
 });
 
-app.whenReady().then(() => {
+// ── Docker daemon check ───────────────────────────────────────────────────────
+// Runs `docker info` which exits non-zero if the daemon is not reachable.
+// Called once at startup before the window is created.
+const checkDockerRunning = () =>
+  new Promise((resolve) => {
+    exec("docker info", { timeout: 8000 }, (error) => {
+      resolve(!error); // true = Docker is running
+    });
+  });
+
+app.whenReady().then(async () => {
+  // ── 1. Docker pre-flight check ───────────────────────────────────────────
+  const dockerOk = await checkDockerRunning();
+
+  if (!dockerOk) {
+    dialog.showMessageBoxSync({
+      type:    "error",
+      title:   "Docker Not Running",
+      message: "Docker daemon is not running",
+      detail:
+        "DTrain Worker requires Docker to execute training jobs.\n\n" +
+        "Please start Docker Desktop (or the Docker service) and then relaunch the app.",
+      buttons: ["Quit"],
+    });
+    app.quit();
+    return;
+  }
+
+  console.log(`${icons.docker} Docker daemon is running — starting DTrain Worker`);
+
+  // ── 2. Open the app window ───────────────────────────────────────────────
   createWindow();
 
   // Ctrl+Shift+I — toggle DevTools (same as Chrome)
