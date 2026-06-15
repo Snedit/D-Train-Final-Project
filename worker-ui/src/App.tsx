@@ -83,6 +83,24 @@ function App() {
 
     newSocket.on("job_status_changed", (data) => {
       console.log("📡 Worker received job status change:", data);
+
+      // ─── Auto-redirect: job was re-queued while worker was on the detail page ───
+      // The idle-timeout checker emits { status: "pending", reason: "worker_idle_timeout" }
+      // If this worker is currently viewing that exact job, send them back to dashboard.
+      if (
+        data.reason === "worker_idle_timeout" &&
+        data.status === "pending"
+      ) {
+        setCurrentJobId((prevJobId) => {
+          if (prevJobId && prevJobId === data.jobId?.toString()) {
+            console.log("⏱️ Job re-queued by idle timeout — redirecting to dashboard");
+            alert("⏱️ This job was re-queued because it was idle too long. You can accept it again from the dashboard.");
+            setCurrentView("dashboard");
+            return null;
+          }
+          return prevJobId;
+        });
+      }
     });
 
     newSocket.on("job_accepted", (data) => {
