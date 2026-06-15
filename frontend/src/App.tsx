@@ -157,7 +157,11 @@ function App() {
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id === data.jobId
-            ? { ...job, status: data.status, assignedWorkerId: data.assignedWorkerId }
+            ? {
+                ...job,
+                status: data.status,
+                assignedWorkerId: data.assignedWorkerId,
+              }
             : job,
         ),
       );
@@ -190,7 +194,12 @@ function App() {
       setJobs((prevJobs) =>
         prevJobs.map((job) =>
           job._id?.toString() === data.jobId?.toString()
-            ? { ...job, status: "completed", modelUrl: data.modelUrl, completedAt: data.completedAt }
+            ? {
+                ...job,
+                status: "completed",
+                modelUrl: data.modelUrl,
+                completedAt: data.completedAt,
+              }
             : job,
         ),
       );
@@ -267,13 +276,13 @@ function App() {
     const interval = setInterval(() => {
       const hasActiveJobs = jobs.some(
         (j) =>
-          j.status === 'pending' ||
-          j.status === 'assigned' ||
-          j.status === 'running' ||
-          j.status === 'processing'
+          j.status === "pending" ||
+          j.status === "assigned" ||
+          j.status === "running" ||
+          j.status === "processing",
       );
       if (hasActiveJobs) {
-        console.log('Polling: active jobs in flight, refreshing...');
+        console.log("Polling: active jobs in flight, refreshing...");
         fetchJobs();
       }
     }, 5000);
@@ -353,7 +362,13 @@ function App() {
 
   const handleJobSubmit = async (
     formData: FormData,
-  ): Promise<{ success: boolean; jobId?: string; message?: string; tierPrice?: number; isDraft?: boolean }> => {
+  ): Promise<{
+    success: boolean;
+    jobId?: string;
+    message?: string;
+    tierPrice?: number;
+    isDraft?: boolean;
+  }> => {
     try {
       const token = localStorage.getItem("dtrain_token");
       const response = await fetch(`${API_BASE}/api/jobs/create`, {
@@ -365,7 +380,12 @@ function App() {
       if (data.success) {
         await fetchJobs();
         // Stay on submission page to show the draft-saved confirmation screen
-        return { success: true, jobId: data.jobId, tierPrice: data.tierPrice, isDraft: true };
+        return {
+          success: true,
+          jobId: data.jobId,
+          tierPrice: data.tierPrice,
+          isDraft: true,
+        };
       } else {
         return { success: false, message: data.message };
       }
@@ -490,7 +510,9 @@ function App() {
           <Route
             path="/"
             element={
-              !isLoading ? (
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : !isLoading ? (
                 <motion.div
                   key="hero"
                   variants={pageVariants}
@@ -511,7 +533,9 @@ function App() {
           <Route
             path="/signin"
             element={
-              !isLoading ? (
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : !isLoading ? (
                 <motion.div
                   key="signin"
                   variants={pageVariants}
@@ -532,7 +556,9 @@ function App() {
           <Route
             path="/signup"
             element={
-              !isLoading ? (
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : !isLoading ? (
                 <motion.div
                   key="signup"
                   variants={pageVariants}
