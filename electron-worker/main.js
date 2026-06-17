@@ -73,7 +73,7 @@ function createWindow() {
 
   mainWindow.setMenu(null);
   mainWindow.maximize();
-  mainWindow.loadFile(path.join(__dirname, "../worker-ui", "dist", "index.html"));
+  mainWindow.loadFile(path.join(__dirname, "dist", "index.html"));
   // DevTools only open with Ctrl+Shift+I (like Chrome) — not automatically
 }
 
