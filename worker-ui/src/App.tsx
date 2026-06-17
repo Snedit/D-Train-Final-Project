@@ -11,12 +11,14 @@ import JobDetail from "./components/JobDetail";
 import Documentation from "./components/Documentation";
 import type { Worker as WorkerType, Job } from "./types";
 import { API_BASE } from "./config";
+import DockerGate from "./components/DockerGate";
 
 const TOKEN_KEY = "dtrain_worker_token";
 const WORKER_KEY = "dtrain_worker";
 
 function App() {
   const [currentView, setCurrentView] = useState<
+    | "dockerCheck"
     | "hero"
     | "signin"
     | "signup"
@@ -25,7 +27,7 @@ function App() {
     | "runningJob"
     | "jobDetail"
     | "documentation"
-  >("hero");
+  >("dockerCheck");
 
   const [worker, setWorker] = useState<WorkerType | null>(null);
   const [currentJobId, setCurrentJobId] = useState<string | null>(null);
@@ -65,7 +67,9 @@ function App() {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ deviceId: w.deviceId }),
-            }).catch((err) => console.error("❌ Reconnect heartbeat failed:", err));
+            }).catch((err) =>
+              console.error("❌ Reconnect heartbeat failed:", err),
+            );
           }
         } catch {
           // ignore JSON parse errors from corrupted storage
@@ -87,14 +91,15 @@ function App() {
       // ─── Auto-redirect: job was re-queued while worker was on the detail page ───
       // The idle-timeout checker emits { status: "pending", reason: "worker_idle_timeout" }
       // If this worker is currently viewing that exact job, send them back to dashboard.
-      if (
-        data.reason === "worker_idle_timeout" &&
-        data.status === "pending"
-      ) {
+      if (data.reason === "worker_idle_timeout" && data.status === "pending") {
         setCurrentJobId((prevJobId) => {
           if (prevJobId && prevJobId === data.jobId?.toString()) {
-            console.log("⏱️ Job re-queued by idle timeout — redirecting to dashboard");
-            alert("⏱️ This job was re-queued because it was idle too long. You can accept it again from the dashboard.");
+            console.log(
+              "⏱️ Job re-queued by idle timeout — redirecting to dashboard",
+            );
+            alert(
+              "⏱️ This job was re-queued because it was idle too long. You can accept it again from the dashboard.",
+            );
             setCurrentView("dashboard");
             return null;
           }
@@ -140,7 +145,10 @@ function App() {
   useEffect(() => {
     if (socket && worker?.deviceId && socket.connected) {
       socket.emit("register_worker", { deviceId: worker.deviceId });
-      console.log("📋 Re-registered worker socket after worker state update:", worker.deviceId);
+      console.log(
+        "📋 Re-registered worker socket after worker state update:",
+        worker.deviceId,
+      );
     }
   }, [worker?.deviceId, socket]);
 
@@ -186,12 +194,11 @@ function App() {
         const parsedWorker: WorkerType = JSON.parse(savedWorker);
         setIsAuthenticated(true);
         setWorker(parsedWorker);
-        setCurrentView("dashboard");
       } catch {
         // corrupted storage — clear and start fresh
         localStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(WORKER_KEY);
-        localStorage.removeItem('dtrain_worker_user'); 
+        localStorage.removeItem("dtrain_worker_user");
       }
     }
   }, []);
@@ -268,7 +275,10 @@ function App() {
       if (!loginRes.ok) throw new Error(loginData.message || "Login failed");
 
       localStorage.setItem(TOKEN_KEY, loginData.token);
-      localStorage.setItem('dtrain_worker_user', JSON.stringify(loginData.user));
+      localStorage.setItem(
+        "dtrain_worker_user",
+        JSON.stringify(loginData.user),
+      );
       setIsAuthenticated(true);
       setIsLoading(true);
 
@@ -309,7 +319,10 @@ function App() {
 
       if (registerData.token) {
         localStorage.setItem(TOKEN_KEY, registerData.token);
-        localStorage.setItem('dtrain_worker_user', JSON.stringify(registerData.user)); 
+        localStorage.setItem(
+          "dtrain_worker_user",
+          JSON.stringify(registerData.user),
+        );
         setIsAuthenticated(true);
 
         const existingWorker = await checkExistingWorker(registerData.token);
@@ -355,7 +368,8 @@ function App() {
         const electronInfo = await (window as any).worker.getDeviceInfo();
         deviceInfo = {
           os: electronInfo.os || "Unknown OS",
-          cpu: electronInfo.cpu || `${navigator.hardwareConcurrency || 4} cores`,
+          cpu:
+            electronInfo.cpu || `${navigator.hardwareConcurrency || 4} cores`,
           ram: electronInfo.ram || `${(navigator as any).deviceMemory || 8}GB`,
           gpu: electronInfo.gpu || "Not detected",
         };
@@ -410,7 +424,10 @@ function App() {
         (window as any).worker &&
         typeof (window as any).worker.setDeviceId === "function"
       ) {
-        console.log("💾 Storing deviceId in Electron:", workerData.worker.deviceId);
+        console.log(
+          "💾 Storing deviceId in Electron:",
+          workerData.worker.deviceId,
+        );
         await (window as any).worker.setDeviceId(workerData.worker.deviceId);
       }
 
@@ -430,7 +447,7 @@ function App() {
     setWorker(null);
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(WORKER_KEY);
-    localStorage.removeItem('dtrain_worker_user'); 
+    localStorage.removeItem("dtrain_worker_user");
     setIsLoading(true);
     setTimeout(() => {
       setCurrentView("hero");
@@ -585,6 +602,27 @@ function App() {
                 ))}
               </motion.div>
             </div>
+          </motion.div>
+        )}
+
+        {!isLoading && currentView === "dockerCheck" && (
+          <motion.div
+            key="dockerCheck"
+            variants={pageVariants}
+            initial="initial"
+            animate="animate"
+            exit="exit"
+            transition={pageTransition}
+          >
+            <DockerGate
+              onDockerReady={() => {
+                if (isAuthenticated && worker) {
+                  setCurrentView("dashboard");
+                } else {
+                  setCurrentView("hero");
+                }
+              }}
+            />
           </motion.div>
         )}
 

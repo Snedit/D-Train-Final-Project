@@ -1,30 +1,36 @@
-import React from 'react';
-import { Zap, Shield, Globe, Database, Code } from 'lucide-react';
+import React from "react";
+import { Zap, Shield, Globe, Database, Code } from "lucide-react";
 
 interface HeroSectionProps {
   onGetStarted: () => void;
   onViewDocs: () => void; // FIX: was onDocumentation
 }
 
-const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) => {
+const HeroSection: React.FC<HeroSectionProps> = ({
+  onGetStarted,
+  onViewDocs,
+}) => {
   const features = [
     {
       icon: Globe,
       title: "Decentralized Training",
-      description: "Leverage distributed computing power from workers around the globe",
-      color: 'bg-[#FFD447]',
+      description:
+        "Leverage distributed computing power from workers around the globe",
+      color: "bg-[#FFD447]",
     },
     {
       icon: Shield,
       title: "Secure Execution",
-      description: "Your code runs in isolated Docker containers with full security",
-      color: 'bg-[#FF76B8]',
+      description:
+        "Your code runs in isolated Docker containers with full security",
+      color: "bg-[#FF76B8]",
     },
     {
       icon: Zap,
       title: "Real-time Monitoring",
-      description: "Watch your training progress with live metrics and terminal output",
-      color: 'bg-[#7CF2D0]',
+      description:
+        "Watch your training progress with live metrics and terminal output",
+      color: "bg-[#7CF2D0]",
     },
   ];
 
@@ -37,31 +43,31 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
           className="absolute inset-0 rounded-[32px] border-[3px] border-slate-900 shadow-[12px_12px_0_0_rgba(15,23,42,1)] bg-[#FFFDF8]"
           style={{
             backgroundImage:
-              'linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)',
-            backgroundSize: '26px 26px',
+              "linear-gradient(to right, rgba(15,23,42,0.05) 1px, transparent 1px), linear-gradient(to bottom, rgba(15,23,42,0.05) 1px, transparent 1px)",
+            backgroundSize: "26px 26px",
           }}
         />
 
         {/* Memphis / playful shapes */}
         <div
           className="absolute -top-6 -left-6 w-28 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#7BC8FF]"
-          style={{ animation: 'float 5s ease-in-out infinite' }}
+          style={{ animation: "float 5s ease-in-out infinite" }}
         />
         <div
           className="absolute -bottom-10 left-10 w-24 h-24 rounded-3xl border-[3px] border-slate-900 bg-[#FF76B8] flex items-center justify-center"
-          style={{ animation: 'wiggle 6s ease-in-out infinite' }}
+          style={{ animation: "wiggle 6s ease-in-out infinite" }}
         >
           <Code className="w-8 h-8 text-slate-900" />
         </div>
         <div
           className="absolute -top-8 right-4 w-24 h-24 rounded-full border-[3px] border-slate-900 bg-[#FFD447] flex items-center justify-center"
-          style={{ animation: 'pulse 4s ease-in-out infinite' }}
+          style={{ animation: "pulse 4s ease-in-out infinite" }}
         >
           <Database className="w-7 h-7 text-slate-900" />
         </div>
         <div
           className="absolute bottom-4 -right-10 w-32 h-16 rounded-[999px] border-[3px] border-slate-900 bg-[#7CF2D0]"
-          style={{ animation: 'slideHorizontal 5s ease-in-out infinite' }}
+          style={{ animation: "slideHorizontal 5s ease-in-out infinite" }}
         />
 
         {/* Main content card */}
@@ -69,11 +75,15 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
           {/* Top nav */}
           <nav
             className="flex items-center justify-between mb-10"
-            style={{ animation: 'slideDown 0.6s ease-out' }}
+            style={{ animation: "slideDown 0.6s ease-out" }}
           >
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-[14px] bg-blue-400 border-[3px] border-slate-900 flex items-center justify-center shadow-[4px_4px_0_0_rgba(15,23,42,1)]">
-                <img src="/logo.png" alt="DTrain Logo" className="w-8 h-8 object-contain" />
+                <img
+                  src="/logo.png"
+                  alt="DTrain Logo"
+                  className="w-8 h-8 object-contain"
+                />
               </div>
               <span className="text-2xl font-extrabold bg-blue-400 bg-clip-text text-transparent">
                 DTrain
@@ -96,7 +106,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
               <div>
                 <h1
                   className="text-4xl md:text-5xl lg:text-6xl font-extrabold leading-[1.3] pb-2"
-                  style={{ animation: 'slideUp 0.7s ease-out 0.2s both' }}
+                  style={{ animation: "slideUp 0.7s ease-out 0.2s both" }}
                 >
                   <span className="bg-slate-900 bg-clip-text text-transparent">
                     Decentralized
@@ -109,17 +119,17 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
 
                 <p
                   className="mt-4 text-sm md:text-base text-slate-700 max-w-xl"
-                  style={{ animation: 'slideUp 0.7s ease-out 0.35s both' }}
+                  style={{ animation: "slideUp 0.7s ease-out 0.35s both" }}
                 >
-                  Train your machine learning models using distributed computing power.
-                  Upload your Python code, let workers around the world handle the heavy lifting,
-                  and monitor everything in real-time.
+                  Train your machine learning models using distributed computing
+                  power. Upload your Python code, let workers around the world
+                  handle the heavy lifting, and monitor everything in real-time.
                 </p>
               </div>
 
               <div
                 className="flex flex-col sm:flex-row items-start sm:items-center gap-4"
-                style={{ animation: 'slideUp 0.6s ease-out 0.45s both' }}
+                style={{ animation: "slideUp 0.6s ease-out 0.45s both" }}
               >
                 <button
                   onClick={onGetStarted}
@@ -127,13 +137,34 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
                 >
                   <span>Get Started</span>
                 </button>
+                <a
+                  href="/DownloadExe/DTrain Worker Setup 1.0.0.exe"
+                  download
+                  className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-[16px] border-[3px] border-slate-900 bg-[#FFD447] text-slate-900 text-sm md:text-base font-extrabold shadow-[6px_6px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[8px_8px_0_0_rgba(15,23,42,1)] active:translate-y-0 active:shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  <span>Download Worker App</span>
+                </a>
               </div>
             </div>
 
             {/* Right: fake UI card */}
             <div
               className="relative"
-              style={{ animation: 'slideLeft 0.7s ease-out 0.25s both' }}
+              style={{ animation: "slideLeft 0.7s ease-out 0.25s both" }}
             >
               <div className="absolute -top-4 -left-4 w-full h-full rounded-[22px] border-[3px] border-slate-900 bg-[#7BC8FF] opacity-90" />
               <div className="relative rounded-[22px] border-[3px] border-slate-900 bg-white p-4 md:p-5 shadow-[8px_8px_0_0_rgba(15,23,42,1)]">
@@ -150,28 +181,56 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
 
                 <div className="grid grid-cols-1 gap-4">
                   <div className="rounded-[14px] border-[2px] border-slate-900 bg-slate-900 text-[11px] font-mono p-3 h-28 overflow-hidden">
-                    <p className="text-[#E0E7FF]">$ python train.py --epochs 40 --lr 3e-4</p>
-                    <p className="mt-1 text-[#E0E7FF]">[worker-12] epoch 3/40 • loss: 0.431</p>
-                    <p className="text-[#E0E7FF]">[worker-88] epoch 3/40 • loss: 0.438</p>
-                    <p className="text-[#E0E7FF]">[scheduler] rebalancing jobs across 37 nodes…</p>
-                    <p className="text-[#4ADE80] mt-1">✓ checkpoint saved: s3://dtrain/run-421</p>
+                    <p className="text-[#E0E7FF]">
+                      $ python train.py --epochs 40 --lr 3e-4
+                    </p>
+                    <p className="mt-1 text-[#E0E7FF]">
+                      [worker-12] epoch 3/40 • loss: 0.431
+                    </p>
+                    <p className="text-[#E0E7FF]">
+                      [worker-88] epoch 3/40 • loss: 0.438
+                    </p>
+                    <p className="text-[#E0E7FF]">
+                      [scheduler] rebalancing jobs across 37 nodes…
+                    </p>
+                    <p className="text-[#4ADE80] mt-1">
+                      ✓ checkpoint saved: s3://dtrain/run-421
+                    </p>
                   </div>
 
                   <div className="grid grid-cols-3 gap-3 text-[11px]">
                     <div className="rounded-[12px] border-[2px] border-slate-900 bg-[#FFE66D] p-2">
-                      <div className="font-semibold text-slate-900 mb-1">GPU hours</div>
-                      <div className="text-2xl font-extrabold leading-none text-slate-900">312</div>
-                      <div className="mt-1 text-slate-900">pooled from 58 workers</div>
+                      <div className="font-semibold text-slate-900 mb-1">
+                        GPU hours
+                      </div>
+                      <div className="text-2xl font-extrabold leading-none text-slate-900">
+                        312
+                      </div>
+                      <div className="mt-1 text-slate-900">
+                        pooled from 58 workers
+                      </div>
                     </div>
                     <div className="rounded-[12px] border-[2px] border-slate-900 bg-[#7CF2D0] p-2">
-                      <div className="font-semibold text-slate-900 mb-1">Speed-up</div>
-                      <div className="text-2xl font-extrabold leading-none text-slate-900">×9.4</div>
-                      <div className="mt-1 text-slate-900">vs local machine</div>
+                      <div className="font-semibold text-slate-900 mb-1">
+                        Speed-up
+                      </div>
+                      <div className="text-2xl font-extrabold leading-none text-slate-900">
+                        ×9.4
+                      </div>
+                      <div className="mt-1 text-slate-900">
+                        vs local machine
+                      </div>
                     </div>
                     <div className="rounded-[12px] border-[2px] border-slate-900 bg-[#FFB4D3] p-2">
-                      <div className="font-semibold text-slate-900 mb-1">Cost</div>
-                      <div className="text-2xl font-extrabold leading-none text-slate-900">-63%</div>
-                      <div className="mt-1 text-slate-900">vs managed cloud</div>
+                      <div className="font-semibold text-slate-900 mb-1">
+                        Cost
+                      </div>
+                      <div className="text-2xl font-extrabold leading-none text-slate-900">
+                        -63%
+                      </div>
+                      <div className="mt-1 text-slate-900">
+                        vs managed cloud
+                      </div>
                     </div>
                   </div>
 
@@ -181,8 +240,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
                         +
                       </span>
                       <div>
-                        <div className="font-semibold text-slate-900">New worker joined</div>
-                        <div className="text-slate-700">Amsterdam • A100 • 4x faster than median</div>
+                        <div className="font-semibold text-slate-900">
+                          New worker joined
+                        </div>
+                        <div className="text-slate-700">
+                          Amsterdam • A100 • 4x faster than median
+                        </div>
                       </div>
                     </div>
                     <span className="px-2 py-1 text-[10px] rounded-full border-[2px] border-slate-900 bg-white font-semibold text-slate-900">
@@ -197,21 +260,27 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
           {/* Features Grid */}
           <div
             className="grid md:grid-cols-3 gap-5 mb-10"
-            style={{ animation: 'slideUp 0.7s ease-out 0.5s both' }}
+            style={{ animation: "slideUp 0.7s ease-out 0.5s both" }}
           >
             {features.map((feature, index) => (
               <div
                 key={feature.title}
                 className={`relative rounded-[18px] border-[3px] border-slate-900 ${feature.color} p-4 shadow-[5px_5px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-1 hover:shadow-[7px_7px_0_0_rgba(15,23,42,1)]`}
-                style={{ animation: `fadeIn 0.6s ease-out ${0.6 + index * 0.15}s both` }}
+                style={{
+                  animation: `fadeIn 0.6s ease-out ${0.6 + index * 0.15}s both`,
+                }}
               >
                 <div className="flex items-start gap-3">
                   <div className="w-9 h-9 rounded-[12px] bg-white border-[2px] border-slate-900 flex items-center justify-center flex-shrink-0">
                     <feature.icon className="w-5 h-5 text-slate-900" />
                   </div>
                   <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 mb-1">{feature.title}</h3>
-                    <p className="text-xs text-slate-900 font-medium leading-snug">{feature.description}</p>
+                    <h3 className="text-sm font-extrabold text-slate-900 mb-1">
+                      {feature.title}
+                    </h3>
+                    <p className="text-xs text-slate-900 font-medium leading-snug">
+                      {feature.description}
+                    </p>
                   </div>
                 </div>
               </div>
@@ -221,16 +290,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({ onGetStarted, onViewDocs }) =
           {/* Stats */}
           <div
             className="grid grid-cols-3 gap-8 max-w-2xl mx-auto pt-6 border-t-[2px] border-dashed border-slate-900"
-            style={{ animation: 'slideUp 0.8s ease-out 0.65s both' }}
+            style={{ animation: "slideUp 0.8s ease-out 0.65s both" }}
           >
             {[
-              { value: '24/7', label: 'Available Workers' },
-              { value: '∞', label: 'Scalability' },
-              { value: '100%', label: 'Open Source' },
+              { value: "24/7", label: "Available Workers" },
+              { value: "∞", label: "Scalability" },
+              { value: "100%", label: "Open Source" },
             ].map((stat) => (
               <div key={stat.label} className="text-center">
                 <div className="rounded-[16px] border-[3px] border-slate-900 bg-white px-4 py-3 shadow-[4px_4px_0_0_rgba(15,23,42,1)] transition-all hover:-translate-y-0.5 hover:shadow-[6px_6px_0_0_rgba(15,23,42,1)]">
-                  <div className="text-3xl font-extrabold text-blue-500 mb-2">{stat.value}</div>
+                  <div className="text-3xl font-extrabold text-blue-500 mb-2">
+                    {stat.value}
+                  </div>
                   <div className="text-sm text-slate-700">{stat.label}</div>
                 </div>
               </div>

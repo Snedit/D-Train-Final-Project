@@ -48,5 +48,11 @@ contextBridge.exposeInMainWorld("worker", {
   // ✅ Remove metrics listener
   offMetrics: () => {
     ipcRenderer.removeAllListeners('job-metrics');
-  }
+  },
+
+  // ✅ Docker status check
+  checkDocker: () => ipcRenderer.invoke("check-docker"),
+
+  // ✅ Launch Docker Desktop
+  launchDocker: () => ipcRenderer.invoke("launch-docker"),
 });
