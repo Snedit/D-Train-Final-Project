@@ -13,6 +13,7 @@ import {
   Server,
   AlertCircle,
 } from "lucide-react";
+import { API_BASE } from "../config";
 
 interface Job {
   _id: string;
@@ -88,7 +89,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
       console.log('🔍 Fetching job details for:', id, 'with workerId:', workerId);
       
       const response = await fetch(
-        `http://localhost:5000/api/worker/job/${id}/details?deviceId=${workerId}`,
+        `${API_BASE}/api/worker/job/${id}/details?deviceId=${workerId}`,
         {
           headers: {
             'Content-Type': 'application/json'
@@ -133,7 +134,7 @@ const JobDetail: React.FC<JobDetailProps> = ({
     try {
       console.log('📤 Sending accept request with deviceId:', workerId);
       
-      const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
+      const response = await fetch(`${API_BASE}/api/worker/accept-job`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

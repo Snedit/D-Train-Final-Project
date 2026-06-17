@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowUpRight, CheckCircle, XCircle, Banknote, Info, X } from 'lucide-react';
+import { API_BASE as ROOT_URL } from '../config';
 
 interface PayoutRequestProps {
   walletBalance: number;
@@ -9,7 +10,7 @@ interface PayoutRequestProps {
   onClose: () => void;
 }
 
-const API_BASE = 'http://localhost:5000/api/payment';
+const API_BASE = `${ROOT_URL}/api/payment`;
 
 const PayoutRequest: React.FC<PayoutRequestProps> = ({
   walletBalance,

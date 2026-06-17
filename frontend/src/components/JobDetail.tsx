@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Job } from '../types';
 import { Socket } from 'socket.io-client';
 import { XAxis, YAxis, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { API_BASE } from "../config";
 
 interface JobDetailProps {
   job: Job;
@@ -91,7 +92,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
       try {
         setIsLoadingLogs(true);
         const token = localStorage.getItem('dtrain_token');
-        const res = await fetch(`http://localhost:5000/api/jobs/${job._id}/logs`, {
+        const res = await fetch(`${API_BASE}/api/jobs/${job._id}/logs`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -114,7 +115,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     (async () => {
       try {
         const token = localStorage.getItem('dtrain_token');
-        const res = await fetch(`http://localhost:5000/api/jobs/${job._id}/results`, {
+        const res = await fetch(`${API_BASE}/api/jobs/${job._id}/results`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) { const d = await res.json(); if (d.modelUrl) setModelUrl(d.modelUrl); }
@@ -128,7 +129,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
     (async () => {
       try {
         const token = localStorage.getItem('dtrain_token');
-        const logsRes = await fetch(`http://localhost:5000/api/jobs/${job._id}/logs`, {
+        const logsRes = await fetch(`${API_BASE}/api/jobs/${job._id}/logs`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         let finalDuration = (job.pricing as any)?.durationSeconds ?? 0;
@@ -139,7 +140,7 @@ const JobDetail: React.FC<JobDetailProps> = ({ job, onBack, socket }) => {
         }
         if (finalDuration > 0) setLiveElapsed(finalDuration);
 
-        const billRes = await fetch(`http://localhost:5000/api/jobs/${job._id}/bill`, {
+        const billRes = await fetch(`${API_BASE}/api/jobs/${job._id}/bill`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         let points: LiveMetric[] = [];

@@ -10,8 +10,8 @@ import RunningJobs from "./components/RunningJobs";
 import JobDetail from "./components/JobDetail";
 import Documentation from "./components/Documentation";
 import type { Worker as WorkerType, Job } from "./types";
+import { API_BASE } from "./config";
 
-const API_BASE = "http://localhost:5000";
 const TOKEN_KEY = "dtrain_worker_token";
 const WORKER_KEY = "dtrain_worker";
 
@@ -38,7 +38,7 @@ function App() {
   useEffect(() => {
     console.log("🔌 Initializing Worker Socket.IO connection...");
 
-    const newSocket = io(API_BASE, {
+    const newSocket = io(API_BASE || undefined, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,

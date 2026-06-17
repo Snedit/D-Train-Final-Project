@@ -1,4 +1,3 @@
-// electron-worker/main.js - FIXED: Use Lucide-style symbols instead of emojis
 const { app, BrowserWindow, ipcMain, globalShortcut, dialog } = require("electron");
 const path = require("path");
 const fs = require("fs");
@@ -7,6 +6,15 @@ const { spawn, exec } = require("child_process");
 const os = require("os");
 const fetch = require('node-fetch');
 const FormData = require('form-data');
+
+require('dotenv').config({
+  path: app.isPackaged
+    ? path.join(process.resourcesPath, '.env')
+    : path.join(__dirname, '.env')
+});
+
+const API_BASE = process.env.API_BASE || "http://localhost:5000";
+
 
 let REGISTERED_DEVICE_ID = null;
 let mainWindow = null; // module-level so docker stats can access it
@@ -35,7 +43,7 @@ const icons = {
 
 const streamLogToBackend = async (jobId, deviceId, logLine) => {
   try {
-    await fetch('http://localhost:5000/api/worker/push-log', {
+    await fetch(`${API_BASE}/api/worker/push-log`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -193,7 +201,7 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
   // ✅ Notify backend that training is actually starting NOW
   // This triggers the cost clock on the user's side
   try {
-    await fetch(`http://localhost:5000/api/worker/start-job`, {
+    await fetch(`${API_BASE}/api/worker/start-job`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId, deviceId }),
@@ -221,7 +229,7 @@ ipcMain.handle("run-test-job", async (event, jobId, passedDeviceId) => {
     await sendLog(`${icons.robot} Using Worker ID: ${deviceId}\n`);
 
     const jobResponse = await fetch(
-      `http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
+      `${API_BASE}/api/worker/job/${jobId}/details?deviceId=${deviceId}`,
       {
         headers: {
           'Content-Type': 'application/json'
@@ -391,7 +399,7 @@ CMD ["python", "${mainFileName}"]
     if (outputFiles.length === 0) {
       await sendLog(`\n${icons.warning} No output files generated\n`);
 
-      await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
+      await fetch(`${API_BASE}/api/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -437,7 +445,7 @@ CMD ["python", "${mainFileName}"]
     formData.append('logs', JSON.stringify(collectedLogs));
     formData.append('outputZip', fs.createReadStream(outputZipPath));
 
-    const uploadResponse = await fetch(`http://localhost:5000/api/jobs/${jobId}/complete`, {
+    const uploadResponse = await fetch(`${API_BASE}/api/jobs/${jobId}/complete`, {
       method: 'POST',
       body: formData
     });
@@ -480,7 +488,7 @@ CMD ["python", "${mainFileName}"]
     await sendLog(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
 
     try {
-      await fetch(`http://localhost:5000/api/jobs/${jobId}/fail`, {
+      await fetch(`${API_BASE}/api/jobs/${jobId}/fail`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -517,7 +525,7 @@ ipcMain.handle("fetch-available-jobs", async () => {
     }
 
     const response = await fetch(
-      `http://localhost:5000/api/worker/available-jobs?deviceId=${deviceId}`,
+      `${API_BASE}/api/worker/available-jobs?deviceId=${deviceId}`,
       {
         headers: { 'Content-Type': 'application/json' }
       }
@@ -547,7 +555,7 @@ ipcMain.handle("accept-job", async (event, jobId) => {
       throw new Error('No deviceId set');
     }
 
-    const response = await fetch(`http://localhost:5000/api/worker/accept-job`, {
+    const response = await fetch(`${API_BASE}/api/worker/accept-job`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ jobId, deviceId })

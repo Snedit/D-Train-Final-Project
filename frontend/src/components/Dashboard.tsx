@@ -19,6 +19,7 @@ import {
 import { Job, Worker } from "../types";
 import ProfileDropdown from "./ProfileDropdown";
 import SettingsModal from "./SettingsModal";
+import { API_BASE } from "../config";
 
 interface DashboardProps {
   onJobSelect: (job: Job) => void;
@@ -62,7 +63,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     try {
       const token = localStorage.getItem("dtrain_token");
       const res = await fetch(
-        `http://localhost:5000/api/jobs/${job._id}/publish`,
+        `${API_BASE}/api/jobs/${job._id}/publish`,
         {
           method: "POST",
           headers: {
@@ -136,7 +137,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       try {
         const token = localStorage.getItem("dtrain_token");
         const response = await fetch(
-          "http://localhost:5000/api/payment/wallet/balance",
+          `${API_BASE}/api/payment/wallet/balance`,
           {
             headers: { Authorization: `Bearer ${token}` },
           },
@@ -543,7 +544,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       const token =
                                         localStorage.getItem("dtrain_token");
                                       const res = await fetch(
-                                        `http://localhost:5000/api/jobs/${job._id}`,
+                                        `${API_BASE}/api/jobs/${job._id}`,
                                         {
                                           method: "DELETE",
                                           headers: {
@@ -688,7 +689,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                       const token =
                                         localStorage.getItem("dtrain_token");
                                       const response = await fetch(
-                                        `http://localhost:5000/api/jobs/${job._id}`,
+                                        `${API_BASE}/api/jobs/${job._id}`,
                                         {
                                           method: "DELETE",
                                           headers: {

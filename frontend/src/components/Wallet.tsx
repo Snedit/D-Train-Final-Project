@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Wallet as WalletIcon, CreditCard, History, TrendingUp, CheckCircle, XCircle, X, Lock } from 'lucide-react';
 import { loadStripe } from '@stripe/stripe-js';
 import { EmbeddedCheckoutProvider, EmbeddedCheckout } from '@stripe/react-stripe-js';
+import { API_BASE as ROOT_URL } from '../config';
 
 interface Transaction {
   id: string;
@@ -20,7 +21,7 @@ interface WalletProps {
 // All tier values — shown as quick-select buttons so user can top up the exact amount needed
 const TIER_QUICK_SELECT = [50, 100, 150, 200, 300, 400, 500];
 
-const API_BASE = 'http://localhost:5000/api/payment';
+const API_BASE = `${ROOT_URL}/api/payment`;
 
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
 

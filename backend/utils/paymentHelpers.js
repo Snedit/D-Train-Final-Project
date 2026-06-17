@@ -322,10 +322,34 @@ export const creditWorkerWallet = async (workerId, workerAmount, jobId) => {
 
 export const addFundsToWallet = async (userId, amount, stripeSessionId) => {
   try {
+    // ── Idempotency guard ─────────────────────────────────────────────
+    // Stripe can deliver the same "checkout.session.completed" webhook
+    // event more than once (their retry policy), and our own
+    // /stripe/verify route can ALSO fire for the same session right
+    // after checkout. Without this check, both code paths would call
+    // addFundsToWallet and credit the wallet twice for one payment.
+    // We treat "a completed transaction already exists for this
+    // session" as a no-op success, not an error.
+    const existing = await Transaction.findOne({
+      "metadata.stripeSessionId": stripeSessionId,
+      status: "completed",
+    });
+    if (existing) {
+      const user = await User.findById(userId);
+      return {
+        success: true,
+        alreadyProcessed: true,
+        transaction: existing,
+        newBalance: user?.walletBalance ?? null,
+      };
+    }
+
     const user = await User.findById(userId);
     if (!user) return { success: false, error: "User not found" };
+
     user.walletBalance = parseFloat((user.walletBalance + amount).toFixed(2));
     await user.save();
+
     let transaction = await Transaction.findOneAndUpdate(
       { "metadata.stripeSessionId": stripeSessionId, status: "pending" },
       { status: "completed", description: `Wallet top-up of ₹${amount.toFixed(2)}` },
@@ -338,11 +362,13 @@ export const addFundsToWallet = async (userId, amount, stripeSessionId) => {
         metadata: { stripeSessionId },
       });
     }
+
     return { success: true, transaction, newBalance: user.walletBalance };
   } catch (error) {
     return { success: false, error: error.message };
   }
 };
+
 
 export const getElapsedSeconds = (startTime) =>
   Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);

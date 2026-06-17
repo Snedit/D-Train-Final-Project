@@ -19,6 +19,7 @@ import type { Worker, Wallet as WalletType, Transaction } from "../types";
 import WalletCard from "./WalletCard";
 import PayoutRequest from "./PayoutRequest";
 import ProfileDropdown from "./ProfileDropdown";
+import { API_BASE } from "../config";
 
 interface WorkerDashboardProps {
   worker: Worker | null;
@@ -163,7 +164,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
       }
 
       const response = await fetch(
-        `http://localhost:5000/api/worker/available-jobs?deviceId=${worker.deviceId}`,
+        `${API_BASE}/api/worker/available-jobs?deviceId=${worker.deviceId}`,
         { headers: { "Content-Type": "application/json" } },
       );
 
@@ -203,7 +204,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
       }
 
       const earningsRes = await fetch(
-        "http://localhost:5000/api/worker/earnings",
+        `${API_BASE}/api/worker/earnings`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -232,7 +233,7 @@ const WorkerDashboard: React.FC<WorkerDashboardProps> = ({
       const token = localStorage.getItem("dtrain_worker_token");
       if (!token) return;
 
-      const walletRes = await fetch("http://localhost:5000/api/worker/wallet", {
+      const walletRes = await fetch(`${API_BASE}/api/worker/wallet`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 

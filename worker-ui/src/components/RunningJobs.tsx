@@ -8,6 +8,7 @@ import {
   Smartphone, Bot, Clock, IndianRupee
 } from 'lucide-react';
 import type { Job } from '../types';
+import { API_BASE } from "../config";
 
 interface RunningJobsProps {
   jobId: string;
@@ -92,7 +93,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
     if (!w?.onMetrics) return;
     w.onMetrics(async (data: { cpu: number; memory: number; timestamp: string }) => {
       try {
-        await fetch('http://localhost:5000/api/worker/metrics', {
+        await fetch(`${API_BASE}/api/worker/metrics`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -110,7 +111,7 @@ const RunningJobs: React.FC<RunningJobsProps> = ({ jobId, workerId, onJobComplet
   // ── Fetch job details (get tier pricing) ─────────────────────────
   useEffect(() => {
     scrollToBottom();
-    fetch(`http://localhost:5000/api/worker/job/${jobId}/details?deviceId=${workerId}`, {
+    fetch(`${API_BASE}/api/worker/job/${jobId}/details?deviceId=${workerId}`, {
       headers: { 'Content-Type': 'application/json' },
     })
       .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.json(); })

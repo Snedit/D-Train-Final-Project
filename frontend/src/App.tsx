@@ -20,8 +20,7 @@ import Documentation from "./components/Documentation";
 import Wallet from "./components/Wallet";
 import { Job, Worker } from "./types";
 import { io, Socket } from "socket.io-client";
-
-const API_BASE = "http://localhost:5000";
+import { API_BASE } from "./config";
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -129,7 +128,7 @@ function App() {
     }
 
     console.log("🔌 Initializing Socket.IO connection...");
-    const newSocket = io(API_BASE, {
+    const newSocket = io(API_BASE || undefined, {
       transports: ["websocket", "polling"],
       reconnection: true,
       reconnectionDelay: 1000,

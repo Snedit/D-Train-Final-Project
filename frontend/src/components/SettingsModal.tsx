@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Mail, Trash2, Save, AlertTriangle, CheckCircle } from 'lucide-react';
+import { API_BASE } from '../config';
 
 interface SettingsModalProps {
   userName: string;
@@ -11,8 +12,6 @@ interface SettingsModalProps {
   onSignOut: () => void;
   onProfileUpdated: (name: string, email: string) => void;
 }
-
-const API_BASE = 'http://localhost:5000';
 
 const SettingsModal: React.FC<SettingsModalProps> = ({
   userName,
