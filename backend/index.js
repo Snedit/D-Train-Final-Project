@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import mongoose from "mongoose";
 import http from "http";
 import { Server } from "socket.io";
+import path from "path";
+import { fileURLToPath } from "url";
 
 import UserRouter from "./routes/UserRoutes.js";
 import WorkerRouter from "./routes/WorkerRoutes.js";
@@ -15,6 +17,10 @@ import { getElapsedSeconds } from "./utils/paymentHelpers.js";
 import morgan from "morgan";
 
 dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const frontendDist = path.join(__dirname, "../frontend/dist");
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -128,15 +134,16 @@ app.use("/api/user", UserRouter);
 app.use("/api/worker", WorkerRouter);
 app.use("/api/jobs", JobRouter);
 app.use("/api/payment", PaymentRouter);
-
-// Alias so App.tsx fetchWalletBalance (GET /api/user/wallet) resolves correctly
 app.use("/api/user", PaymentRouter);
 
+/* ---------- serve the built React app (same-origin deployment) ---------- */
+app.use(express.static(frontendDist));
+
 /* ---------- health check ---------- */
-app.get("/", (req, res) => {
+app.get("/api/health", (req, res) => {
   res.json({
     status: "running",
-    message: "ML Distributed Compute Backend",
+    message: "DTrain Backend Running Smoothly",
     socketConnections: io.engine.clientsCount,
     timestamp: new Date().toISOString()
   });
@@ -144,7 +151,14 @@ app.get("/", (req, res) => {
 
 /* ---------- 404 handler ---------- */
 app.use((req, res) => {
-  res.status(404).json({ message: "Route not found", path: req.path });
+  // Genuine API typos still get a clean JSON 404...
+  if (req.path.startsWith("/api") || req.path.startsWith("/socket.io")) {
+     return res.status(404).json({ message: "Route not found", path: req.path });
+   }
+   // ...anything else (e.g. /dashboard, /jobs/abc123) is a client-side
+   // React Router path, not a real server route, so hand it the SPA shell
+   // and let React Router take over in the browser.
+  res.sendFile(path.join(frontendDist, "index.html"));
 });
 
 /* ---------- error handler ---------- */
