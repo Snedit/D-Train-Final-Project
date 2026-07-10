@@ -119,6 +119,68 @@ const VideoPlayer: React.FC<{ src: string }> = ({ src }) => {
   );
 };
 
+// ─── Smart link for GitHub asset URLs that lack a file extension ────────────
+// GitHub "user-attachments/assets/<uuid>" links (e.g. a demo video pasted
+// into a README as `[Demo Video](https://github.com/user-attachments/assets/...)`)
+// don't carry a .mp4/.webm suffix, so isVideoSrc() can't detect them and they
+// fall through to a plain text link. This tries to play the link as a video;
+// if the asset genuinely isn't a video, it falls back to a normal clickable
+// link so nothing else breaks.
+const SmartAssetLink: React.FC<{ href: string; children: React.ReactNode }> = ({ href, children }) => {
+  const [videoFailed, setVideoFailed] = React.useState(false);
+  const [loaded, setLoaded] = React.useState(false);
+
+  if (videoFailed) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={{
+          display: 'inline',
+          color: '#1d4ed8',
+          fontWeight: 700,
+          textDecoration: 'none',
+          borderBottom: '2.5px solid #1d4ed8',
+          paddingBottom: '1px',
+        }}
+      >
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <div className="my-6 rounded-[16px] border-[3px] border-slate-900 overflow-hidden shadow-[6px_6px_0_0_rgba(15,23,42,1)] bg-slate-100 relative min-h-[200px]">
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-100 z-10">
+          <div className="text-center">
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+              className="w-16 h-16 mx-auto mb-3 rounded-[12px] border-[3px] border-slate-900 bg-blue-400 shadow-[4px_4px_0_0_rgba(15,23,42,1)]"
+            />
+            <p className="text-sm font-bold text-slate-700">Loading video…</p>
+          </div>
+        </div>
+      )}
+      <video
+        src={href}
+        controls
+        className="w-full h-auto relative z-0"
+        preload="metadata"
+        onLoadedData={() => setLoaded(true)}
+        onError={() => setVideoFailed(true)}
+        style={{ opacity: loaded ? 1 : 0, transition: 'opacity 0.3s ease-in-out' }}
+      >
+        Your browser does not support the video tag.
+      </video>
+    </div>
+  );
+};
+
+const GITHUB_ASSET_LINK_RE = /github\.com\/user-attachments\/assets\//;
+
 // ─── Context to track if we're inside a table cell ───────────────────────────
 const TableCellContext = React.createContext(false);
 
@@ -252,6 +314,15 @@ const Documentation: React.FC<DocumentationProps> = ({ onBack }) => {
       );
       const hasImg = childArray.some(child => React.isValidElement(child));
       const isImageOnly = hasNoText && hasImg;
+
+      // Plain-text links to GitHub user-attachments assets (e.g. a demo video
+      // pasted directly as a markdown link) often lack a file extension, so
+      // isVideoSrc() misses them. Only intercept text links here — image-wrapped
+      // links (isImageOnly, e.g. clickable badges) and every other link/domain
+      // are left completely untouched.
+      if (href && !isImageOnly && GITHUB_ASSET_LINK_RE.test(href)) {
+        return <SmartAssetLink href={getMediaUrl(href)}>{children}</SmartAssetLink>;
+      }
 
       if (isImageOnly) {
         return (
