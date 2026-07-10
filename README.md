@@ -30,8 +30,9 @@
 
 ## <img width="22" height="22" alt="clapperboard" src="https://github.com/user-attachments/assets/03f2ce2a-92fb-49b9-add3-1846319254eb" align="absmiddle"/> Demo
  
-[DTrain Demo Video](https://your-demo-video-url-here.mp4)
- 
+[DTrain Demo Video](https://github.com/user-attachments/assets/0ca2d74e-0d8f-4af0-b241-5805055daec3)
+
+
 > 📽️ *Replace the URL above with your actual video link (GitHub upload, Google Drive, or YouTube). GitHub supports direct .mp4 embeds in READMEs.*
 
 ---
